@@ -645,7 +645,7 @@ const Print = {
         .hdr-logo-ar{font-size:9.5pt;font-weight:700;color:#1a6b5a;letter-spacing:.06em;margin-bottom:1pt}
         .hdr-logo-en{font-size:7pt;color:#555;letter-spacing:.09em}
         
-        .form-title-wrap{display:flex;align-items:center;margin:4pt 14pt 4pt;gap:10pt}
+        .form-title-wrap{display:flex;align-items:center;margin:4pt 14pt 10pt;gap:10pt}
         .ftlines{flex:1;display:flex;flex-direction:column;gap:4pt}
         .ftlines span{display:block;height:0;border-top:1px solid #bbb}
         .form-title-box{border:1.5px solid #1a6b5a;border-radius:18pt;padding:6pt 28pt;font-size:13pt;font-weight:900;color:#111;white-space:nowrap}
@@ -654,7 +654,7 @@ const Print = {
         .ifield{position:relative;border:1.5px solid #2e9e85;border-radius:8pt;padding:12pt 12pt 8pt}
         .ifield-lbl{position:absolute;top:-7.5pt;right:12pt;background:#fff;padding:0 5pt;font-size:8pt;font-weight:700;color:#2e9e85;white-space:nowrap}
         .ifield-val{font-size:11pt;font-weight:700;text-align:center}
-        .sec{position:relative;border:1.5px solid #2e9e85;border-radius:8pt;margin:0 14pt 12pt;padding:14pt 12pt 10pt}
+        .sec{position:relative;border:1.5px solid #2e9e85;border-radius:8pt;margin:0 14pt 15pt;padding:14pt 12pt 10pt}
         .sec-lbl{position:absolute;top:-7.5pt;right:12pt;background:#fff;padding:0 5pt;font-size:8.5pt;font-weight:700;color:#2e9e85;white-space:nowrap}
         .sec-val{font-size:11pt;font-weight:700;min-height:32pt;line-height:2}
         .sec-val.center{text-align:center}
@@ -669,7 +669,7 @@ const Print = {
         .sig-name{font-size:10pt;font-weight:700;margin-bottom:20pt;min-height:16pt}
         .sig-line{border-top:1.5px solid #1a6b5a;margin-bottom:4pt}
         .sig-lbl{font-size:8pt;color:#666}
-        .foot{margin-top:auto;border-top:2px solid #1a6b5a;padding:4pt 16pt;display:flex;justify-content:space-between;font-size:7.5pt;color:#666}
+        .foot{border-top:2px solid #1a6b5a;padding:4pt 16pt;display:flex;justify-content:space-between;font-size:7.5pt;color:#666;margin-top:25pt}
         .no-print{text-align:center;padding:10pt;background:#f3f4f6;border-radius:6pt;margin:10pt}
         .no-print button{padding:8pt 24pt;background:#1a6b5a;color:white;border:none;border-radius:5pt;font-size:12pt;cursor:pointer;font-family:inherit;font-weight:700}
         @media print{
@@ -728,15 +728,13 @@ const Print = {
           ${reasonsHtml}
         </div>
       </div>
-      <div style="flex:1;display:grid;grid-template-rows:1fr 1fr;min-height:0;gap:0">
-      <div class="sec" style="min-height:0;overflow:visible;margin-bottom:6pt">
+      <div class="sec" style="overflow:visible;margin-bottom:15pt;min-height:150pt">
         <span class="sec-lbl">ملاحظات ${_T.theTch} :</span>
         <div class="sec-val light">${notes||'&nbsp;'}</div>
       </div>
-      <div class="sec" style="padding-bottom:14pt;min-height:0;display:flex;flex-direction:column">
+      <div class="sec" style="overflow:visible;margin-bottom:8pt">
         <span class="sec-lbl">الإجراء المتخذ من قِبل ${refTo} :</span>
-        <div class="sec-val" style="flex:1">
-          <div class="wline"></div>
+        <div class="sec-val">
           <div class="wline"></div>
           <div class="wline"></div>
           <div class="wline"></div>
@@ -747,7 +745,7 @@ const Print = {
           <div class="wline"></div>
         </div>
       </div>
-      </div>
+      <div style="height:20pt"></div>
       </div>
       <div class="sigs">
         <div class="sig">
@@ -1591,7 +1589,7 @@ const Pages = {
   },
 
   _diceAnswer(stuId, classId, correct) {
-    this.incBehavior(stuId, correct ? 'correct' : 'disruptive', classId);
+    if (correct) this.incBehavior(stuId, 'correct', classId);
     correct ? Sound.correct() : Sound.wrong();
 
     // avatar flash
@@ -3350,6 +3348,7 @@ const Pages = {
   async settings() {
     const t = DB.teacher() || {};
     const fsIdx = FontSize._sizes.indexOf(FontSize.current());
+    const sett = DB.settings();
 
     const _students   = DB.get('students');
     const _classes    = DB.get('classes');
@@ -3379,6 +3378,36 @@ const Pages = {
       </div>
       <div class="settings-grid">
         ${subHtml}
+
+        <div class="settings-card">
+          <div class="settings-card-hdr"><i class="fas fa-bell"></i> إشعارات الحصص</div>
+          <div class="settings-row">
+            <div><div style="font-weight:600">إشعار بداية الحصة</div><div style="font-size:.82rem;color:var(--gray-500)">تنبيه عند بدء كل حصة في جدولك</div></div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="notif-start" ${sett.notifyStart?'checked':''} onchange="Notify.toggle('notifyStart',this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div><div style="font-weight:600">إشعار قرب نهاية الحصة</div><div style="font-size:.82rem;color:var(--gray-500)">تنبيه قبل انتهاء الحصة بدقائق</div></div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="notif-end" ${sett.notifyEnd?'checked':''} onchange="Notify.toggle('notifyEnd',this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row" id="notif-before-row" style="${sett.notifyEnd?'':'opacity:.4;pointer-events:none'}">
+            <div><div style="font-weight:600">التنبيه قبل النهاية بـ</div></div>
+            <div style="display:flex;align-items:center;gap:.4rem">
+              <input type="number" min="1" max="20" value="${sett.notifyEndBefore??5}"
+                style="width:52px;padding:.3rem .4rem;border:1.5px solid var(--border);border-radius:8px;text-align:center;font-family:inherit"
+                onchange="const s=DB.settings();s.notifyEndBefore=+this.value;DB.saveSettings(s);document.getElementById('notif-before-row').style.opacity=''">
+              <span style="font-size:.85rem;color:var(--gray-500)">دقيقة</span>
+            </div>
+          </div>
+          <div style="font-size:.75rem;color:var(--gray-400);margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--gray-100)">
+            <i class="fas fa-info-circle"></i> يجب إبقاء المتصفح مفتوحاً لاستقبال الإشعارات
+          </div>
+        </div>
 
         <div class="settings-card">
           <div class="settings-card-hdr"><i class="fas fa-text-height"></i> حجم الخط</div>
@@ -4034,78 +4063,6 @@ const FontSize = {
   init() { this.apply(this.current()); }
 };
 
-/* ==================== TIMER ==================== */
-const Timer = {
-  _interval: null,
-  _remaining: 0,
-  _total: 0,
-  _running: false,
-  _open: false,
-
-  toggle() {
-    this._open = !this._open;
-    document.getElementById('timer-panel')?.classList.toggle('hidden', !this._open);
-  },
-
-  set(seconds) {
-    this.pause();
-    this._remaining = seconds;
-    this._total = seconds;
-    this._render();
-  },
-
-  setCustom() {
-    const val = parseInt(document.getElementById('timer-custom-min')?.value);
-    if (!val || val < 1) return;
-    this.set(val * 60);
-  },
-
-  start() {
-    if (this._remaining <= 0) return;
-    if (this._running) return;
-    this._running = true;
-    this._interval = setInterval(() => {
-      this._remaining--;
-      this._render();
-      if (this._remaining <= 0) {
-        this.pause();
-        Sound.timerEnd();
-        Toast.show('⏰ انتهى الوقت!', 'warn');
-      }
-    }, 1000);
-    this._render();
-  },
-
-  pause() {
-    clearInterval(this._interval);
-    this._interval = null;
-    this._running = false;
-    this._render();
-  },
-
-  reset() {
-    this.pause();
-    this._remaining = this._total;
-    this._render();
-  },
-
-  _render() {
-    const display = document.getElementById('timer-display');
-    const bar     = document.getElementById('timer-bar');
-    if (!display) return;
-    const m = Math.floor(this._remaining / 60);
-    const s = this._remaining % 60;
-    display.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    const pct = this._total > 0 ? this._remaining / this._total : 1;
-    const color = pct <= 0.1 ? '#dc2626' : pct <= 0.25 ? '#f59e0b' : '#10b981';
-    display.style.color = color;
-    display.classList.toggle('timer-pulse', this._remaining <= 10 && this._remaining > 0 && this._running);
-    if (bar) { bar.style.width = (pct * 100) + '%'; bar.style.background = color; }
-    document.getElementById('timer-start-btn')?.classList.toggle('hidden', this._running);
-    document.getElementById('timer-pause-btn')?.classList.toggle('hidden', !this._running);
-  },
-};
-
 /* ==================== AI ASSISTANT ==================== */
 const AI = {
   _history: [],
@@ -4154,9 +4111,18 @@ const AI = {
       return `• ${cls.name}${cls.subject?' ('+cls.subject+')':''}: ${stus.length} طالب، غائب اليوم: ${absentToday}${warns.length?'، تحذيرات سلوك: '+warns.join('، '):''}`;
     }).join('\n');
 
-    return `أنت مساعد تربوي ذكي تساعد ${_T.theTch} ${teacher.teacherName||''} في مدرسة ${teacher.school||''}، مادته ${teacher.subject||''}.
+    const isFemTch = _T._f;
+    const tchRef   = isFemTch ? 'قامت المعلمة' : 'قام المعلم';
+
+    return `أنت مساعد تربوي ذكي تساعد ${_T.theTch} ${teacher.teacherName||''} في مدرسة ${teacher.school||''}، ${isFemTch?'مادتها':'مادته'} ${teacher.subject||''}.
 البيانات الحالية (${today}):
 ${classInfo || 'لا توجد فصول مسجّلة بعد.'}
+
+قواعد اللغة (مهم جداً):
+- ${_T.theTch} جنسها ${isFemTch?'أنثى':'ذكر'}. عند الإشارة لها استخدم: "${tchRef}..".
+- عند الكتابة عن طالب ذكر استخدم ضمائر المذكر: (مزاجه، تفاعله، حضوره، إحالته، سلوكه).
+- عند الكتابة عن طالبة أنثى استخدم ضمائر المؤنث: (مزاجها، تفاعلها، حضورها، إحالتها، سلوكها).
+- تحقق دائماً من جنس الطالب قبل استخدام الضمائر.
 أجب باللغة العربية بأسلوب مهني وودّي. الردود مختصرة ومفيدة.`;
   },
 
@@ -4237,4 +4203,91 @@ ${classInfo || 'لا توجد فصول مسجّلة بعد.'}
   },
 };
 
-document.addEventListener('DOMContentLoaded', () => { FontSize.init(); App.init(); });
+/* ==================== NOTIFICATIONS ==================== */
+const Notify = {
+  _interval: null,
+
+  async requestPermission() {
+    if (!('Notification' in window)) return false;
+    if (Notification.permission === 'granted') return true;
+    const res = await Notification.requestPermission();
+    return res === 'granted';
+  },
+
+  _fire(title, body) {
+    if (Notification.permission !== 'granted') return;
+    new Notification(title, { body, icon: 'icons/icon-192.png', lang: 'ar' });
+  },
+
+  _hhmm(str) {
+    const [h, m] = (str || '').split(':').map(Number);
+    return h * 60 + m;
+  },
+
+  _check() {
+    const s = DB.settings();
+    if (!s.notifyStart && !s.notifyEnd) return;
+    const now   = new Date();
+    const cur   = now.getHours() * 60 + now.getMinutes();
+    const today = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][now.getDay()];
+    const sched = DB.get('schedule').filter(x => x.day === today);
+    if (!sched.length) return;
+
+    const periods = s.periods || [];
+    const classes = DB.get('classes');
+
+    sched.forEach(entry => {
+      const period = periods.find(p => p.p === entry.period);
+      if (!period) return;
+      const cls = classes.find(c => c.id === entry.classId);
+      const name = cls ? `${cls.name}${entry.subject ? ' — ' + entry.subject : ''}` : 'حصة';
+
+      const startMin = this._hhmm(period.s);
+      const endMin   = this._hhmm(period.e);
+      const beforeMin = s.notifyEndBefore ?? 5;
+
+      if (s.notifyStart && cur === startMin) {
+        this._fire(`🔔 بداية الحصة`, `${name} — الفترة ${entry.period}`);
+      }
+      if (s.notifyEnd && cur === endMin - beforeMin) {
+        this._fire(`⏰ قرب انتهاء الحصة`, `${name} — تبقى ${beforeMin} دقائق`);
+      }
+    });
+  },
+
+  init() {
+    const s = DB.settings();
+    if (s.notifyStart || s.notifyEnd) {
+      this.requestPermission();
+      this._start();
+    }
+  },
+
+  _start() {
+    clearInterval(this._interval);
+    this._interval = setInterval(() => this._check(), 60000);
+  },
+
+  stop() {
+    clearInterval(this._interval);
+    this._interval = null;
+  },
+
+  async toggle(key, val) {
+    const s = DB.settings();
+    s[key] = val;
+    DB.saveSettings(s);
+    if ((s.notifyStart || s.notifyEnd) && val) {
+      const ok = await this.requestPermission();
+      if (!ok) {
+        Toast.show('يجب السماح بالإشعارات من إعدادات المتصفح', 'warn');
+        return;
+      }
+      this._start();
+    } else if (!s.notifyStart && !s.notifyEnd) {
+      this.stop();
+    }
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => { FontSize.init(); App.init(); Notify.init(); });

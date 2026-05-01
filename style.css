@@ -1034,8 +1034,18 @@ tr.stu-row-late   td { background: #fffbeb; }
 .dot-drop button.danger:hover { background: #fef2f2; }
 .dot-drop button i { width: 14px; text-align: center; opacity: .7; }
 
-/* ========== Timer ========== */
-.timer-topbar-btn {
+/* ========== Toggle Switch ========== */
+.toggle-switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+.toggle-switch input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; cursor:pointer; inset:0; background:#d1d5db; border-radius:24px; transition:.25s; }
+.toggle-slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.25s; }
+.toggle-switch input:checked + .toggle-slider { background:#0d9488; }
+.toggle-switch input:checked + .toggle-slider:before { transform:translateX(20px); }
+
+/* ========== Analytics ========== */
+.analytics-placeholder { display: none; }
+/* ========== Timer-removed ========== */
+.timer-topbar-btn-deleted {
   background: none;
   border: 1.5px solid var(--border);
   border-radius: 8px;
@@ -1165,10 +1175,7 @@ tr.stu-row-late   td { background: #fffbeb; }
   font-family: inherit;
   transition: opacity .15s;
 }
-.timer-ctrl-btn.green  { background: #10b981; color: #fff; }
-.timer-ctrl-btn.orange { background: #f59e0b; color: #fff; }
-.timer-ctrl-btn.gray   { background: #e5e7eb; color: #374151; }
-.timer-ctrl-btn:hover  { opacity: .85; }
+.timer-ctrl-btn-deleted { display:none; }
 
 /* ========== Analytics ========== */
 .analytics-grid {

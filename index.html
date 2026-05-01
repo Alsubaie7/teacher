@@ -7,6 +7,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563EB">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="منصة المعلم">
 </head>
 <body>
 
@@ -143,10 +147,7 @@
           <input type="text" id="search-input" class="search-input" placeholder="بحث عن طالب...">
           <div class="search-results hidden" id="search-results"></div>
         </div>
-        <button class="timer-topbar-btn" onclick="Timer.toggle()" title="مؤقت الأنشطة" id="timer-topbar-btn">
-          <i class="fas fa-stopwatch"></i>
-        </button>
-        <div class="font-size-ctrl">
+<div class="font-size-ctrl">
           <button onclick="FontSize.change(-1)" title="تصغير الخط" id="fs-down"><span>A</span><i class="fas fa-minus"></i></button>
           <button onclick="FontSize.change(1)"  title="تكبير الخط"  id="fs-up"><span>A</span><i class="fas fa-plus"></i></button>
         </div>
@@ -176,36 +177,7 @@
   <!-- Toast -->
   <div id="toasts"></div>
 
-  <!-- Timer Panel -->
-  <div id="timer-panel" class="timer-panel hidden">
-    <div class="timer-panel-hdr">
-      <div style="display:flex;align-items:center;gap:8px">
-        <i class="fas fa-stopwatch" style="color:#0d9488"></i>
-        <span>مؤقت الأنشطة</span>
-      </div>
-      <button onclick="Timer.toggle()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:1rem;padding:3px 6px;border-radius:5px"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="timer-presets">
-      <button onclick="Timer.set(5*60)">5 د</button>
-      <button onclick="Timer.set(10*60)">10 د</button>
-      <button onclick="Timer.set(15*60)">15 د</button>
-      <button onclick="Timer.set(20*60)">20 د</button>
-      <button onclick="Timer.set(30*60)">30 د</button>
-    </div>
-    <div class="timer-custom-row">
-      <input type="number" id="timer-custom-min" class="timer-custom-input" placeholder="دقائق" min="1" max="99">
-      <button onclick="Timer.setCustom()" class="timer-custom-btn">ضبط</button>
-    </div>
-    <div id="timer-display" class="timer-display">00:00</div>
-    <div class="timer-bar-wrap"><div id="timer-bar" class="timer-bar"></div></div>
-    <div class="timer-controls">
-      <button id="timer-start-btn" class="timer-ctrl-btn green" onclick="Timer.start()"><i class="fas fa-play"></i> شغّل</button>
-      <button id="timer-pause-btn" class="timer-ctrl-btn orange hidden" onclick="Timer.pause()"><i class="fas fa-pause"></i> إيقاف</button>
-      <button class="timer-ctrl-btn gray" onclick="Timer.reset()"><i class="fas fa-redo"></i> إعادة</button>
-    </div>
-  </div>
-
-  <!-- AI Assistant -->
+<!-- AI Assistant -->
   <div id="ai-fab" onclick="AI.toggle()" title="المساعد الذكي">
     <i class="fas fa-robot"></i>
   </div>
@@ -235,5 +207,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');</script>
 </body>
 </html>
