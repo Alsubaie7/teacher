@@ -28,6 +28,13 @@ self.addEventListener('fetch', e => {
   if (e.request.url.includes('supabase.co') || e.request.url.includes('pollinations.ai')) {
     return;
   }
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      caches.match('/teacher/index.html')
+        .then(cached => cached || fetch('/teacher/index.html'))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
