@@ -1,10 +1,10 @@
-const CACHE = 'teacher-platform-v1';
+const CACHE = 'teacher-platform-v2';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/app.js',
-  '/style.css',
-  '/manifest.json',
+  '/teacher/',
+  '/teacher/index.html',
+  '/teacher/app.js',
+  '/teacher/style.css',
+  '/teacher/manifest.json',
   'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
@@ -25,7 +25,6 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Supabase API — network only (لا نخزّن بيانات المستخدم)
   if (e.request.url.includes('supabase.co') || e.request.url.includes('pollinations.ai')) {
     return;
   }
@@ -38,7 +37,7 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
-      }).catch(() => caches.match('/index.html'));
+      }).catch(() => caches.match('/teacher/index.html'));
     })
   );
 });
