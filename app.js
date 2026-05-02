@@ -633,10 +633,11 @@ const Print = {
       <meta charset="UTF-8"><title>نموذج إحالة ${_T.stu}</title>
       <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
       <style>
+        @page{size:A4 portrait;margin:0}
         *{box-sizing:border-box;margin:0;padding:0}
-        html,body{width:210mm}
+        html,body{width:210mm;max-width:210mm}
         body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;color:#111;font-size:11pt;background:#fff;margin:0 auto}
-        .page{width:210mm;margin:0 auto}
+        .page{width:210mm;max-width:210mm;margin:0 auto}
         .page-body{display:block}
         .hdr{padding:8pt 14pt;display:flex;align-items:center;justify-content:space-between;background:#fff}
         .hdr-right{text-align:center;font-size:9pt;line-height:2;color:#111;font-weight:700}
