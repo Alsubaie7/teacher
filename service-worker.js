@@ -1,4 +1,4 @@
-const CACHE = 'teacher-platform-v2';
+const CACHE = 'teacher-platform-v3';
 const ASSETS = [
   '/teacher/',
   '/teacher/index.html',
@@ -30,21 +30,17 @@ self.addEventListener('fetch', e => {
   }
   if (e.request.mode === 'navigate') {
     e.respondWith(
-      caches.match('/teacher/index.html')
-        .then(cached => cached || fetch('/teacher/index.html'))
+      fetch('/teacher/index.html').catch(() => caches.match('/teacher/index.html'))
     );
     return;
   }
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res.ok && e.request.method === 'GET') {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => caches.match('/teacher/index.html'));
-    })
+    fetch(e.request).then(res => {
+      if (res.ok && e.request.method === 'GET') {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request))
   );
 });
