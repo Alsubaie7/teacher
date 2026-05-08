@@ -131,7 +131,10 @@ const DB = {
   set(key, val) {
     localStorage.setItem(this._k[key], JSON.stringify(val));
     _sb.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) _sb.from('user_data').upsert({ user_id: session.user.id, key, value: JSON.stringify(val), updated_at: new Date().toISOString() });
+      if (session?.user) _sb.from('user_data').upsert(
+        { user_id: session.user.id, key, value: JSON.stringify(val), updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,key' }
+      ).then(({ error }) => { if (error) console.error('Sync error:', key, error.message); });
     });
   },
   teacher() { return JSON.parse(localStorage.getItem(this._k.teacher) || 'null'); },
@@ -4390,10 +4393,27 @@ const SBAuth = {
       _sb.from('user_data').select('key,value').eq('user_id', userId),
       _sb.from('profiles').select('name,school,subject,gender').eq('id', userId).maybeSingle()
     ]);
-    if (rows) rows.forEach(r => { if (DB._k[r.key]) localStorage.setItem(DB._k[r.key], r.value); });
+    if (rows && rows.length) {
+      rows.forEach(r => { if (DB._k[r.key]) localStorage.setItem(DB._k[r.key], r.value); });
+    }
     if (profile) {
       const _existing = DB.teacher() || {};
       localStorage.setItem(DB._k.teacher, JSON.stringify({ ..._existing, ...profile }));
+    }
+  },
+
+  async syncToCloud(userId) {
+    const keys = Object.keys(DB._k).filter(k => k !== 'teacher');
+    const rows = [];
+    for (const k of keys) {
+      const val = localStorage.getItem(DB._k[k]);
+      if (val && val !== '[]' && val !== '{}' && val !== 'null') {
+        rows.push({ user_id: userId, key: k, value: val, updated_at: new Date().toISOString() });
+      }
+    }
+    if (rows.length) {
+      const { error } = await _sb.from('user_data').upsert(rows, { onConflict: 'user_id,key' });
+      if (error) console.error('Cloud sync error:', error.message);
     }
   },
 
@@ -4478,6 +4498,7 @@ const App = {
         return;
       }
       await SBAuth.loadUserData(session.user.id);
+      SBAuth.syncToCloud(session.user.id);
       const teacher = DB.teacher();
       if (teacher) { this.start(teacher); return; }
     }
@@ -4523,6 +4544,7 @@ const App = {
         } else {
           const loginData = await SBAuth.signIn(email, pwd);
           await SBAuth.checkSubscription(loginData.user.id, loginData.user.email);
+          SBAuth.syncToCloud(loginData.user.id);
           this.start(DB.teacher() || { name: email, school: '', subject: '' });
         }
       } catch (err) {
