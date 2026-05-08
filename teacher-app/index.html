@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصة المعلم | Teacher Platform</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#006738">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="منصة المعلم">
+</head>
+<body>
+
+  <!-- Setup Screen -->
+  <div id="setup-screen" class="setup-overlay">
+    <div class="setup-card">
+      <div class="setup-logo"><i class="fas fa-chalkboard-teacher"></i></div>
+      <h1>منصة المعلم</h1>
+      <p class="setup-sub">Teacher Platform — نظام إدارة الفصل الدراسي</p>
+      <form id="setup-form" data-mode="login">
+        <div class="auth-tabs">
+          <button type="button" class="auth-tab active" onclick="App.switchAuthMode('login')"><i class="fas fa-sign-in-alt"></i> دخول</button>
+          <button type="button" class="auth-tab" onclick="App.switchAuthMode('signup')"><i class="fas fa-user-plus"></i> حساب جديد</button>
+        </div>
+        <div id="signup-fields" class="hidden">
+          <div class="form-group">
+            <label><i class="fas fa-venus-mars"></i> أنت</label>
+            <div style="display:flex;gap:1rem;margin-top:.4rem">
+              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+                <input type="radio" name="setup-gender" value="male" checked> معلم
+              </label>
+              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+                <input type="radio" name="setup-gender" value="female"> معلمة
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-user-tie"></i> الاسم</label>
+            <input type="text" id="setup-teacher" placeholder="أدخل اسمك الكريم">
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-school"></i> اسم المدرسة</label>
+            <input type="text" id="setup-school" placeholder="اسم المدرسة">
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-book"></i> المادة الرئيسية</label>
+            <input type="text" id="setup-subject" placeholder="الرياضيات، العلوم، اللغة العربية...">
+          </div>
+        </div>
+        <div class="form-group">
+          <label><i class="fas fa-envelope"></i> البريد الإلكتروني</label>
+          <input type="email" id="setup-email" placeholder="example@email.com" required>
+        </div>
+        <div class="form-group">
+          <label><i class="fas fa-lock"></i> كلمة المرور</label>
+          <input type="password" id="setup-password" placeholder="••••••••" required minlength="6">
+        </div>
+        <div id="auth-error" class="auth-error hidden"></div>
+        <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-full btn-lg">
+          <i class="fas fa-sign-in-alt"></i> <span id="auth-btn-text">دخول</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="app hidden">
+
+    <!-- Smart Topbar -->
+    <header class="smart-topbar" id="smart-topbar">
+
+      <!-- Brand → home -->
+      <div class="st-brand" onclick="Router.go('dashboard')" title="الرئيسية">
+        <div class="st-logo-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+        <span class="st-brand-name">منصة المعلم</span>
+      </div>
+
+      <!-- Actions -->
+      <div class="st-actions">
+
+        <!-- Date/Time display (moved from center) -->
+        <div id="st-time-ctx" class="st-time-ctx"></div>
+
+        <!-- Command Palette Trigger -->
+        <button class="cmd-trigger-btn" onclick="CmdPalette.open()" title="بحث سريع (Ctrl+K)">
+          <i class="fas fa-search"></i>
+          <span class="cmd-trigger-label">بحث سريع</span>
+          <kbd class="cmd-trigger-kbd">⌘K</kbd>
+        </button>
+
+        <!-- Font Size -->
+        <div class="font-size-ctrl">
+          <button onclick="FontSize.change(-1)" title="تصغير الخط" id="fs-down"><span>A</span><i class="fas fa-minus"></i></button>
+          <button onclick="FontSize.change(1)"  title="تكبير الخط"  id="fs-up"><span>A</span><i class="fas fa-plus"></i></button>
+        </div>
+
+        <!-- live-class-badge removed (وضع الحصة moved to Hero Section) -->
+        <div id="live-class-badge" class="hidden"></div>
+
+        <!-- Dark Mode -->
+        <button id="dark-mode-btn" onclick="DarkMode.toggle()" class="st-icon-btn" title="الوضع الليلي">
+          <i class="fas fa-moon"></i>
+        </button>
+
+        <!-- AI Assistant -->
+        <button id="ai-fab" onclick="AI.toggle()" class="st-ai-btn" title="المساعد الذكي">
+          <i class="fas fa-robot"></i>
+        </button>
+
+        <!-- Teacher Avatar with dropdown -->
+        <div class="st-avatar-wrap" id="st-avatar-wrap">
+          <button class="st-avatar" id="st-avatar" onclick="this.closest('.st-avatar-wrap').classList.toggle('open')">
+            <i class="fas fa-user-tie"></i>
+          </button>
+          <div class="st-avatar-dropdown">
+            <div class="st-avatar-info">
+              <div class="st-avatar-name" id="sb-name">—</div>
+              <div class="st-avatar-school" id="sb-school">—</div>
+              <div class="st-avatar-email" id="sb-email">—</div>
+            </div>
+            <div class="st-avatar-divider"></div>
+            <button class="st-avatar-action" onclick="Router.go('settings');document.getElementById('st-avatar-wrap').classList.remove('open')">
+              <i class="fas fa-cog"></i> الإعدادات
+            </button>
+            <button class="st-avatar-action" onclick="Backup.export();document.getElementById('st-avatar-wrap').classList.remove('open')">
+              <i class="fas fa-download"></i> تصدير البيانات
+            </button>
+            <label class="st-avatar-action" style="cursor:pointer">
+              <i class="fas fa-upload"></i> استيراد بيانات
+              <input type="file" accept=".json" style="display:none" onchange="Backup.import(this)">
+            </label>
+            <div class="st-avatar-divider" id="admin-divider" style="display:none"></div>
+            <button id="admin-nav-btn" class="st-avatar-action" style="display:none;color:#7C3AED"
+              onclick="Router.go('admin');document.getElementById('st-avatar-wrap').classList.remove('open')">
+              <i class="fas fa-shield-alt" style="color:#7C3AED"></i> لوحة الإدارة
+            </button>
+            <div class="st-avatar-divider"></div>
+            <button class="st-avatar-action danger" onclick="App.logout()">
+              <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- Sub Navigation -->
+    <nav class="sub-nav" id="sub-nav">
+      <a class="sub-nav-link active" data-page="dashboard"  onclick="Router.go('dashboard')"> <i class="fas fa-th-large"></i><span>الرئيسية</span></a>
+      <a class="sub-nav-link" data-page="lessons"   onclick="Router.go('lessons')">  <i class="fas fa-calendar-alt"></i><span>الجدول</span></a>
+      <a class="sub-nav-link" data-page="classes"   onclick="Router.go('classes')">  <i class="fas fa-door-open"></i><span>الفصول</span></a>
+      <a class="sub-nav-link" data-page="analytics" onclick="Router.go('analytics')"><i class="fas fa-chart-bar"></i><span>التحليلات</span></a>
+      <a class="sub-nav-link" data-page="grades"    onclick="Router.go('grades')">   <i class="fas fa-star-half-alt"></i><span>الدرجات</span></a>
+      <a class="sub-nav-link" data-page="referrals" onclick="Router.go('referrals')"><i class="fas fa-file-medical-alt"></i><span>الإحالات</span></a>
+      <a class="sub-nav-link" data-page="admin" id="admin-subnav-link" style="display:none;color:#7C3AED" onclick="Router.go('admin')"><i class="fas fa-shield-alt"></i><span>الإدارة</span></a>
+    </nav>
+
+    <!-- App Body -->
+    <div class="app-body">
+      <div id="preview-banner" class="preview-banner hidden">
+        <i class="fas fa-eye"></i>
+        <span id="preview-banner-text">وضع المعاينة</span>
+        <button onclick="Pages._exitPreview()"><i class="fas fa-sign-out-alt"></i> خروج من المعاينة</button>
+      </div>
+      <main class="content" id="content"></main>
+    </div>
+
+  </div>
+
+  <!-- Command Palette -->
+  <div id="cmd-overlay" class="cmd-overlay hidden" onclick="CmdPalette.close()">
+    <div id="cmd-box" class="cmd-box" onclick="event.stopPropagation()">
+      <div class="cmd-search-row">
+        <i class="fas fa-search cmd-search-icon"></i>
+        <input type="text" id="cmd-input" class="cmd-input" placeholder="ابحث عن طالب، فصل، أو نفّذ أمراً...">
+        <kbd class="cmd-esc-key">ESC</kbd>
+      </div>
+      <div id="cmd-results" class="cmd-results"></div>
+    </div>
+  </div>
+
+  <!-- Lesson Mode Overlay -->
+  <div id="lesson-mode-overlay" class="hidden">
+    <div class="lm-header" id="lm-header">
+      <div class="lm-header-inner">
+        <div class="lm-header-info">
+          <span class="lm-period-badge" id="lm-period-badge">الحصة —</span>
+          <span class="lm-class-name" id="lm-class-name">—</span>
+          <span class="lm-subject-name" id="lm-subject-name"></span>
+        </div>
+        <div class="lm-header-actions">
+          <div class="lm-countdown" id="lm-countdown"></div>
+          <button onclick="Pages.diceRoll(LessonMode._classId)" class="lm-action-btn" title="اختيار عشوائي">
+            <i class="fas fa-dice"></i>
+          </button>
+          <button onclick="LessonMode.close()" class="lm-close-btn">
+            <i class="fas fa-compress-alt"></i> خروج
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="lm-body">
+      <div class="lm-tabs" id="lm-tabs">
+        <button class="lm-tab active" data-tab="combined" onclick="LessonMode._switchTab('combined')">
+          <i class="fas fa-clipboard-check"></i> الحضور والسلوك
+        </button>
+        <button class="lm-tab" data-tab="groups" onclick="LessonMode._switchTab('groups')">
+          <i class="fas fa-object-group"></i> المجموعات
+        </button>
+      </div>
+      <div class="lm-content" id="lm-content"></div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop hidden" id="modal-backdrop">
+    <div class="modal-box" id="modal-box">
+      <div class="modal-hdr">
+        <h3 id="modal-title">—</h3>
+        <button class="modal-x" onclick="Modal.close()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toasts"></div>
+
+  <!-- AI Assistant -->
+  <div id="ai-panel" class="ai-panel hidden">
+    <div class="ai-panel-hdr">
+      <div style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-robot" style="color:#7c3aed"></i>
+        <span>المساعد الذكي</span>
+        <span id="ai-status" class="ai-status"></span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="AI.clear()" title="محادثة جديدة" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:.85rem;padding:3px 6px;border-radius:5px" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'"><i class="fas fa-trash-alt"></i></button>
+        <button onclick="AI.toggle()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:1rem;padding:3px 6px;border-radius:5px" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+    <div class="ai-messages" id="ai-messages"></div>
+    <div class="ai-suggestions" id="ai-suggestions"></div>
+    <div class="ai-input-row">
+      <textarea id="ai-input" class="ai-input" placeholder="اسأل عن طلابك، الدرجات، السلوك..." rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();AI.send()}"></textarea>
+      <button class="ai-send-btn" onclick="AI.send()" id="ai-send-btn">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');</script>
+</body>
+</html>
