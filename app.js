@@ -4243,8 +4243,20 @@ const Pages = {
     const males   = teachers.filter(p => p.gender !== 'female').length;
     const females = teachers.filter(p => p.gender === 'female').length;
 
+    const pending  = teachers.filter(p => !p.approved && p.email !== _ADMIN_EMAIL);
+    const approved = teachers.filter(p => p.approved || p.email === _ADMIN_EMAIL);
+
     const rows = teachers.map((p, i) => {
       const pJson = JSON.stringify({ name: p.name||'', school: p.school||'', subject: p.subject||'', gender: p.gender||'male', email: p.email||'' }).replace(/"/g, '&quot;');
+      const isMe = p.email === _ADMIN_EMAIL;
+      const statusBadge = isMe
+        ? '<span class="badge" style="background:#059669;color:#fff">أدمن</span>'
+        : p.approved
+          ? '<span class="badge" style="background:#10b981;color:#fff">مفعّل</span>'
+          : '<span class="badge" style="background:#f59e0b;color:#fff">قيد المراجعة</span>';
+      const actions = isMe ? '' : p.approved
+        ? `<button class="btn btn-sm" style="background:#ef4444;color:#fff" onclick="Pages._setApproval('${p.id}',false)"><i class="fas fa-ban"></i> تعليق</button>`
+        : `<button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="Pages._setApproval('${p.id}',true)"><i class="fas fa-check"></i> تفعيل</button>`;
       return `
       <tr>
         <td>${i + 1}</td>
@@ -4253,8 +4265,12 @@ const Pages = {
         <td><span class="badge ${p.gender === 'female' ? 'purple' : 'blue'}">${p.gender === 'female' ? 'معلمة' : 'معلم'}</span></td>
         <td>${p.school || '—'}</td>
         <td>${p.subject || '—'}</td>
+        <td>${statusBadge}</td>
         <td style="font-size:.78rem;color:var(--gray-500)">${p.created_at ? new Date(p.created_at).toLocaleDateString('ar-SA') : '—'}</td>
-        <td><button class="btn btn-sm btn-outline" onclick='Pages._previewAs(${pJson})'><i class="fas fa-eye"></i> معاينة</button></td>
+        <td style="display:flex;gap:.3rem">
+          ${actions}
+          <button class="btn btn-sm btn-outline" onclick='Pages._previewAs(${pJson})'><i class="fas fa-eye"></i> معاينة</button>
+        </td>
       </tr>`;
     }).join('');
 
@@ -4275,6 +4291,10 @@ const Pages = {
         <div class="stat-card">
           <div class="stat-icon" style="background:#fce7f3;color:#db2777"><i class="fas fa-female"></i></div>
           <div class="stat-info"><div class="stat-val">${females}</div><div class="stat-lbl">معلمة</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#fef3c7;color:#d97706"><i class="fas fa-clock"></i></div>
+          <div class="stat-info"><div class="stat-val">${pending.length}</div><div class="stat-lbl">طلبات معلّقة</div></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon" style="background:${isPlatformOpen ? '#d1fae5' : '#fee2e2'};color:${isPlatformOpen ? '#059669' : '#dc2626'}">
@@ -4330,11 +4350,20 @@ const Pages = {
         ${teachers.length === 0
           ? `<div class="empty-state"><i class="fas fa-users fa-2x"></i><p>لا يوجد معلمون مسجلون بعد</p></div>`
           : `<div style="overflow-x:auto"><table class="data-table">
-              <thead><tr><th>#</th><th>الاسم</th><th>البريد الإلكتروني</th><th>الجنس</th><th>المدرسة</th><th>المادة</th><th>تاريخ الإنشاء</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>الاسم</th><th>البريد الإلكتروني</th><th>الجنس</th><th>المدرسة</th><th>المادة</th><th>الحالة</th><th>تاريخ الإنشاء</th><th></th></tr></thead>
               <tbody>${rows}</tbody>
             </table></div>`
         }
       </div>`;
+  },
+
+  async _setApproval(userId, approve) {
+    const action = approve ? 'تفعيل' : 'تعليق';
+    if (!confirm(`هل تريد ${action} هذا الحساب؟`)) return;
+    const { error } = await _sb.from('profiles').update({ approved: approve }).eq('id', userId);
+    if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
+    Toast.show(approve ? 'تم تفعيل الحساب بنجاح' : 'تم تعليق الحساب', approve ? 'success' : 'info');
+    Pages.admin();
   },
 
   async _adminSetPlatform(open) {
@@ -4374,7 +4403,12 @@ const SBAuth = {
     const { data, error } = await _sb.auth.signUp({ email, password });
     if (error) throw error;
     if (data.user) {
-      await _sb.from('profiles').upsert({ id: data.user.id, name, school, subject, gender, email: email.toLowerCase() });
+      const prevId = localStorage.getItem('tm_current_user');
+      if (prevId && prevId !== data.user.id) {
+        Object.values(DB._k).forEach(k => localStorage.removeItem(k));
+      }
+      localStorage.setItem('tm_current_user', data.user.id);
+      await _sb.from('profiles').upsert({ id: data.user.id, name, school, subject, gender, email: email.toLowerCase(), approved: false });
       localStorage.setItem(DB._k.teacher, JSON.stringify({ name, school, subject, gender }));
       localStorage.setItem('tm_user_email', email.toLowerCase());
     }
@@ -4384,9 +4418,14 @@ const SBAuth = {
   async signIn(email, password) {
     const { data, error } = await _sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    if (email !== _ADMIN_EMAIL) {
+    if (email.toLowerCase() !== _ADMIN_EMAIL) {
       const { data: platRow } = await _sb.from('user_data').select('value').eq('key','platform_open').maybeSingle();
       if (platRow?.value === '0') throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
+      const { data: prof } = await _sb.from('profiles').select('approved').eq('id', data.user.id).maybeSingle();
+      if (!prof || prof.approved !== true) {
+        await _sb.auth.signOut();
+        throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
+      }
     }
     const prevId = localStorage.getItem('tm_current_user');
     if (prevId && prevId !== data.user.id) {
@@ -4425,6 +4464,12 @@ const App = {
       localStorage.setItem('tm_user_email', session.user.email.toLowerCase());
       try {
         await SBAuth.checkSubscription(session.user.id, session.user.email);
+        if (session.user.email.toLowerCase() !== _ADMIN_EMAIL) {
+          const { data: prof } = await _sb.from('profiles').select('approved').eq('id', session.user.id).maybeSingle();
+          if (!prof || prof.approved !== true) {
+            throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
+          }
+        }
       } catch (err) {
         await SBAuth.signOut();
         document.getElementById('setup-screen').classList.remove('hidden');
@@ -4466,15 +4511,15 @@ const App = {
           const subject    = document.getElementById('setup-subject').value.trim();
           const gender     = document.querySelector('input[name="setup-gender"]:checked')?.value || 'male';
           if (!name || !school || !subject) throw new Error('يرجى تعبئة جميع الحقول');
-          const result = await SBAuth.signUp(email, pwd, name, school, subject, gender);
-          if (result.session) {
-            this.start(DB.teacher() || { name, school, subject });
-          } else {
-            Toast.show('تم إنشاء الحساب! يمكنك الدخول الآن', 'success');
-            this.switchAuthMode('login');
-            document.getElementById('setup-email').value = email;
-            document.getElementById('setup-password').value = '';
-          }
+          await SBAuth.signUp(email, pwd, name, school, subject, gender);
+          await _sb.auth.signOut();
+          Object.values(DB._k).forEach(k => localStorage.removeItem(k));
+          localStorage.removeItem('tm_current_user');
+          localStorage.removeItem('tm_user_email');
+          Toast.show('تم إنشاء الحساب بنجاح! سيتم تفعيله بعد موافقة الإدارة والدفع.', 'success');
+          this.switchAuthMode('login');
+          document.getElementById('setup-email').value = email;
+          document.getElementById('setup-password').value = '';
         } else {
           const loginData = await SBAuth.signIn(email, pwd);
           await SBAuth.checkSubscription(loginData.user.id, loginData.user.email);
