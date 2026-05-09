@@ -121,7 +121,8 @@ const DB = {
   _k: {
     teacher: 'tm_teacher', classes: 'tm_classes', students: 'tm_students',
     attendance: 'tm_attendance', grades: 'tm_grades', schedule: 'tm_schedule',
-    behavior: 'tm_behavior', comms: 'tm_comms', settings: 'tm_settings', groups: 'tm_groups'
+    behavior: 'tm_behavior', comms: 'tm_comms', settings: 'tm_settings', groups: 'tm_groups',
+    behaviorEvents: 'tm_bev', dismissedWarnings: 'tm_dw'
   },
   get(key) {
     const data = JSON.parse(localStorage.getItem(this._k[key]) || '[]');
@@ -1413,7 +1414,12 @@ const Pages = {
     const totalExpected = todayAtt.reduce((n,a) => n + a.records.length, 0);
     const attRate = totalExpected ? Math.round(totalPresent/totalExpected*100) : 0;
 
-    const allWarned = students.filter(s => _behWarn(s).length > 0);
+    // Weekly warnings: only students with negative behavior events in last 7 days
+    const sevenAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+    const recentEvts = DB.get('behaviorEvents').filter(e => e.date >= sevenAgo);
+    const recentIds  = new Set(recentEvts.map(e => e.studentId));
+    const dismissed  = new Set(DB.get('dismissedWarnings').filter(d => d.date >= sevenAgo).map(d => d.studentId));
+    const allWarned  = students.filter(s => recentIds.has(s.id) && !dismissed.has(s.id));
 
     const curPeriod = TimeAware.currentPeriod();
     const curSlot   = curPeriod ? DB.get('schedule').find(s => s.day===dayKey && s.period===curPeriod.p) : null;
@@ -1422,22 +1428,31 @@ const Pages = {
     const clsCards = classes.map(cls => this._xlWidget(cls, students, todayAtt, activeClsId)).join('');
 
     const warnSection = allWarned.length ? `
-      <div class="home-warn-card">
+      <div class="home-warn-card" id="home-warn-card">
         <div class="home-warn-hdr">
-          <h3><i class="fas fa-triangle-exclamation"></i> تحذيرات سلوكية — ${allWarned.length} ${_T.stu}</h3>
+          <h3><i class="fas fa-triangle-exclamation"></i> تحذيرات هذا الأسبوع — ${allWarned.length} ${_T.stu}</h3>
           <button class="hcc-btn hcc-btn-att" style="background:rgba(248,113,113,.1);color:#F87171;border-color:rgba(248,113,113,.25)" onclick="Router.go('referrals')"><i class="fas fa-file-medical-alt"></i> إحالات</button>
         </div>
         <div class="home-warn-list">
-          ${allWarned.slice(0,5).map(s => {
+          ${allWarned.slice(0,6).map(s => {
             const cls  = classes.find(c => c.id===s.classId);
-            const behs = _behWarn(s);
-            return `<div class="home-warn-item">
+            const evts = recentEvts.filter(e => e.studentId === s.id);
+            const behKeys = [...new Set(evts.map(e => e.key))];
+            const behs = behKeys.map(k => BEH_TYPES.find(b => b.key === k)).filter(Boolean);
+            return `<div class="home-warn-item" id="wi-${s.id}">
               <div class="home-warn-avatar">${s.name.charAt(0)}</div>
-              <div><div class="home-warn-name">${s.name}</div><div class="home-warn-cls">${cls?.name||'—'}</div></div>
+              <div style="flex:1;min-width:0">
+                <div class="home-warn-name">${s.name}</div>
+                <div class="home-warn-cls">${cls?.name||'—'}</div>
+              </div>
               <div class="home-warn-behs">${behs.map(b=>`<span title="${b.label}">${b.emoji}</span>`).join('')}</div>
+              <button onclick="Pages.dismissWarning('${s.id}')"
+                style="background:none;border:1px solid #D0D0D0;border-radius:6px;padding:3px 8px;
+                  font-size:.72rem;color:#888;cursor:pointer;white-space:nowrap;font-family:inherit;margin-right:.3rem"
+                title="تجاهل لأسبوع">تجاهل ✕</button>
             </div>`;
           }).join('')}
-          ${allWarned.length>5 ? `<div style="text-align:center;font-size:.78rem;color:var(--text-muted);padding:.3rem">و ${allWarned.length-5} ${_T.others}...</div>` : ''}
+          ${allWarned.length>6 ? `<div style="text-align:center;font-size:.78rem;color:var(--text-muted);padding:.3rem">و ${allWarned.length-6} ${_T.others}...</div>` : ''}
         </div>
       </div>` : '';
 
@@ -2793,10 +2808,17 @@ const Pages = {
       return { ...s, behaviors: behs };
     });
     DB.set('students', updated);
+    // log timestamped event for weekly warning filter
+    const bDef = BEH_TYPES.find(b => b.key === key);
+    if (bDef && !bDef.pos) {
+      const events = DB.get('behaviorEvents');
+      const cutoff = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      events.push({ studentId: stuId, key, classId: classId || '', date: new Date().toISOString().slice(0, 10) });
+      DB.set('behaviorEvents', events.filter(e => e.date >= cutoff));
+    }
     const stu = updated.find(s => s.id === stuId);
     const el = document.getElementById(`beh-${stuId}-${key}`);
     if (el) el.textContent = stu?.behaviors?.[key] || 0;
-    const bDef = BEH_TYPES.find(b => b.key === key);
     if (bDef?.warnAt && (stu?.behaviors?.[key] || 0) >= bDef.warnAt) {
       Toast.show(`⚠️ ${stu?.name}: وصل لـ ${stu.behaviors[key]} مرات "${bDef.label}" — يُنصح بالتحويل`, 'error');
       this.students({ classId });
@@ -2965,6 +2987,29 @@ const Pages = {
       this._xlRefreshRow(s.id, status);
     });
     this.saveAtt(Pages._attClassId, Pages._attDate, true);
+  },
+
+  dismissWarning(stuId) {
+    const sevenAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+    const list = DB.get('dismissedWarnings').filter(d => d.date >= sevenAgo);
+    list.push({ studentId: stuId, date: new Date().toISOString().slice(0, 10) });
+    DB.set('dismissedWarnings', list);
+    // remove row from UI without full re-render
+    const row = document.getElementById(`wi-${stuId}`);
+    if (row) {
+      row.style.transition = 'opacity .2s';
+      row.style.opacity = '0';
+      setTimeout(() => {
+        row.remove();
+        const card = document.getElementById('home-warn-card');
+        const remaining = card?.querySelectorAll('.home-warn-item');
+        if (card && (!remaining || remaining.length === 0)) card.remove();
+        else if (card) {
+          const h3 = card.querySelector('h3');
+          if (h3) h3.innerHTML = `<i class="fas fa-triangle-exclamation"></i> تحذيرات هذا الأسبوع — ${remaining.length} ${_T.stu}`;
+        }
+      }, 200);
+    }
   },
 
   saveAtt(clsId, date, silent = false) {
