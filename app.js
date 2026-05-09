@@ -989,7 +989,7 @@ const CmdPalette = {
       .slice(0,5)
       .map(c => ({
         label: c.name, sub: c.subject||'', icon:'fa-door-open', color:'blue',
-        action:()=>LessonMode.open(c.id), group:'فصول — فتح وضع الحصة'
+        action:()=>Router.go('classDetail',{classId:c.id,tab:'att'}), group:'فصول — الحضور والسلوك'
       }));
 
     const pageItems = pages.filter(p =>
@@ -1158,11 +1158,8 @@ const Pages = {
     const _activeHtml = (period, cls) => {
       const left = md(hm, period.e);
       const clsActions = cls ? `
-        <button class="hero-btn hero-btn-primary" onclick="LessonMode.open('${cls.id}')">
-          <i class="fas fa-chalkboard"></i> وضع الحصة
-        </button>
-        <button class="hero-btn hero-btn-outline" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
-          <i class="fas fa-clipboard-check"></i> الحضور
+        <button class="hero-btn hero-btn-primary" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
+          <i class="fas fa-clipboard-check"></i> الحضور والسلوك
         </button>
         <button class="hero-btn hero-btn-outline" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'groups'})">
           <i class="fas fa-object-group"></i> المجموعات
@@ -1390,14 +1387,14 @@ const Pages = {
         <button class="xl-action-btn xl-action-green" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
           <i class="fas fa-clipboard-check"></i> حضور
         </button>
-        <button class="xl-action-btn xl-action-blue" onclick="Router.go('grades',{classId:'${cls.id}'})">
-          <i class="fas fa-star"></i> درجات
-        </button>
         <button class="xl-action-btn xl-action-gray" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'groups'})">
           <i class="fas fa-object-group"></i> مجموعات
         </button>
-        <button class="xl-action-btn xl-action-lm" style="margin-right:auto" onclick="LessonMode.open('${cls.id}')">
-          <i class="fas fa-chalkboard"></i> حصة
+        <button class="xl-action-btn xl-action-blue" onclick="Router.go('grades',{classId:'${cls.id}'})">
+          <i class="fas fa-star"></i> درجات
+        </button>
+        <button class="xl-action-btn xl-action-gray" style="margin-right:auto" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'manage'})">
+          <i class="fas fa-cog"></i> إدارة
         </button>
       </div>
     </div>`;
@@ -1546,37 +1543,95 @@ const Pages = {
         </div>
         <div class="cd-tabs">
           <button class="cd-tab ${tab==='att'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'att',date:'${selDate}'})">
-            <i class="fas fa-clipboard-check"></i> الحضور
+            <i class="fas fa-clipboard-check"></i> الحضور والسلوك
           </button>
           <button class="cd-tab ${tab==='groups'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'groups'})">
             <i class="fas fa-object-group"></i> المجموعات
           </button>
-          <button class="cd-tab ${tab==='log'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'log'})">
-            <i class="fas fa-star-half-alt"></i> السلوك
+          <button class="cd-tab ${tab==='manage'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'manage'})">
+            <i class="fas fa-cog"></i> الإدارة
           </button>
         </div>
         <div class="cd-header-actions">
-          <button class="btn btn-sm btn-outline" onclick="LessonMode.open('${selId}')"><i class="fas fa-chalkboard"></i> حصة</button>
           <button class="btn btn-sm btn-outline" onclick="Pages.addClassModal('${selId}')"><i class="fas fa-edit"></i></button>
-          <button class="btn btn-sm btn-outline-danger" onclick="Pages.deleteClass('${selId}')"><i class="fas fa-trash"></i></button>
         </div>
       </div>`;
 
     let body = '';
-    if (tab === 'att')         body = this._cdAttBody(selId, list, map, selDate);
-    else if (tab === 'groups') body = this._cdGroupsBody(selId, saved);
-    else                       body = this._cdLogBody(selId, list);
+    if (tab === 'att')          body = this._cdAttBody(selId, list, map, selDate);
+    else if (tab === 'groups')  body = this._cdGroupsBody(selId, saved);
+    else                        body = this._cdManageBody(selId, list);
 
-    document.getElementById('content').innerHTML = header + body;
+    const content = document.getElementById('content');
+    content.innerHTML = header + body;
+    // att tab needs flex layout to fill height
+    content.style.display = tab === 'att' ? 'flex' : '';
+    content.style.flexDirection = tab === 'att' ? 'column' : '';
+    content.style.overflow = tab === 'att' ? 'hidden' : '';
   },
 
   _cdAttBody(selId, list, map, selDate) {
+    const cls = DB.get('classes').find(c => c.id === selId) || {};
+    const n = list.length;
+    const cfColors = {
+      present: { bg: '#E2EFDA', color: '#375623', border: '#A9D18E' },
+      late:    { bg: '#FCEACC', color: '#7A4F1C', border: '#F4B942' },
+      absent:  { bg: '#FCE4D6', color: '#9C0006', border: '#FF7676' },
+    };
+    const counts = { present: 0, late: 0, absent: 0 };
+    list.forEach(s => counts[map[s.id] || 'present']++);
+
+    if (!list.length) return `
+      <div class="cd-att-bar">
+        <button class="btn btn-sm btn-outline" onclick="Pages.bulkStudentsModal('${selId}')"><i class="fas fa-list"></i> إضافة جماعية</button>
+        <button class="btn btn-sm btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة ${_T.stu}</button>
+      </div>
+      <div class="empty-state"><div class="empty-icon"><i class="fas fa-user-plus"></i></div>
+        <h3>لا يوجد ${_T.theStus} في هذا الفصل</h3>
+        <button class="btn btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة ${_T.stu}</button>
+      </div>`;
+
     const rows = list.map((s, i) => {
-      const st    = map[s.id] || 'present';
-      const behs  = s.behaviors || {};
+      const st = map[s.id] || 'present';
+      const cf = cfColors[st];
       const warns = _behWarn(s);
-      const warnBadge = warns.length
-        ? `<span title="${warns.map(b=>b.label).join('، ')}" style="background:#fee2e2;color:#dc2626;border-radius:20px;padding:1px 7px;font-size:.7rem;font-weight:700;cursor:default"><i class="fas fa-triangle-exclamation"></i> تحذير</span>` : '';
+      const attBtns = ['present','late','absent'].map(key => {
+        const active = st === key;
+        const kc = cfColors[key];
+        const icon = key==='present'?'✓':key==='late'?'⏰':'✗';
+        return `<button id="ar-att-${s.id}-${key}"
+          onclick="Pages.setAtt('${s.id}','${key}','${selId}','${selDate}')"
+          style="width:26px;height:26px;border-radius:3px;font-size:.65rem;font-weight:900;
+            border:1.5px solid ${active?kc.border:'#C0C0C0'};
+            background:${active?kc.bg:'#fff'};color:${active?kc.color:'#aaa'};
+            cursor:pointer;transition:all .1s;font-family:inherit;padding:0">
+          ${icon}</button>`;
+      }).join('');
+      const behCells = BEH_TYPES.map(b => {
+        const val = s.behaviors?.[b.key] || 0;
+        return `<td class="xl-cell" style="text-align:center;padding:2px 4px;cursor:pointer;
+            background:${val>0?(b.pos?'#E2EFDA':'#FCE4D6'):'transparent'}"
+          onclick="Pages.incBehavior('${s.id}','${b.key}','${selId}')" title="${b.label}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+            <span style="font-size:.9rem;line-height:1">${b.emoji}</span>
+            <span id="beh-${s.id}-${b.key}" style="font-size:.6rem;font-weight:800;
+              color:${b.pos?'#375623':'#9C0006'}">${val||''}</span>
+          </div></td>`;
+      }).join('');
+      const warnCell = warns.length
+        ? `<td class="xl-cell" style="text-align:center;cursor:default" title="${warns.map(b=>b.label).join('، ')}"><span style="font-size:.75rem">⚠️</span></td>`
+        : `<td class="xl-cell"></td>`;
+      return `<tr id="ar-${s.id}" style="background:${cf.bg}">
+        <td class="xl-rownum">${i+2}</td>
+        <td class="xl-cell" style="font-weight:700;color:${cf.color};white-space:nowrap;cursor:pointer"
+          onclick="Pages.studentProfile('${s.id}')">${s.name}</td>
+        <td class="xl-cell" style="padding:3px 5px">
+          <div style="display:flex;gap:2px;align-items:center;justify-content:center">${attBtns}</div>
+        </td>
+        ${behCells}
+        ${warnCell}
+      </tr>`;
+    }).join('');
       const mkBadge = b => `
         <button onclick="Pages.incBehavior('${s.id}','${b.key}','${selId}')" title="${b.label}"
           style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;
@@ -1587,89 +1642,53 @@ const Pages = {
           ${_bIcon(b)}
           <span id="beh-${s.id}-${b.key}" style="font-size:.7rem;font-weight:800;color:${b.color};line-height:1">${behs[b.key]||0}</span>
         </button>`;
-      const posBadges = BEH_TYPES.filter(b=>b.pos).map(mkBadge).join('');
-      const negBadges = BEH_TYPES.filter(b=>!b.pos).map(mkBadge).join('');
-      const rowCls = st==='absent' ? 'stu-row-absent' : st==='late' ? 'stu-row-late' : '';
-      return `
-        <tr id="ar-${s.id}" class="${rowCls}">
-          <td style="text-align:center;width:36px">${i+1}</td>
-          <td>
-            <div style="display:flex;align-items:center;gap:8px">
-              <div class="student-avatar-sm" style="flex-shrink:0">${s.name.charAt(0)}</div>
-              <div><div style="font-weight:600">${s.name}</div>${warnBadge}</div>
-            </div>
-          </td>
-          <td style="width:80px">
-            <div class="att-v">
-              <button class="att-btn p ${st==='present'?'active':''}" onclick="Pages.setAtt('${s.id}','present','${selId}','${selDate}')"><i class="fas fa-check"></i> حاضر</button>
-              <button class="att-btn l ${st==='late'?'active':''}"    onclick="Pages.setAtt('${s.id}','late','${selId}','${selDate}')"><i class="fas fa-clock"></i> متأخر</button>
-              <button class="att-btn a ${st==='absent'?'active':''}"  onclick="Pages.setAtt('${s.id}','absent','${selId}','${selDate}')"><i class="fas fa-times"></i> غائب</button>
-            </div>
-          </td>
-          <td>
-            <div style="display:flex;flex-direction:column;gap:3px;align-items:center">
-              <div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center">${posBadges}</div>
-              <div style="width:100%;border-top:1px dashed #e5e7eb;margin:1px 0"></div>
-              <div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center">${negBadges}</div>
-            </div>
-          </td>
-          <td style="width:40px">
-            <div class="dot-menu" id="dm-${s.id}">
-              <button class="dot-btn" onclick="Pages._dotToggle('${s.id}',event)"><i class="fas fa-ellipsis-v"></i></button>
-              <div class="dot-drop hidden">
-                <button onclick="Pages.studentProfile('${s.id}');Pages._dotClose()"><i class="fas fa-user"></i> الملف</button>
-                <button onclick="Pages.editStudentModal('${s.id}');Pages._dotClose()"><i class="fas fa-edit"></i> تعديل</button>
-                <button onclick="Pages.transferStudentModal('${s.id}','${selId}');Pages._dotClose()"><i class="fas fa-exchange-alt"></i> نقل</button>
-                <button class="danger" onclick="Pages.deleteStudent('${s.id}','${selId}');Pages._dotClose()"><i class="fas fa-trash"></i> حذف</button>
-              </div>
-            </div>
-          </td>
-        </tr>`;
-    }).join('');
-
-    if (!list.length) return `
-      <div class="cd-att-bar">
-        <button class="btn btn-sm btn-outline" onclick="Pages.bulkStudentsModal('${selId}')"><i class="fas fa-list"></i> إضافة جماعية</button>
-        <button class="btn btn-sm btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة ${_T.stu}</button>
+    return `<div style="display:flex;flex-direction:column;height:100%;font-size:.8rem">
+      <div class="xl-titlebar" style="display:flex;align-items:center;gap:.5rem;padding:.45rem .8rem;flex-wrap:wrap;flex-shrink:0">
+        <div class="xl-title-icon">X</div>
+        <div class="xl-title-filename">حضور_${cls.name||'فصل'}.xlsx</div>
+        <input type="date" class="date-input" value="${selDate}" style="margin-right:.3rem;font-size:.75rem;padding:2px 6px"
+          onchange="Pages.classDetail({classId:'${selId}',tab:'att',date:this.value})">
+        <div style="margin-right:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+          <span id="ar-cnt-present" style="background:#E2EFDA;color:#375623;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #A9D18E">✓ ${counts.present} حاضر</span>
+          <span id="ar-cnt-late"    style="background:#FCEACC;color:#7A4F1C;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #F4B942">⏰ ${counts.late} متأخر</span>
+          <span id="ar-cnt-absent"  style="background:#FCE4D6;color:#9C0006;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #FF7676">✗ ${counts.absent} غائب</span>
+          <button onclick="Pages.markAll('present')" style="background:#fff;border:1px solid #C0C0C0;padding:3px 10px;border-radius:4px;font-size:.72rem;cursor:pointer;font-family:inherit"><i class="fas fa-check-double"></i> حضور الكل</button>
+          <button onclick="Pages.markAll('absent')" style="background:#fff;border:1px solid #C0C0C0;padding:3px 10px;border-radius:4px;font-size:.72rem;cursor:pointer;font-family:inherit"><i class="fas fa-times"></i> غياب الكل</button>
+          <button onclick="Pages.diceRoll('${selId}')" style="background:#fff;border:1px solid #C0C0C0;padding:3px 8px;border-radius:4px;font-size:.72rem;cursor:pointer;font-family:inherit"><i class="fas fa-dice"></i></button>
+          <button onclick="Print.attendance('${selId}','${selDate}')" style="background:#fff;border:1px solid #C0C0C0;padding:3px 8px;border-radius:4px;font-size:.72rem;cursor:pointer;font-family:inherit"><i class="fas fa-print"></i></button>
+        </div>
       </div>
-      <div class="empty-state">
-        <div class="empty-icon"><i class="fas fa-user-plus"></i></div>
-        <h3>لا يوجد ${_T.theStus} في هذا الفصل</h3>
-        <button class="btn btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة ${_T.stu}</button>
-      </div>`;
-
-    return `
-      <div class="cd-att-bar">
-        <input type="date" class="date-input" value="${selDate}" onchange="Pages.classDetail({classId:'${selId}',tab:'att',date:this.value})">
-        <button class="btn btn-sm btn-outline" onclick="Pages.diceRoll('${selId}')"><i class="fas fa-dice"></i> النرد</button>
-        <button class="btn btn-sm btn-outline" onclick="Pages.bulkStudentsModal('${selId}')"><i class="fas fa-list"></i> إضافة جماعية</button>
-        <button class="btn btn-sm btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة</button>
+      <div class="xl-formulabar" style="flex-shrink:0">
+        <div class="xl-fb-cellref">B${n+1}</div>
+        <div class="xl-fb-sep"></div>
+        <span class="xl-fb-fx">fx</span>
+        <div class="xl-fb-formula">=COUNTIF(B2:B${n+1},"حاضر")</div>
       </div>
-      <div class="section-card">
-        <div class="card-header" style="padding:.75rem 1.25rem">
-          <div id="att-summary">${this._attSummary(list, map)}</div>
-          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-            <button class="btn btn-sm btn-outline" onclick="Pages.markAll('present')"><i class="fas fa-check-double"></i> حضور الكل</button>
-            <button class="btn btn-sm btn-outline" onclick="Pages.markAll('absent')"><i class="fas fa-times"></i> غياب الكل</button>
-            <button class="btn btn-sm btn-outline" onclick="Print.attendance('${selId}','${selDate}')"><i class="fas fa-print"></i> طباعة كشف الحضور</button>
-          </div>
-        </div>
-        <div class="table-container">
-          <table class="data-table">
-            <thead><tr>
-              <th style="width:36px">#</th>
-              <th>الاسم</th>
-              <th style="width:80px;text-align:center">الحضور</th>
-              <th style="text-align:center">السلوك</th>
-              <th style="width:40px"></th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-        <div style="padding:.5rem 1.25rem;font-size:.78rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          <i class="fas fa-cloud"></i> يُحفظ تلقائياً عند كل تغيير
-        </div>
-      </div>`;
+      <div style="overflow:auto;flex:1">
+        <table class="xl-table" style="width:100%">
+          <thead>
+            <tr>
+              <td class="xl-col-hdr-cell corner"></td>
+              <td class="xl-col-hdr-cell">A</td>
+              <td class="xl-col-hdr-cell">B</td>
+              ${BEH_TYPES.map((_,i)=>`<td class="xl-col-hdr-cell">${String.fromCharCode(67+i)}</td>`).join('')}
+              <td class="xl-col-hdr-cell">K</td>
+            </tr>
+            <tr style="background:#F2F2F2">
+              <td class="xl-rownum">1</td>
+              <td class="xl-cell label">الاسم</td>
+              <td class="xl-cell label" style="text-align:center;font-size:.72rem">الحضور</td>
+              ${BEH_TYPES.map(b=>`<td class="xl-cell label" style="text-align:center;padding:2px 4px" title="${b.label}">${b.emoji}</td>`).join('')}
+              <td class="xl-cell label" style="text-align:center;font-size:.72rem">تنبيه</td>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="padding:.3rem .8rem;font-size:.72rem;color:#888;border-top:1px solid #E0E0E0;background:#FAFAFA;flex-shrink:0">
+        <i class="fas fa-cloud" style="color:#1D6F42"></i> يُحفظ تلقائياً عند كل تغيير
+      </div>
+    </div>`;
   },
 
   _cdGroupsBody(selId, saved) {
@@ -1691,61 +1710,61 @@ const Pages = {
       <div id="grp-container">${this._grpRender(selId)}</div>`;
   },
 
-  _cdLogBody(selId, list) {
-    if (!list.length) return `
-      <div class="empty-state">
-        <div class="empty-icon"><i class="fas fa-star-half-alt"></i></div>
-        <h3>لا يوجد ${_T.theStus} في هذا الفصل</h3>
-      </div>`;
-
-    const rows = list.map((s, i) => {
+  _cdManageBody(selId, list) {
+    const cls = DB.get('classes').find(c => c.id === selId) || {};
+    const stuRows = list.map((s, i) => {
       const behs = s.behaviors || {};
-      const warns = _behWarn(s);
       const posScore = BEH_TYPES.filter(b=>b.pos).reduce((n,b) => n + (behs[b.key]||0), 0);
       const negScore = BEH_TYPES.filter(b=>!b.pos).reduce((n,b) => n + (behs[b.key]||0), 0);
-      const warnBadge = warns.length
-        ? `<span style="background:#fee2e2;color:#dc2626;border-radius:20px;padding:1px 7px;font-size:.7rem;font-weight:700"><i class="fas fa-triangle-exclamation"></i> ${warns.length}</span>` : '';
-      const behIcons = BEH_TYPES.filter(b=>(behs[b.key]||0)>0).map(b =>
-        `<span title="${b.label}: ${behs[b.key]}">${b.emoji} <small style="font-weight:700">${behs[b.key]}</small></span>`
-      ).join(' ');
-      return `
-        <tr>
-          <td style="text-align:center;width:36px;color:var(--text-muted)">${i+1}</td>
-          <td>
-            <div style="display:flex;align-items:center;gap:8px">
-              <div class="student-avatar-sm" style="flex-shrink:0">${s.name.charAt(0)}</div>
-              <div><div style="font-weight:600">${s.name}</div>${warnBadge}</div>
+      const warns = _behWarn(s);
+      return `<tr>
+        <td style="text-align:center;width:32px;color:#888;font-size:.78rem">${i+1}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="student-avatar-sm" style="flex-shrink:0;background:${cls.color||'#3B82F6'}">${s.name.charAt(0)}</div>
+            <div>
+              <div style="font-weight:600;font-size:.85rem">${s.name}</div>
+              ${warns.length ? `<span style="background:#fee2e2;color:#dc2626;border-radius:20px;padding:1px 7px;font-size:.68rem;font-weight:700"><i class="fas fa-triangle-exclamation"></i> ${warns.map(b=>b.label).join('، ')}</span>` : ''}
             </div>
-          </td>
-          <td style="text-align:center">
-            <span style="color:#16a34a;font-weight:800;font-size:1rem">+${posScore}</span>
-          </td>
-          <td style="text-align:center">
-            <span style="color:#dc2626;font-weight:800;font-size:1rem">${negScore>0?'-'+negScore:'—'}</span>
-          </td>
-          <td style="font-size:.82rem">${behIcons||'<span style="color:var(--text-muted)">—</span>'}</td>
-          <td style="text-align:center">
-            <button class="btn btn-sm btn-outline" onclick="Pages.studentProfile('${s.id}')"><i class="fas fa-user"></i> الملف</button>
-          </td>
-        </tr>`;
+          </div>
+        </td>
+        <td style="text-align:center"><span style="color:#16a34a;font-weight:800">+${posScore}</span></td>
+        <td style="text-align:center"><span style="color:#dc2626;font-weight:800">${negScore>0?'-'+negScore:'—'}</span></td>
+        <td style="text-align:center">
+          <div style="display:flex;gap:4px;justify-content:center">
+            <button class="btn btn-sm btn-outline" onclick="Pages.studentProfile('${s.id}')"><i class="fas fa-user"></i></button>
+            <button class="btn btn-sm btn-outline" onclick="Pages.editStudentModal('${s.id}')"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-sm btn-outline" onclick="Pages.transferStudentModal('${s.id}','${selId}')"><i class="fas fa-exchange-alt"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="Pages.deleteStudent('${s.id}','${selId}')"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
     }).join('');
 
     return `
+      <div class="cd-att-bar">
+        <button class="btn btn-sm btn-outline" onclick="Pages.bulkStudentsModal('${selId}')"><i class="fas fa-list"></i> إضافة جماعية</button>
+        <button class="btn btn-sm btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة ${_T.stu}</button>
+        <div style="margin-right:auto;display:flex;gap:.4rem">
+          <button class="btn btn-sm btn-outline" onclick="Router.go('grades',{classId:'${selId}'})"><i class="fas fa-star"></i> الدرجات</button>
+          <button class="btn btn-sm btn-outline" onclick="Print.attendance('${selId}',new Date().toISOString().slice(0,10))"><i class="fas fa-print"></i> طباعة</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="Pages.deleteClass('${selId}')"><i class="fas fa-trash"></i> حذف الفصل</button>
+        </div>
+      </div>
+      ${!list.length ? `<div class="empty-state"><div class="empty-icon"><i class="fas fa-user-plus"></i></div><h3>لا يوجد ${_T.theStus} في هذا الفصل</h3><button class="btn btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة ${_T.stu}</button></div>` : `
       <div class="section-card">
         <div class="table-container">
           <table class="data-table">
             <thead><tr>
-              <th style="width:36px">#</th>
-              <th>الاسم</th>
-              <th style="text-align:center">إيجابي</th>
-              <th style="text-align:center">سلبي</th>
-              <th>التفاصيل</th>
-              <th style="width:90px"></th>
+              <th style="width:32px">#</th><th>الاسم</th>
+              <th style="text-align:center;width:60px">إيجابي</th>
+              <th style="text-align:center;width:60px">سلبي</th>
+              <th style="width:140px"></th>
             </tr></thead>
-            <tbody>${rows}</tbody>
+            <tbody>${stuRows}</tbody>
           </table>
         </div>
-      </div>`;
+      </div>`}`;
   },
 
   /* ---- CLASSES ---- */
@@ -2901,22 +2920,50 @@ const Pages = {
   setAtt(stuId, status) {
     if (!Pages._currentAtt) Pages._currentAtt = {};
     Pages._currentAtt[stuId] = status;
-    this._applyAttRow(document.getElementById(`ar-${stuId}`), status);
-    document.getElementById('att-summary')?.replaceWith(
-      Object.assign(document.createElement('div'), { id: 'att-summary', innerHTML: this._attSummary(Pages._attStudents || [], Pages._currentAtt) })
-    );
+    this._xlRefreshRow(stuId, status);
     this.saveAtt(Pages._attClassId, Pages._attDate, true);
+  },
+
+  _xlRefreshRow(stuId, status) {
+    const cfColors = {
+      present: { bg: '#E2EFDA', color: '#375623', border: '#A9D18E' },
+      late:    { bg: '#FCEACC', color: '#7A4F1C', border: '#F4B942' },
+      absent:  { bg: '#FCE4D6', color: '#9C0006', border: '#FF7676' },
+    };
+    const cf = cfColors[status];
+    const row = document.getElementById(`ar-${stuId}`);
+    if (row) {
+      row.style.background = cf.bg;
+      const nameCell = row.querySelector('td:nth-child(2)');
+      if (nameCell) nameCell.style.color = cf.color;
+    }
+    ['present','late','absent'].forEach(key => {
+      const btn = document.getElementById(`ar-att-${stuId}-${key}`);
+      if (!btn) return;
+      const active = key === status;
+      const kc = cfColors[key];
+      btn.style.background = active ? kc.bg : '#fff';
+      btn.style.borderColor = active ? kc.border : '#C0C0C0';
+      btn.style.color = active ? kc.color : '#aaa';
+    });
+    // update counter badges
+    const students = Pages._attStudents || [];
+    const counts = { present: 0, late: 0, absent: 0 };
+    students.forEach(s => counts[Pages._currentAtt?.[s.id] || 'present']++);
+    const pEl = document.getElementById('ar-cnt-present');
+    const lEl = document.getElementById('ar-cnt-late');
+    const aEl = document.getElementById('ar-cnt-absent');
+    if (pEl) pEl.textContent = `✓ ${counts.present} حاضر`;
+    if (lEl) lEl.textContent = `⏰ ${counts.late} متأخر`;
+    if (aEl) aEl.textContent = `✗ ${counts.absent} غائب`;
   },
 
   markAll(status) {
     const students = Pages._attStudents || [];
     students.forEach(s => {
       Pages._currentAtt[s.id] = status;
-      this._applyAttRow(document.getElementById(`ar-${s.id}`), status);
+      this._xlRefreshRow(s.id, status);
     });
-    document.getElementById('att-summary')?.replaceWith(
-      Object.assign(document.createElement('div'), { id: 'att-summary', innerHTML: this._attSummary(students, Pages._currentAtt) })
-    );
     this.saveAtt(Pages._attClassId, Pages._attDate, true);
   },
 
@@ -4608,406 +4655,6 @@ const App = {
   }
 };
 
-/* ==================== LESSON MODE ==================== */
-const LessonMode = {
-  _classId: null,
-  _tab: 'attendance',
-  _attMap: {},
-  _periodEnd: null,
-  _periodNum: '?',
-  _cdInterval: null,
-
-  open(classId) {
-    const cls = DB.get('classes').find(c => c.id === classId);
-    if (!cls) return;
-    this._classId = classId;
-    this._tab = 'attendance';
-
-    // init attendance from today's saved record
-    const today = new Date().toISOString().slice(0, 10);
-    const rec = DB.get('attendance').find(a => a.classId === classId && a.date === today);
-    this._attMap = {};
-    DB.get('students').filter(s => s.classId === classId)
-      .forEach(s => { this._attMap[s.id] = 'present'; });
-    if (rec) rec.records.forEach(r => { this._attMap[r.studentId] = r.status; });
-
-    // detect active period
-    const active = ActiveClass.get();
-    this._periodEnd = active?.period?.e || null;
-    this._periodNum = active?.period?.p || '?';
-
-    // render header
-    const color = cls.color || '#2563eb';
-    const hdr = document.getElementById('lm-header');
-    hdr.style.cssText = `border-right:5px solid ${color};background:#fff`;
-    document.getElementById('lm-class-name').textContent = cls.name;
-    document.getElementById('lm-class-name').style.color = color;
-    document.getElementById('lm-subject-name').textContent = cls.subject || '';
-    const badge = document.getElementById('lm-period-badge');
-    badge.textContent = `الحصة ${this._periodNum}`;
-    badge.style.background = color;
-
-    document.getElementById('lesson-mode-overlay').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-    this._switchTab('combined');
-    this._startCountdown();
-  },
-
-  close() {
-    document.getElementById('lesson-mode-overlay').classList.add('hidden');
-    document.body.style.overflow = '';
-    clearInterval(this._cdInterval);
-  },
-
-  _startCountdown() {
-    clearInterval(this._cdInterval);
-    this._updateCountdown();
-    this._cdInterval = setInterval(() => this._updateCountdown(), 30000);
-  },
-
-  _updateCountdown() {
-    const el = document.getElementById('lm-countdown');
-    if (!el) return;
-    if (!this._periodEnd) { el.textContent = ''; return; }
-    const [eh, em] = this._periodEnd.split(':').map(Number);
-    const now = new Date();
-    const left = (eh * 60 + em) - (now.getHours() * 60 + now.getMinutes());
-    if (left <= 0) { el.textContent = 'انتهت الحصة'; el.style.background = 'rgba(239,68,68,.35)'; return; }
-    el.textContent = `⏱ ${left} دقيقة`;
-    el.style.background = left <= 5 ? 'rgba(239,68,68,.35)' : left <= 10 ? 'rgba(245,158,11,.35)' : 'rgba(0,0,0,.2)';
-  },
-
-  _switchTab(tab) {
-    this._tab = tab;
-    document.querySelectorAll('.lm-tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.tab === tab));
-    const c = document.getElementById('lm-content');
-    if (!c) return;
-    c.classList.remove('page-fade-in'); void c.offsetWidth; c.classList.add('page-fade-in');
-    c.classList.toggle('lm-content-xl', tab === 'combined');
-    if (tab === 'combined')  c.innerHTML = this._renderCombined();
-    else if (tab === 'groups') c.innerHTML = this._renderGroups();
-  },
-
-  /* ---- ATTENDANCE ---- */
-  _renderCombined() {
-    const cls = DB.get('classes').find(c => c.id === this._classId) || {};
-    const students = DB.get('students').filter(s => s.classId === this._classId);
-    const n = students.length;
-    const cfColors = {
-      present: { bg: '#E2EFDA', color: '#375623', border: '#A9D18E' },
-      late:    { bg: '#FCEACC', color: '#7A4F1C', border: '#F4B942' },
-      absent:  { bg: '#FCE4D6', color: '#9C0006', border: '#FF7676' },
-    };
-    const counts = { present: 0, late: 0, absent: 0 };
-    students.forEach(s => counts[this._attMap[s.id] || 'present']++);
-
-    const rows = students.map((s, i) => {
-      const st = this._attMap[s.id] || 'present';
-      const cf = cfColors[st];
-      const attBtns = ['present','late','absent'].map(key => {
-        const active = st === key;
-        const kc = cfColors[key];
-        const icon = key==='present'?'✓':key==='late'?'⏰':'✗';
-        return `<button id="lm-att-${s.id}-${key}"
-          onclick="LessonMode._setAtt('${s.id}','${key}')"
-          style="width:26px;height:26px;border-radius:3px;font-size:.65rem;font-weight:900;
-            border:1.5px solid ${active?kc.border:'#C0C0C0'};
-            background:${active?kc.bg:'#fff'};color:${active?kc.color:'#aaa'};
-            cursor:pointer;transition:all .1s;font-family:inherit;padding:0">
-          ${icon}</button>`;
-      }).join('');
-      const behCells = BEH_TYPES.map(b => {
-        const val = s.behaviors?.[b.key] || 0;
-        return `<td class="xl-cell" style="text-align:center;padding:2px 4px;cursor:pointer;
-            background:${val>0?(b.pos?'#E2EFDA':'#FCE4D6'):'transparent'}"
-          onclick="Pages.incBehavior('${s.id}','${b.key}','${this._classId}');LessonMode._refreshBeh('${s.id}')"
-          title="${b.label}">
-          <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-            <span style="font-size:.9rem;line-height:1">${b.emoji}</span>
-            <span id="lm-beh-${s.id}-${b.key}" style="font-size:.6rem;font-weight:800;
-              color:${b.pos?'#375623':'#9C0006'}">${val||''}</span>
-          </div></td>`;
-      }).join('');
-      return `<tr id="lm-row-${s.id}" style="background:${cf.bg}">
-        <td class="xl-rownum">${i+2}</td>
-        <td class="xl-cell" style="font-weight:700;color:${cf.color};white-space:nowrap">${s.name}</td>
-        <td class="xl-cell" style="padding:3px 5px">
-          <div style="display:flex;gap:2px;align-items:center;justify-content:center">${attBtns}</div>
-        </td>
-        ${behCells}
-      </tr>`;
-    }).join('');
-
-    const filename = `حضور_${cls.name||'فصل'}.xlsx`;
-    return `<div style="display:flex;flex-direction:column;height:100%;font-size:.8rem">
-      <div class="xl-titlebar" style="display:flex;align-items:center;gap:.5rem;padding:.45rem .8rem;flex-wrap:wrap;flex-shrink:0">
-        <div class="xl-title-icon">X</div>
-        <div class="xl-title-filename">${filename}</div>
-        <div style="margin-right:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
-          <span id="lm-cnt-present" style="background:#E2EFDA;color:#375623;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #A9D18E">✓ ${counts.present} حاضر</span>
-          <span id="lm-cnt-late"    style="background:#FCEACC;color:#7A4F1C;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #F4B942">⏰ ${counts.late} متأخر</span>
-          <span id="lm-cnt-absent"  style="background:#FCE4D6;color:#9C0006;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #FF7676">✗ ${counts.absent} غائب</span>
-          <button onclick="LessonMode._saveAtt()"
-            style="background:#1D6F42;color:#fff;border:none;padding:4px 14px;border-radius:4px;
-              font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit">
-            <i class="fas fa-save"></i> حفظ</button>
-        </div>
-      </div>
-      <div class="xl-formulabar" style="flex-shrink:0">
-        <div class="xl-fb-cellref">B${n+1}</div>
-        <div class="xl-fb-sep"></div>
-        <span class="xl-fb-fx">fx</span>
-        <div class="xl-fb-formula">=COUNTIF(B2:B${n+1},"حاضر")</div>
-      </div>
-      <div style="overflow:auto;flex:1">
-        <table class="xl-table" style="width:100%">
-          <thead>
-            <tr>
-              <td class="xl-col-hdr-cell corner"></td>
-              <td class="xl-col-hdr-cell">A</td>
-              <td class="xl-col-hdr-cell">B</td>
-              ${BEH_TYPES.map((_,i)=>`<td class="xl-col-hdr-cell">${String.fromCharCode(67+i)}</td>`).join('')}
-            </tr>
-            <tr style="background:#F2F2F2">
-              <td class="xl-rownum">1</td>
-              <td class="xl-cell label">الاسم</td>
-              <td class="xl-cell label" style="text-align:center;font-size:.72rem">الحضور</td>
-              ${BEH_TYPES.map(b=>`<td class="xl-cell label" style="text-align:center;padding:2px 4px" title="${b.label}">${b.emoji}</td>`).join('')}
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </div>`;
-  },
-
-  _renderAttendance() {
-    const students = DB.get('students').filter(s => s.classId === this._classId);
-    const cfg = {
-      present: { color: '#10b981', bg: 'rgba(16,185,129,.12)',  border: 'rgba(16,185,129,.3)'  },
-      late:    { color: '#C8962A', bg: 'rgba(200,150,42,.12)', border: 'rgba(200,150,42,.3)' },
-      absent:  { color: '#EF4444', bg: 'rgba(239,68,68,.12)',  border: 'rgba(239,68,68,.3)'  },
-    };
-    const counts = { present: 0, late: 0, absent: 0 };
-    students.forEach(s => counts[this._attMap[s.id] || 'present']++);
-
-    const grid = students.map(s => {
-      const st = this._attMap[s.id] || 'present';
-      const c = cfg[st];
-      const mkSt = (key, icon) => {
-        const active = st === key;
-        const col = cfg[key].color;
-        return `<button onclick="LessonMode._setAtt('${s.id}','${key}')"
-          style="flex:1;padding:3px 0;border-radius:8px;font-size:.62rem;font-weight:800;
-            border:1.5px solid ${active ? col : 'rgba(255,255,255,.15)'};
-            background:${active ? col : 'transparent'};
-            color:${active ? '#fff' : 'rgba(255,255,255,.4)'};cursor:pointer;transition:all .12s;font-family:inherit">
-          ${icon}</button>`;
-      };
-      return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;
-          padding:10px 8px;border-radius:14px;border:2px solid ${c.border};background:${c.bg}">
-        <div style="width:46px;height:46px;border-radius:50%;background:${c.color};color:#fff;
-          display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900">
-          ${s.name.charAt(0)}</div>
-        <div style="font-size:.73rem;font-weight:700;color:rgba(245,248,252,.88);width:100%;
-          text-align:center;line-height:1.35;word-break:break-word">${s.name}</div>
-        <div style="display:flex;gap:3px;width:100%">
-          ${mkSt('present','✓')}
-          ${mkSt('late','⏰')}
-          ${mkSt('absent','✗')}
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div style="padding:.85rem 1rem">
-      <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:1rem;flex-wrap:wrap">
-        <span style="background:rgba(16,185,129,.2);color:#10b981;padding:4px 14px;border-radius:20px;font-size:.82rem;font-weight:700;border:1px solid rgba(16,185,129,.3)">✓ ${counts.present} حاضر</span>
-        <span style="background:rgba(200,150,42,.18);color:#d97706;padding:4px 14px;border-radius:20px;font-size:.82rem;font-weight:700;border:1px solid rgba(200,150,42,.3)">⏰ ${counts.late} متأخر</span>
-        <span style="background:rgba(239,68,68,.18);color:#f87171;padding:4px 14px;border-radius:20px;font-size:.82rem;font-weight:700;border:1px solid rgba(239,68,68,.3)">✗ ${counts.absent} غائب</span>
-        <button onclick="LessonMode._saveAtt()"
-          style="margin-right:auto;background:#059669;color:#fff;border:none;padding:5px 16px;
-            border-radius:20px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit">
-          <i class="fas fa-save"></i> حفظ الحضور</button>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">${grid}</div>
-    </div>`;
-  },
-
-  _cycleAtt(stuId) {
-    const cycle = { present: 'late', late: 'absent', absent: 'present' };
-    this._attMap[stuId] = cycle[this._attMap[stuId] || 'present'];
-    this._refreshAtt(stuId);
-  },
-
-  _setAtt(stuId, status) {
-    this._attMap[stuId] = status;
-    this._refreshAtt(stuId);
-  },
-
-  _refreshAtt(stuId) {
-    const cfColors = {
-      present: { bg: '#E2EFDA', color: '#375623', border: '#A9D18E' },
-      late:    { bg: '#FCEACC', color: '#7A4F1C', border: '#F4B942' },
-      absent:  { bg: '#FCE4D6', color: '#9C0006', border: '#FF7676' },
-    };
-    const st = this._attMap[stuId] || 'present';
-    const cf = cfColors[st];
-    const row = document.getElementById(`lm-row-${stuId}`);
-    if (row) row.style.background = cf.bg;
-    ['present','late','absent'].forEach(key => {
-      const btn = document.getElementById(`lm-att-${stuId}-${key}`);
-      if (!btn) return;
-      const active = st === key;
-      const kc = cfColors[key];
-      btn.style.background = active ? kc.bg : '#fff';
-      btn.style.borderColor = active ? kc.border : '#C0C0C0';
-      btn.style.color = active ? kc.color : '#aaa';
-    });
-    // update the name cell color
-    const nameCell = row?.querySelector('td:nth-child(2)');
-    if (nameCell) nameCell.style.color = cf.color;
-    // update counter pills
-    const students = DB.get('students').filter(s => s.classId === this._classId);
-    const counts = { present: 0, late: 0, absent: 0 };
-    students.forEach(s => counts[this._attMap[s.id] || 'present']++);
-    const pEl = document.getElementById('lm-cnt-present');
-    const lEl = document.getElementById('lm-cnt-late');
-    const aEl = document.getElementById('lm-cnt-absent');
-    if (pEl) pEl.textContent = `✓ ${counts.present} حاضر`;
-    if (lEl) lEl.textContent = `⏰ ${counts.late} متأخر`;
-    if (aEl) aEl.textContent = `✗ ${counts.absent} غائب`;
-  },
-
-  _saveAtt() {
-    const today = new Date().toISOString().slice(0, 10);
-    const allAtt = DB.get('attendance');
-    const records = Object.entries(this._attMap).map(([studentId, status]) => ({ studentId, status }));
-    const idx = allAtt.findIndex(a => a.classId === this._classId && a.date === today);
-    const entry = { classId: this._classId, date: today, records };
-    if (idx === -1) allAtt.push(entry); else allAtt[idx] = entry;
-    DB.set('attendance', allAtt);
-    Toast.show('✅ تم حفظ الحضور');
-  },
-
-  /* ---- BEHAVIOR ---- */
-  _renderBehavior() {
-    const students = DB.get('students').filter(s => s.classId === this._classId);
-    const rows = students.map(s => {
-      const warns = _behWarn(s).length > 0;
-      const mkBtn = b => `<button
-        onclick="Pages.incBehavior('${s.id}','${b.key}','${this._classId}');LessonMode._refreshBeh('${s.id}')"
-        title="${b.label}"
-        style="background:${b.color}15;border:1.5px solid ${b.color}40;border-radius:8px;
-          padding:5px 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
-          gap:2px;transition:background .12s;min-width:36px;font-family:inherit"
-        onmouseover="this.style.background='${b.color}30'" onmouseout="this.style.background='${b.color}15'">
-        <span style="font-size:1.05rem">${b.emoji}</span>
-        <span id="lm-beh-${s.id}-${b.key}" style="font-size:.65rem;font-weight:800;color:${b.color}">
-          ${s.behaviors?.[b.key] || 0}</span>
-      </button>`;
-      return `<div style="display:flex;align-items:center;gap:10px;padding:.6rem .9rem;
-          border-bottom:1px solid var(--gray-100)">
-        <div style="width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;
-          display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0;font-size:.95rem">
-          ${s.name.charAt(0)}</div>
-        <div style="font-weight:700;font-size:.85rem;flex:1;min-width:0;overflow:hidden;
-          text-overflow:ellipsis;white-space:nowrap">
-          ${s.name}${warns ? ' <span style="color:#ef4444;font-size:.72rem">⚠</span>' : ''}</div>
-        <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">
-          ${BEH_TYPES.filter(b => b.pos).map(mkBtn).join('')}
-          <div style="width:1px;height:26px;background:var(--gray-200);margin:0 2px;flex-shrink:0"></div>
-          ${BEH_TYPES.filter(b => !b.pos).map(mkBtn).join('')}
-        </div>
-      </div>`;
-    }).join('');
-    return `<div>${rows}</div>`;
-  },
-
-  _refreshBeh(stuId) {
-    const s = DB.get('students').find(x => x.id === stuId);
-    if (!s) return;
-    BEH_TYPES.forEach(b => {
-      const el = document.getElementById(`lm-beh-${s.id}-${b.key}`);
-      if (el) el.textContent = s.behaviors?.[b.key] || 0;
-    });
-  },
-
-  /* ---- GROUPS ---- */
-  _renderGroups() {
-    const saved = (DB.get('groups') || []).find(g => g.classId === this._classId);
-    if (!saved) return `<div style="text-align:center;padding:3rem 1rem;color:var(--gray-400)">
-      <i class="fas fa-object-group" style="font-size:2.5rem;opacity:.3;display:block;margin-bottom:.75rem"></i>
-      <div style="font-weight:700;margin-bottom:1rem">لا توجد مجموعات محفوظة لهذا الفصل</div>
-      <button onclick="LessonMode.close();Router.go('groups',{classId:'${this._classId}'})"
-        style="background:var(--primary);color:#fff;border:none;padding:.55rem 1.25rem;
-          border-radius:10px;font-family:inherit;font-weight:700;cursor:pointer">
-        إنشاء مجموعات</button></div>`;
-
-    const students = DB.get('students');
-    const C = Pages._GRP_COLORS;
-    if (Pages._grpClass !== this._classId || !Pages._grpSessionPts.length) {
-      Pages._grpClass = this._classId;
-      Pages._grpSessionPts = saved.members.map(() => 0);
-      Pages._grpWork = saved.members.map(ids =>
-        ids.map(id => students.find(s => s.id === id)).filter(Boolean));
-      Pages._grpNames = saved.members.map((_, i) => saved.groupNames?.[i] || `المجموعة ${i + 1}`);
-    }
-    const totalPts = saved.totalPoints || saved.members.map(() => 0);
-
-    const cards = saved.members.map((ids, gi) => {
-      const color = C[gi % C.length];
-      const members = ids.map(id => students.find(s => s.id === id)).filter(Boolean);
-      const sesPts = Pages._grpSessionPts[gi] || 0;
-      return `<div style="background:var(--gray-50);border:2px solid ${color};border-radius:14px;
-          overflow:hidden;flex:1;min-width:140px">
-        <div style="background:${color};color:#fff;padding:8px 12px;
-          display:flex;align-items:center;justify-content:space-between">
-          <span style="font-weight:700;font-size:.9rem">${Pages._grpNames[gi]}</span>
-          <span style="font-size:.75rem;opacity:.8">${members.length} أعضاء</span>
-        </div>
-        <div style="padding:8px 12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div>
-              <span id="lm-grp-${gi}" style="font-size:1.7rem;font-weight:900;color:${color}">${sesPts}</span>
-              <span style="font-size:.68rem;color:#9ca3af;margin-right:3px">الحصة</span>
-            </div>
-            <span style="font-size:.72rem;color:#9ca3af">ترم: <b style="color:${color}">${totalPts[gi] || 0}</b></span>
-          </div>
-          <div style="display:flex;gap:6px;margin-bottom:8px">
-            <button onclick="LessonMode._grpPt(${gi},1)"
-              style="flex:1;padding:7px;background:#d1fae5;border:1.5px solid #10b981;border-radius:8px;
-                color:#10b981;font-weight:900;font-size:1.1rem;cursor:pointer;transition:background .12s"
-              onmouseover="this.style.background='#a7f3d0'" onmouseout="this.style.background='#d1fae5'">+1</button>
-            <button onclick="LessonMode._grpPt(${gi},-1)"
-              style="flex:1;padding:7px;background:#fee2e2;border:1.5px solid #ef4444;border-radius:8px;
-                color:#ef4444;font-weight:900;font-size:1.1rem;cursor:pointer;transition:background .12s"
-              onmouseover="this.style.background='#fca5a5'" onmouseout="this.style.background='#fee2e2'">−1</button>
-          </div>
-          <div style="font-size:.72rem;color:#6b7280;line-height:1.8">
-            ${members.map(s => `<div style="border-bottom:1px solid #f3f4f6;padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>`).join('')}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div style="padding:.85rem 1rem">
-      <div style="margin-bottom:.75rem">
-        <button onclick="Pages._grpSaveSession('${this._classId}');LessonMode._switchTab('groups')"
-          style="background:var(--primary);color:#fff;border:none;padding:6px 16px;border-radius:10px;
-            font-family:inherit;font-size:.82rem;font-weight:700;cursor:pointer">
-          <i class="fas fa-save"></i> حفظ نقاط الحصة</button>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">${cards}</div>
-    </div>`;
-  },
-
-  _grpPt(gi, delta) {
-    Pages._grpSessionPts[gi] = Math.max(0, (Pages._grpSessionPts[gi] || 0) + delta);
-    const el = document.getElementById(`lm-grp-${gi}`);
-    if (el) el.textContent = Pages._grpSessionPts[gi];
-    delta > 0 ? Sound.correct() : Sound.wrong();
-  },
-};
 
 /* ==================== DARK MODE ==================== */
 const DarkMode = {

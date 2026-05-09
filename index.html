@@ -182,39 +182,6 @@
     </div>
   </div>
 
-  <!-- Lesson Mode Overlay -->
-  <div id="lesson-mode-overlay" class="hidden">
-    <div class="lm-header" id="lm-header">
-      <div class="lm-header-inner">
-        <div class="lm-header-info">
-          <span class="lm-period-badge" id="lm-period-badge">الحصة —</span>
-          <span class="lm-class-name" id="lm-class-name">—</span>
-          <span class="lm-subject-name" id="lm-subject-name"></span>
-        </div>
-        <div class="lm-header-actions">
-          <div class="lm-countdown" id="lm-countdown"></div>
-          <button onclick="Pages.diceRoll(LessonMode._classId)" class="lm-action-btn" title="اختيار عشوائي">
-            <i class="fas fa-dice"></i>
-          </button>
-          <button onclick="LessonMode.close()" class="lm-close-btn">
-            <i class="fas fa-compress-alt"></i> خروج
-          </button>
-        </div>
-      </div>
-    </div>
-    <div class="lm-body">
-      <div class="lm-tabs" id="lm-tabs">
-        <button class="lm-tab active" data-tab="combined" onclick="LessonMode._switchTab('combined')">
-          <i class="fas fa-clipboard-check"></i> الحضور والسلوك
-        </button>
-        <button class="lm-tab" data-tab="groups" onclick="LessonMode._switchTab('groups')">
-          <i class="fas fa-object-group"></i> المجموعات
-        </button>
-      </div>
-      <div class="lm-content" id="lm-content"></div>
-    </div>
-  </div>
-
   <!-- Modal -->
   <div class="modal-backdrop hidden" id="modal-backdrop">
     <div class="modal-box" id="modal-box">
