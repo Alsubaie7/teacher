@@ -1623,6 +1623,8 @@ select option { background: #fff; color: var(--text-primary); }
 
 @media (max-width: 480px) {
   .xl-grid-section { grid-template-columns: 1fr; }
+  .an-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .an-two-col  { grid-template-columns: 1fr; }
 }
 
 /* ============================================================
@@ -2048,8 +2050,65 @@ select option { background: #fff; color: var(--text-primary); }
 }
 
 /* ============================================================
-   ANALYTICS PAGE — stats-row, stat-lbl, analytics-card, charts
+   ANALYTICS PAGE — redesigned dashboard
    ============================================================ */
+
+/* KPI grid */
+.an-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .85rem;
+  margin-bottom: 1.1rem;
+}
+.an-kpi-card {
+  border: 1px solid #C8D4D0;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,.07);
+  background: #fff;
+  transition: box-shadow .2s, transform .2s;
+}
+.an-kpi-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.11); transform: translateY(-2px); }
+.an-kpi-body { padding: .75rem 1rem .8rem; }
+.an-kpi-val { font-size: 1.7rem; font-weight: 900; line-height: 1.1; font-family: 'Consolas','Courier New',monospace; }
+.an-kpi-lbl { font-size: .73rem; color: #6b7280; font-weight: 600; margin-top: .25rem; }
+
+/* Two-column charts row */
+.an-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .85rem;
+  margin-bottom: 1.1rem;
+}
+
+/* Section card (xl-header + body) */
+.an-section {
+  border: 1px solid #C8D4D0;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,.07);
+  background: #fff;
+  margin-bottom: 1.1rem;
+}
+.an-section-body { padding: .75rem 1rem; }
+
+/* Sortable table header cells */
+.an-sort-hdr {
+  background: #E8F5E9 !important;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 800 !important;
+  transition: background .15s;
+}
+.an-sort-hdr:hover { background: #C8E6C9 !important; }
+
+/* Dark mode */
+[data-theme="dark"] .an-kpi-card,
+[data-theme="dark"] .an-section { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .an-sort-hdr { background: #1A3326 !important; }
+[data-theme="dark"] .an-sort-hdr:hover { background: #1F4030 !important; }
+
+/* OLD — kept for compatibility */
 .stats-row {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
   gap: .75rem; margin-bottom: 1.1rem;

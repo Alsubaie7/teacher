@@ -4021,120 +4021,307 @@ const Pages = {
       return;
     }
 
-    // --- attendance + engagement per class ---
+    // ── Donut SVG helper ──────────────────────────────────────────────
+    function _donut(segs) {
+      const r = 36, cx = 50, cy = 50, circ = 2 * Math.PI * r;
+      let angle = -90;
+      return segs.filter(s => s.pct > 0).map(s => {
+        const len = s.pct / 100 * circ;
+        const seg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="16"
+          stroke-dasharray="${len.toFixed(2)} ${(circ-len).toFixed(2)}"
+          transform="rotate(${angle} ${cx} ${cy})"/>`;
+        angle += s.pct / 100 * 360;
+        return seg;
+      }).join('');
+    }
+
+    // ── Sparkline SVG helper ──────────────────────────────────────────
+    function _spark(vals) {
+      const w = 260, h = 72;
+      const valid = vals.filter(v => v !== null);
+      if (valid.length < 2) return '<div style="color:#9ca3af;font-size:.8rem;text-align:center;padding:1.5rem">لا توجد بيانات كافية للرسم</div>';
+      const pad = { t: 8, b: 4, l: 28, r: 8 };
+      const W = w - pad.l - pad.r, H = h - pad.t - pad.b;
+      const xS = i => pad.l + (i / (vals.length - 1)) * W;
+      const yS = v => pad.t + (1 - v / 100) * H;
+      const nonNull = vals.map((v, i) => ({v, i})).filter(d => d.v !== null);
+      const pts = nonNull.map(d => `${xS(d.i).toFixed(1)},${yS(d.v).toFixed(1)}`).join(' ');
+      const area = [
+        `${xS(nonNull[0].i).toFixed(1)},${(pad.t+H).toFixed(1)}`,
+        ...nonNull.map(d => `${xS(d.i).toFixed(1)},${yS(d.v).toFixed(1)}`),
+        `${xS(nonNull[nonNull.length-1].i).toFixed(1)},${(pad.t+H).toFixed(1)}`
+      ].join(' ');
+      const grids = [25,50,75,100].map(v =>
+        `<line x1="${pad.l}" y1="${yS(v).toFixed(1)}" x2="${w-pad.r}" y2="${yS(v).toFixed(1)}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3,3"/>
+         <text x="${pad.l-4}" y="${(yS(v)+3.5).toFixed(1)}" text-anchor="end" font-size="7" fill="#9ca3af">${v}</text>`
+      ).join('');
+      const lastV = nonNull[nonNull.length-1].v;
+      const lineColor = lastV >= 80 ? '#1D6F42' : lastV >= 60 ? '#f59e0b' : '#dc2626';
+      const dots = nonNull.map(d =>
+        `<circle cx="${xS(d.i).toFixed(1)}" cy="${yS(d.v).toFixed(1)}" r="2.5" fill="${d.v >= 80 ? '#1D6F42' : d.v >= 60 ? '#f59e0b' : '#dc2626'}"/>`
+      ).join('');
+      return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" style="overflow:visible">
+        ${grids}
+        <polygon points="${area}" fill="${lineColor}" opacity=".08"/>
+        <polyline points="${pts}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dots}
+      </svg>`;
+    }
+
+    // ── Class stats ───────────────────────────────────────────────────
     const classStats = classes.map(cls => {
-      const stus = students.filter(s => s.classId === cls.id);
+      const stus    = students.filter(s => s.classId === cls.id);
       const attRecs = allAtt.filter(a => a.classId === cls.id);
-      const totalSlots = stus.length * attRecs.length;
+      const totalSlots   = stus.length * attRecs.length;
       const presentCount = attRecs.reduce((n, a) =>
         n + a.records.filter(r => r.status === 'present' || r.status === 'late').length, 0);
-      const attRate = totalSlots > 0 ? Math.round(presentCount / totalSlots * 100) : null;
-      const posBeh = stus.reduce((n, s) => {
+      const attRate  = totalSlots > 0 ? Math.round(presentCount / totalSlots * 100) : null;
+      const posBeh   = stus.reduce((n, s) => {
         const b = s.behaviors || {};
-        return n + BEH_TYPES.filter(bt => bt.pos).reduce((a, bt) => a + (b[bt.key] || 0), 0);
+        return n + BEH_TYPES.filter(bt => bt.pos).reduce((a, bt) => a + (b[bt.key]||0), 0);
       }, 0);
-      return { cls, stus: stus.length, attRate, posBeh, sessions: attRecs.length };
+      const clsGrades = grades.filter(g => stus.some(s => s.id === g.studentId));
+      const avgGrade  = clsGrades.length
+        ? Math.round(clsGrades.reduce((s, g) => s + _sumGrades(g.grades), 0) / clsGrades.length)
+        : null;
+      return { cls, stus: stus.length, attRate, posBeh, avgGrade, sessions: attRecs.length };
     });
 
-    const maxBeh = Math.max(1, ...classStats.map(x => x.posBeh));
+    // ── Grade distribution ────────────────────────────────────────────
+    const distMap = {'ممتاز+':0,'ممتاز':0,'جيد جداً+':0,'جيد جداً':0,'جيد+':0,'جيد':0,'مقبول':0,'راسب':0};
+    grades.forEach(g => { const t = _sumGrades(g.grades); if (t > 0) distMap[_letter(t)]++; });
+    const distTotal   = Object.values(distMap).reduce((a,b) => a+b, 0);
+    const passingCount = Object.entries(distMap).filter(([k]) => k !== 'راسب').reduce((s,[,v]) => s+v, 0);
+    const gradeColors = {'ممتاز+':'#1D6F42','ممتاز':'#22c55e','جيد جداً+':'#4ade80','جيد جداً':'#86efac','جيد+':'#fbbf24','جيد':'#f59e0b','مقبول':'#fb923c','راسب':'#dc2626'};
+    const donutSegs   = Object.entries(distMap).filter(([,v])=>v>0)
+      .map(([label,count]) => ({label, count, pct: distTotal > 0 ? count/distTotal*100 : 0, color: gradeColors[label]}));
 
-    // --- students needing attention ---
+    // ── Attendance trend last 14 days ─────────────────────────────────
+    const trendData = [], trendLabels = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const ds = d.toISOString().slice(0,10);
+      trendLabels.push(ds.slice(5));
+      const dayAtt = allAtt.filter(a => a.date === ds);
+      if (dayAtt.length) {
+        const total = dayAtt.reduce((n,a) => n + a.records.length, 0);
+        const pres  = dayAtt.reduce((n,a) => n + a.records.filter(r => r.status==='present'||r.status==='late').length, 0);
+        trendData.push(total > 0 ? Math.round(pres/total*100) : null);
+      } else { trendData.push(null); }
+    }
+    const validTrend = trendData.filter(v => v !== null);
+    const avgTrend   = validTrend.length ? Math.round(validTrend.reduce((a,b)=>a+b,0)/validTrend.length) : null;
+
+    // ── Summary KPIs ──────────────────────────────────────────────────
+    const totalStudents = students.length;
+    const totalAbs      = students.reduce((n,s) => n + _countAtt(s.id,'absent',allAtt), 0);
+    const ratedClasses  = classStats.filter(x => x.attRate !== null);
+    const avgAttRate    = ratedClasses.length ? Math.round(ratedClasses.reduce((s,x)=>s+x.attRate,0)/ratedClasses.length) : null;
+
+    // ── Students needing attention ────────────────────────────────────
     const needsAtt = students.map(s => {
-      const absCount = _countAtt(s.id, 'absent', allAtt);
-      const gr = grades.find(g => g.studentId === s.id && g.classId === s.classId);
+      const absCount = _countAtt(s.id,'absent',allAtt);
+      const gr  = grades.find(g => g.studentId === s.id && g.classId === s.classId);
       const tot = gr ? _sumGrades(gr.grades) : null;
-      const negBeh = BEH_TYPES.filter(b => !b.pos).reduce((n, b) => n + (s.behaviors?.[b.key] || 0), 0);
-      const score = (absCount >= 3 ? 2 : 0) + (tot !== null && tot < 50 ? 2 : 0) + (negBeh >= 5 ? 1 : 0);
+      const negBeh = BEH_TYPES.filter(b => !b.pos).reduce((n,b) => n+(s.behaviors?.[b.key]||0), 0);
+      const score  = (absCount>=3?2:absCount>=1?1:0) + (tot!==null&&tot<50?2:tot!==null&&tot<60?1:0) + (negBeh>=5?2:negBeh>=2?1:0);
       if (!score) return null;
       const cls = classes.find(c => c.id === s.classId);
-      return { s, cls, absCount, tot, negBeh, score };
-    }).filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 8);
+      return { s, cls, absCount, tot, negBeh, score, sev: score>=4?'high':score>=2?'med':'low' };
+    }).filter(Boolean).sort((a,b) => b.score - a.score).slice(0, 8);
 
-    // --- grade distribution ---
-    const distMap = { 'ممتاز+':0,'ممتاز':0,'جيد جداً+':0,'جيد جداً':0,'جيد+':0,'جيد':0,'مقبول':0,'راسب':0 };
-    grades.forEach(g => {
-      const tot = _sumGrades(g.grades);
-      if (tot > 0) distMap[_letter(tot)]++;
+    // ── Sort state ────────────────────────────────────────────────────
+    const sortCol = window._anSortCol || 'attRate';
+    const sortDir = window._anSortDir || -1;
+    const sorted  = [...classStats].sort((a,b) => {
+      const av = a[sortCol], bv = b[sortCol];
+      if (av===null) return 1; if (bv===null) return -1;
+      return typeof av==='string' ? av.localeCompare(bv)*sortDir : (av-bv)*sortDir;
     });
-    const distTotal = Object.values(distMap).reduce((a, b) => a + b, 0);
+    const arrow = col => col!==sortCol ? '<span style="opacity:.3">⇅</span>' : sortDir===-1 ? '↓' : '↑';
 
-    // --- summary stats ---
-    const totalStudents = students.length;
-    const totalAbs = students.reduce((n, s) => n + _countAtt(s.id, 'absent', allAtt), 0);
-    const totalSessions = allAtt.length;
+    // ── Conditional format helper ─────────────────────────────────────
+    const cf = (v, type) => {
+      if (v===null) return '';
+      const thr = type==='att' ? [85,70] : [80,60];
+      return v>=thr[0] ? 'background:#E2EFDA;color:#375623' : v>=thr[1] ? 'background:#FFEB9C;color:#9C5700' : 'background:#FFC7CE;color:#9C0006';
+    };
+
+    // ── Severity style helper ─────────────────────────────────────────
+    const sevStyle = sev => ({
+      high: { bg:'#FEE2E2', color:'#DC2626', border:'rgba(239,68,68,.3)', badge:'background:#FEE2E2;color:#991B1B', label:'⚠ حرج' },
+      med:  { bg:'#FEF3C7', color:'#D97706', border:'rgba(245,158,11,.3)', badge:'background:#FEF3C7;color:#92400E', label:'⚡ متوسط' },
+      low:  { bg:'#E0F2FE', color:'#0369A1', border:'rgba(3,105,161,.3)',  badge:'background:#E0F2FE;color:#075985', label:'ℹ خفيف' },
+    }[sev]);
 
     document.getElementById('content').innerHTML = `
       <div class="page-header">
         <h2><i class="fas fa-chart-bar"></i> لوحة التحليلات</h2>
       </div>
 
-      <div class="stats-row" style="margin-bottom:0">
-        <div class="stat-card"><div class="stat-val">${totalStudents}</div><div class="stat-lbl">إجمالي الطلاب</div></div>
-        <div class="stat-card"><div class="stat-val">${classes.length}</div><div class="stat-lbl">الفصول</div></div>
-        <div class="stat-card"><div class="stat-val">${totalSessions}</div><div class="stat-lbl">جلسات حضور مسجّلة</div></div>
-        <div class="stat-card"><div class="stat-val" style="color:var(--red)">${totalAbs}</div><div class="stat-lbl">إجمالي الغيابات</div></div>
+      <!-- KPI Cards -->
+      <div class="an-kpi-grid">
+        ${[
+          {file:'إجمالي_الطلاب.xlsx',    val:totalStudents,                                              lbl:'إجمالي الطلاب',       icon:'fa-users',          color:'#1F497D'},
+          {file:'الفصول_الدراسية.xlsx',  val:classes.length,                                             lbl:'الفصول الدراسية',     icon:'fa-door-open',      color:'#1D6F42'},
+          {file:'متوسط_الحضور.xlsx',     val:avgAttRate!==null?avgAttRate+'%':'—',                       lbl:'متوسط الحضور',        icon:'fa-clipboard-check', color:avgAttRate===null?'#9ca3af':avgAttRate>=80?'#1D6F42':avgAttRate>=60?'#9C5700':'#9C0006'},
+          {file:'إجمالي_الغيابات.xlsx',  val:totalAbs,                                                   lbl:'إجمالي الغيابات',     icon:'fa-user-times',     color:'#9C0006'},
+        ].map(k => `
+          <div class="an-kpi-card">
+            <div class="xl-titlebar" style="padding:.28rem .6rem">
+              <div class="xl-title-icon">X</div>
+              <div class="xl-title-filename">${k.file}</div>
+            </div>
+            <div class="an-kpi-body">
+              <div class="an-kpi-val" style="color:${k.color}">${k.val}</div>
+              <div class="an-kpi-lbl"><i class="fas ${k.icon}"></i> ${k.lbl}</div>
+            </div>
+          </div>`).join('')}
       </div>
 
-      <div class="analytics-grid">
+      <!-- Charts Row -->
+      <div class="an-two-col">
 
-        <div class="analytics-card">
-          <div class="analytics-card-title"><i class="fas fa-clipboard-check" style="color:#10b981"></i> نسبة الحضور لكل فصل</div>
-          ${classStats.map(x => {
-            const rate = x.attRate;
-            const color = rate === null ? '#9ca3af' : rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#dc2626';
-            return `<div class="att-bar-row">
-              <div class="att-bar-label">
-                <span>${x.cls.name}</span>
-                <span style="color:${color};font-weight:700">${rate === null ? 'لا بيانات' : rate + '%'}</span>
-              </div>
-              <div class="att-bar-track"><div class="att-bar-fill" style="width:${rate ?? 0}%;background:${color}"></div></div>
-            </div>`;
-          }).join('')}
+        <!-- Sparkline trend -->
+        <div class="an-section">
+          <div class="xl-titlebar" style="padding:.28rem .6rem">
+            <div class="xl-title-icon">X</div>
+            <div class="xl-title-filename">اتجاه_الحضور_14_يوم.xlsx</div>
+            ${avgTrend!==null?`<div style="font-size:.68rem;color:rgba(255,255,255,.8);flex-shrink:0">متوسط: ${avgTrend}%</div>`:''}
+          </div>
+          <div class="an-section-body">
+            ${_spark(trendData)}
+            <div style="display:flex;justify-content:space-between;font-size:.62rem;color:#9ca3af;margin-top:.2rem">
+              <span>${trendLabels[0]}</span><span>${trendLabels[6]}</span><span>${trendLabels[13]}</span>
+            </div>
+          </div>
         </div>
 
-        <div class="analytics-card">
-          <div class="analytics-card-title"><i class="fas fa-fire" style="color:#7c3aed"></i> أكثر الفصول تفاعلاً</div>
-          ${[...classStats].sort((a,b) => b.posBeh - a.posBeh).map(x => `
-            <div class="engage-row">
-              <span class="engage-name">${x.cls.name}</span>
-              <div class="engage-bar-track"><div class="engage-bar-fill" style="width:${Math.round(x.posBeh/maxBeh*100)}%"></div></div>
-              <span class="engage-val">${x.posBeh}</span>
-            </div>`).join('')}
-        </div>
-
-        <div class="analytics-card" style="grid-column:1/-1">
-          <div class="analytics-card-title"><i class="fas fa-exclamation-triangle" style="color:#dc2626"></i> طلاب يحتاجون اهتمام</div>
-          ${needsAtt.length === 0
-            ? `<div style="text-align:center;padding:1.5rem;color:#9ca3af"><i class="fas fa-check-circle" style="color:#10b981;font-size:1.5rem"></i><p style="margin-top:.5rem">ممتاز — لا يوجد طلاب بحاجة لتدخل حالياً</p></div>`
-            : needsAtt.map(({s, cls, absCount, tot, negBeh}) => `
-              <div class="attention-row" onclick="Pages.studentProfile('${s.id}')" style="cursor:pointer">
-                <div class="attention-avatar">${s.name.charAt(0)}</div>
-                <div>
-                  <div class="attention-name">${s.name}</div>
-                  <div class="attention-meta">
-                    <span style="color:#6b7280">${cls?.name || '—'}</span>
-                    ${absCount >= 3 ? `<span class="attention-tag tag-abs">غاب ${absCount} مرات</span>` : ''}
-                    ${tot !== null && tot < 50 ? `<span class="attention-tag tag-fail">درجة ${tot}/100</span>` : ''}
-                    ${negBeh >= 5 ? `<span class="attention-tag tag-beh">سلوك سلبي ${negBeh}</span>` : ''}
-                  </div>
+        <!-- Donut chart -->
+        <div class="an-section">
+          <div class="xl-titlebar" style="padding:.28rem .6rem">
+            <div class="xl-title-icon">X</div>
+            <div class="xl-title-filename">توزيع_التقديرات.xlsx</div>
+            ${distTotal>0?`<div style="font-size:.68rem;color:rgba(255,255,255,.8);flex-shrink:0">${distTotal} طالب</div>`:''}
+          </div>
+          <div class="an-section-body" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            ${distTotal===0
+              ? `<div style="color:#9ca3af;font-size:.8rem;text-align:center;width:100%;padding:1.5rem">لا توجد درجات مسجّلة</div>`
+              : `<div style="flex-shrink:0">
+                  <svg viewBox="0 0 100 100" width="110" height="110">
+                    <circle cx="50" cy="50" r="36" fill="none" stroke="#f0f0f0" stroke-width="16"/>
+                    ${_donut(donutSegs)}
+                    <text x="50" y="46" text-anchor="middle" font-size="10" font-weight="800" fill="#1e293b">${distTotal>0?Math.round(passingCount/distTotal*100):0}%</text>
+                    <text x="50" y="58" text-anchor="middle" font-size="6.5" fill="#64748b">ناجحون</text>
+                  </svg>
                 </div>
-              </div>`).join('')}
+                <div style="flex:1;min-width:80px">
+                  ${donutSegs.map(s=>`
+                    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+                      <span style="width:10px;height:10px;border-radius:2px;background:${s.color};flex-shrink:0;display:inline-block"></span>
+                      <span style="font-size:.73rem;color:#374151;font-weight:600;flex:1">${s.label}</span>
+                      <span style="font-size:.73rem;color:#6b7280">${s.count}</span>
+                    </div>`).join('')}
+                </div>`}
+          </div>
         </div>
+      </div>
 
-        <div class="analytics-card">
-          <div class="analytics-card-title"><i class="fas fa-graduation-cap" style="color:#0369a1"></i> توزيع التقديرات</div>
-          ${distTotal === 0
-            ? `<div style="text-align:center;padding:1rem;color:#9ca3af">لا توجد درجات مسجّلة</div>`
-            : Object.entries(distMap).filter(([,v])=>v>0).map(([label, count]) => {
-                const pct = Math.round(count / distTotal * 100);
-                return `<div class="grade-dist-row">
-                  <span style="font-weight:600">${label}</span>
-                  <span style="color:#6b7280">${count} طالب (${pct}%)</span>
+      <!-- Class comparison table -->
+      <div class="an-section" style="margin-bottom:1.1rem">
+        <div class="xl-titlebar" style="padding:.28rem .6rem">
+          <div class="xl-title-icon">X</div>
+          <div class="xl-title-filename">مقارنة_الفصول.xlsx</div>
+          <div style="font-size:.68rem;color:rgba(255,255,255,.8);flex-shrink:0">${classes.length} فصل</div>
+        </div>
+        <div class="an-section-body" style="padding:0;overflow-x:auto">
+          <table class="xl-table" style="min-width:480px">
+            <colgroup>
+              <col style="width:26px"><col style="min-width:100px">
+              <col style="width:60px"><col style="width:65px">
+              <col style="width:80px"><col style="width:90px"><col style="width:70px">
+            </colgroup>
+            <thead>
+              <tr>
+                <td class="xl-col-hdr-cell corner"></td>
+                <td class="xl-col-hdr-cell">A</td><td class="xl-col-hdr-cell">B</td>
+                <td class="xl-col-hdr-cell">C</td><td class="xl-col-hdr-cell">D</td>
+                <td class="xl-col-hdr-cell">E</td><td class="xl-col-hdr-cell">F</td>
+              </tr>
+              <tr>
+                <td class="xl-rownum" style="background:#1D6F42;color:#fff">#</td>
+                <td class="xl-cell label" style="background:#E8F5E9;font-weight:800">اسم الفصل</td>
+                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('stus')">الطلاب ${arrow('stus')}</td>
+                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('sessions')">الجلسات ${arrow('sessions')}</td>
+                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('attRate')">الحضور% ${arrow('attRate')}</td>
+                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('avgGrade')">متوسط الدرجة ${arrow('avgGrade')}</td>
+                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('posBeh')">التفاعل ${arrow('posBeh')}</td>
+              </tr>
+            </thead>
+            <tbody>
+              ${sorted.map((x,i) => `
+                <tr onclick="Router.go('classDetail',{classId:'${x.cls.id}'})" style="cursor:pointer">
+                  <td class="xl-rownum">${i+1}</td>
+                  <td class="xl-cell" style="font-weight:700;color:#1D6F42">${x.cls.name}</td>
+                  <td class="xl-cell" style="text-align:center;font-family:monospace;font-weight:700">${x.stus}</td>
+                  <td class="xl-cell" style="text-align:center;color:#6b7280">${x.sessions}</td>
+                  <td class="xl-cell" style="${cf(x.attRate,'att')};text-align:center;font-weight:700;font-family:monospace">${x.attRate!==null?x.attRate+'%':'—'}</td>
+                  <td class="xl-cell" style="${cf(x.avgGrade,'grade')};text-align:center;font-weight:700;font-family:monospace">${x.avgGrade!==null?x.avgGrade:'—'}</td>
+                  <td class="xl-cell" style="text-align:center;font-family:monospace;color:#7C3AED;font-weight:700">${x.posBeh}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Students needing attention -->
+      <div class="an-section">
+        <div class="xl-titlebar" style="padding:.28rem .6rem">
+          <div class="xl-title-icon">X</div>
+          <div class="xl-title-filename">طلاب_يحتاجون_اهتمام.xlsx</div>
+          ${needsAtt.length?`<div style="font-size:.68rem;color:rgba(255,255,255,.8);flex-shrink:0">${needsAtt.length} طالب</div>`:''}
+        </div>
+        <div class="an-section-body" style="padding:.5rem .75rem">
+          ${needsAtt.length===0
+            ? `<div style="text-align:center;padding:1.5rem;color:#9ca3af">
+                <i class="fas fa-check-circle" style="color:#1D6F42;font-size:1.5rem"></i>
+                <p style="margin-top:.5rem;font-size:.85rem">ممتاز — لا يوجد طلاب بحاجة لتدخل حالياً</p>
+               </div>`
+            : needsAtt.map(({s,cls,absCount,tot,negBeh,sev}) => {
+                const st = sevStyle(sev);
+                return `
+                <div class="attention-row" onclick="Pages.studentProfile('${s.id}')" style="cursor:pointer">
+                  <div class="attention-avatar" style="background:${st.bg};color:${st.color};border-color:${st.border}">
+                    ${s.name.charAt(0)}
+                  </div>
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+                      <div class="attention-name">${s.name}</div>
+                      <span style="padding:.1rem .45rem;border-radius:10px;font-size:.65rem;font-weight:700;${st.badge}">${st.label}</span>
+                    </div>
+                    <div class="attention-meta">
+                      <span style="color:#6b7280;font-size:.75rem">${cls?.name||'—'}</span>
+                      ${absCount>=1?`<span class="attention-tag tag-abs">غاب ${absCount}</span>`:''}
+                      ${tot!==null&&tot<60?`<span class="attention-tag tag-fail">درجة ${tot}</span>`:''}
+                      ${negBeh>=2?`<span class="attention-tag tag-beh">سلوك ${negBeh}</span>`:''}
+                    </div>
+                  </div>
+                  <i class="fas fa-chevron-left" style="color:#d1d5db;font-size:.75rem;flex-shrink:0"></i>
                 </div>`;
               }).join('')}
         </div>
+      </div>
+    `;
+  },
 
-      </div>`;
+  sortAnalytics(col) {
+    if (window._anSortCol === col) {
+      window._anSortDir = (window._anSortDir || -1) * -1;
+    } else {
+      window._anSortCol = col;
+      window._anSortDir = -1;
+    }
+    this.analytics();
   },
 
   async settings() {
