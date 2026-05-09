@@ -4498,7 +4498,6 @@ const App = {
         return;
       }
       await SBAuth.loadUserData(session.user.id);
-      SBAuth.syncToCloud(session.user.id);
       const teacher = DB.teacher();
       if (teacher) { this.start(teacher); return; }
     }
@@ -4544,7 +4543,6 @@ const App = {
         } else {
           const loginData = await SBAuth.signIn(email, pwd);
           await SBAuth.checkSubscription(loginData.user.id, loginData.user.email);
-          SBAuth.syncToCloud(loginData.user.id);
           this.start(DB.teacher() || { name: email, school: '', subject: '' });
         }
       } catch (err) {
