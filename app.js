@@ -4690,70 +4690,97 @@ const LessonMode = {
 
   /* ---- ATTENDANCE ---- */
   _renderCombined() {
+    const cls = DB.get('classes').find(c => c.id === this._classId) || {};
     const students = DB.get('students').filter(s => s.classId === this._classId);
-    const cfg = {
-      present: { color: '#10b981', bg: 'rgba(16,185,129,.12)',  border: 'rgba(16,185,129,.3)'  },
-      late:    { color: '#C8962A', bg: 'rgba(200,150,42,.12)', border: 'rgba(200,150,42,.3)' },
-      absent:  { color: '#EF4444', bg: 'rgba(239,68,68,.12)',  border: 'rgba(239,68,68,.3)'  },
+    const n = students.length;
+    const cfColors = {
+      present: { bg: '#E2EFDA', color: '#375623', border: '#A9D18E' },
+      late:    { bg: '#FCEACC', color: '#7A4F1C', border: '#F4B942' },
+      absent:  { bg: '#FCE4D6', color: '#9C0006', border: '#FF7676' },
     };
     const counts = { present: 0, late: 0, absent: 0 };
     students.forEach(s => counts[this._attMap[s.id] || 'present']++);
 
-    const mkBeh = (s, b) => `<button
-      onclick="Pages.incBehavior('${s.id}','${b.key}','${this._classId}');LessonMode._refreshBeh('${s.id}')"
-      title="${b.label}"
-      style="background:${b.color}18;border:1px solid ${b.color}40;border-radius:7px;
-        padding:4px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
-        gap:1px;transition:background .12s;min-width:32px;font-family:inherit"
-      onmouseover="this.style.background='${b.color}35'" onmouseout="this.style.background='${b.color}18'">
-      <span style="font-size:.95rem;line-height:1">${b.emoji}</span>
-      <span id="lm-beh-${s.id}-${b.key}" style="font-size:.58rem;font-weight:800;color:${b.color}">${s.behaviors?.[b.key] || 0}</span>
-    </button>`;
-
-    const rows = students.map(s => {
+    const rows = students.map((s, i) => {
       const st = this._attMap[s.id] || 'present';
-      const c = cfg[st];
-      const mkAtt = key => `<button id="lm-att-${s.id}-${key}"
-        onclick="LessonMode._setAtt('${s.id}','${key}')"
-        style="width:28px;height:28px;border-radius:7px;font-size:.75rem;font-weight:900;
-          border:1.5px solid ${st===key ? cfg[key].color : 'rgba(255,255,255,.15)'};
-          background:${st===key ? cfg[key].color : 'transparent'};
-          color:${st===key ? '#fff' : 'rgba(255,255,255,.35)'};cursor:pointer;transition:all .12s;font-family:inherit">
-        ${key==='present'?'✓':key==='late'?'⏰':'✗'}</button>`;
-
-      return `<div id="lm-row-${s.id}"
-        style="display:flex;align-items:center;gap:8px;padding:.5rem .75rem;
-          border-bottom:1px solid rgba(255,255,255,.05);border-right:3px solid ${c.color};
-          background:${c.bg};transition:background .15s">
-        <div style="width:34px;height:34px;border-radius:50%;background:${c.color};color:#fff;
-          display:flex;align-items:center;justify-content:center;font-size:.95rem;font-weight:900;flex-shrink:0">
-          ${s.name.charAt(0)}</div>
-        <div style="font-weight:700;font-size:.82rem;flex:1;min-width:0;color:rgba(245,248,252,.9);
-          overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-          ${s.name}</div>
-        <div style="display:flex;gap:2px;align-items:center;flex-shrink:0">
-          ${BEH_TYPES.filter(b=>b.pos).map(b=>mkBeh(s,b)).join('')}
-          <div style="width:1px;height:24px;background:rgba(255,255,255,.1);margin:0 2px"></div>
-          ${BEH_TYPES.filter(b=>!b.pos).map(b=>mkBeh(s,b)).join('')}
-        </div>
-        <div style="display:flex;gap:3px;flex-shrink:0">
-          ${mkAtt('present')}${mkAtt('late')}${mkAtt('absent')}
-        </div>
-      </div>`;
+      const cf = cfColors[st];
+      const attBtns = ['present','late','absent'].map(key => {
+        const active = st === key;
+        const kc = cfColors[key];
+        const icon = key==='present'?'✓':key==='late'?'⏰':'✗';
+        return `<button id="lm-att-${s.id}-${key}"
+          onclick="LessonMode._setAtt('${s.id}','${key}')"
+          style="width:24px;height:24px;border-radius:3px;font-size:.62rem;font-weight:900;
+            border:1.5px solid ${active?kc.border:'#C0C0C0'};
+            background:${active?kc.bg:'#fff'};color:${active?kc.color:'#aaa'};
+            cursor:pointer;transition:all .1s;font-family:inherit;padding:0">
+          ${icon}</button>`;
+      }).join('');
+      const behCells = BEH_TYPES.map(b => {
+        const val = s.behaviors?.[b.key] || 0;
+        return `<td class="xl-cell" style="text-align:center;padding:2px 3px;cursor:pointer;
+            background:${val>0?(b.pos?'#E2EFDA':'#FCE4D6'):'transparent'}"
+          onclick="Pages.incBehavior('${s.id}','${b.key}','${this._classId}');LessonMode._refreshBeh('${s.id}')"
+          title="${b.label}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+            <span style="font-size:.85rem;line-height:1">${b.emoji}</span>
+            <span id="lm-beh-${s.id}-${b.key}" style="font-size:.58rem;font-weight:800;
+              color:${b.pos?'#375623':'#9C0006'}">${val||''}</span>
+          </div></td>`;
+      }).join('');
+      return `<tr id="lm-row-${s.id}" style="background:${cf.bg}">
+        <td class="xl-rownum">${i+2}</td>
+        <td class="xl-cell" style="text-align:center;font-family:monospace;font-weight:700;color:#1F497D">${i+1}</td>
+        <td class="xl-cell" style="font-weight:700;color:${cf.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${s.name}</td>
+        <td class="xl-cell" style="padding:3px 4px">
+          <div style="display:flex;gap:2px;align-items:center;justify-content:center">${attBtns}</div>
+        </td>
+        ${behCells}
+      </tr>`;
     }).join('');
 
-    return `<div style="background:rgba(14,18,26,.95);border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.08)">
-      <div style="display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;
-        border-bottom:1px solid rgba(255,255,255,.07);background:rgba(10,14,20,.9);flex-wrap:wrap">
-        <span id="lm-cnt-present" style="background:rgba(16,185,129,.2);color:#10b981;padding:3px 12px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid rgba(16,185,129,.3)">✓ ${counts.present} حاضر</span>
-        <span id="lm-cnt-late"    style="background:rgba(200,150,42,.18);color:#d97706;padding:3px 12px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid rgba(200,150,42,.3)">⏰ ${counts.late} متأخر</span>
-        <span id="lm-cnt-absent"  style="background:rgba(239,68,68,.18);color:#f87171;padding:3px 12px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid rgba(239,68,68,.3)">✗ ${counts.absent} غائب</span>
-        <button onclick="LessonMode._saveAtt()"
-          style="margin-right:auto;background:#059669;color:#fff;border:none;padding:4px 16px;
-            border-radius:20px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit">
-          <i class="fas fa-save"></i> حفظ الحضور</button>
+    const filename = `حضور_${cls.name||'فصل'}.xlsx`;
+    return `<div class="xl-widget" style="border-radius:8px;overflow:hidden;font-size:.78rem;box-shadow:0 2px 12px rgba(0,0,0,.15)">
+      <div class="xl-titlebar" style="display:flex;align-items:center;gap:.5rem;padding:.4rem .7rem;flex-wrap:wrap">
+        <div class="xl-title-icon">X</div>
+        <div class="xl-title-filename">${filename}</div>
+        <div style="margin-right:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+          <span id="lm-cnt-present" style="background:#E2EFDA;color:#375623;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #A9D18E">✓ ${counts.present} حاضر</span>
+          <span id="lm-cnt-late"    style="background:#FCEACC;color:#7A4F1C;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #F4B942">⏰ ${counts.late} متأخر</span>
+          <span id="lm-cnt-absent"  style="background:#FCE4D6;color:#9C0006;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #FF7676">✗ ${counts.absent} غائب</span>
+          <button onclick="LessonMode._saveAtt()"
+            style="background:#1D6F42;color:#fff;border:none;padding:4px 14px;border-radius:4px;
+              font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit">
+            <i class="fas fa-save"></i> حفظ</button>
+        </div>
       </div>
-      ${rows}
+      <div class="xl-formulabar">
+        <div class="xl-fb-cellref">C${n+1}</div>
+        <div class="xl-fb-sep"></div>
+        <span class="xl-fb-fx">fx</span>
+        <div class="xl-fb-formula">=COUNTIF(C2:C${n+1},"حاضر")</div>
+      </div>
+      <div class="xl-sheet" style="overflow:auto;max-height:62vh">
+        <table class="xl-table" style="min-width:100%">
+          <thead>
+            <tr>
+              <td class="xl-col-hdr-cell corner"></td>
+              <td class="xl-col-hdr-cell">A</td>
+              <td class="xl-col-hdr-cell">B</td>
+              <td class="xl-col-hdr-cell">C</td>
+              ${BEH_TYPES.map((_,i)=>`<td class="xl-col-hdr-cell">${String.fromCharCode(68+i)}</td>`).join('')}
+            </tr>
+            <tr style="background:#F2F2F2">
+              <td class="xl-rownum">1</td>
+              <td class="xl-cell label" style="text-align:center;font-size:.7rem">رقم</td>
+              <td class="xl-cell label">الاسم</td>
+              <td class="xl-cell label" style="text-align:center;font-size:.7rem">الحضور</td>
+              ${BEH_TYPES.map(b=>`<td class="xl-cell label" style="text-align:center;font-size:.75rem;padding:2px 3px" title="${b.label}">${b.emoji}</td>`).join('')}
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
     </div>`;
   },
 
@@ -4821,27 +4848,27 @@ const LessonMode = {
   },
 
   _refreshAtt(stuId) {
-    const cfg = {
-      present: { color: '#10b981', bg: 'rgba(16,185,129,.12)',  border: 'rgba(16,185,129,.3)'  },
-      late:    { color: '#C8962A', bg: 'rgba(200,150,42,.12)', border: 'rgba(200,150,42,.3)' },
-      absent:  { color: '#EF4444', bg: 'rgba(239,68,68,.12)',  border: 'rgba(239,68,68,.3)'  },
+    const cfColors = {
+      present: { bg: '#E2EFDA', color: '#375623', border: '#A9D18E' },
+      late:    { bg: '#FCEACC', color: '#7A4F1C', border: '#F4B942' },
+      absent:  { bg: '#FCE4D6', color: '#9C0006', border: '#FF7676' },
     };
     const st = this._attMap[stuId] || 'present';
-    const c = cfg[st];
+    const cf = cfColors[st];
     const row = document.getElementById(`lm-row-${stuId}`);
-    if (row) {
-      row.style.borderColor = c.border;
-      row.style.background = c.bg;
-    }
+    if (row) row.style.background = cf.bg;
     ['present','late','absent'].forEach(key => {
       const btn = document.getElementById(`lm-att-${stuId}-${key}`);
       if (!btn) return;
       const active = st === key;
-      const col = cfg[key].color;
-      btn.style.background = active ? col : 'transparent';
-      btn.style.borderColor = active ? col : 'rgba(255,255,255,.15)';
-      btn.style.color = active ? '#fff' : 'rgba(255,255,255,.45)';
+      const kc = cfColors[key];
+      btn.style.background = active ? kc.bg : '#fff';
+      btn.style.borderColor = active ? kc.border : '#C0C0C0';
+      btn.style.color = active ? kc.color : '#aaa';
     });
+    // update the name cell color
+    const nameCell = row?.querySelector('td:nth-child(3)');
+    if (nameCell) nameCell.style.color = cf.color;
     // update counter pills
     const students = DB.get('students').filter(s => s.classId === this._classId);
     const counts = { present: 0, late: 0, absent: 0 };
