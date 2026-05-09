@@ -4684,6 +4684,7 @@ const LessonMode = {
     const c = document.getElementById('lm-content');
     if (!c) return;
     c.classList.remove('page-fade-in'); void c.offsetWidth; c.classList.add('page-fade-in');
+    c.classList.toggle('lm-content-xl', tab === 'combined');
     if (tab === 'combined')  c.innerHTML = this._renderCombined();
     else if (tab === 'groups') c.innerHTML = this._renderGroups();
   },
@@ -4710,7 +4711,7 @@ const LessonMode = {
         const icon = key==='present'?'✓':key==='late'?'⏰':'✗';
         return `<button id="lm-att-${s.id}-${key}"
           onclick="LessonMode._setAtt('${s.id}','${key}')"
-          style="width:24px;height:24px;border-radius:3px;font-size:.62rem;font-weight:900;
+          style="width:26px;height:26px;border-radius:3px;font-size:.65rem;font-weight:900;
             border:1.5px solid ${active?kc.border:'#C0C0C0'};
             background:${active?kc.bg:'#fff'};color:${active?kc.color:'#aaa'};
             cursor:pointer;transition:all .1s;font-family:inherit;padding:0">
@@ -4718,21 +4719,20 @@ const LessonMode = {
       }).join('');
       const behCells = BEH_TYPES.map(b => {
         const val = s.behaviors?.[b.key] || 0;
-        return `<td class="xl-cell" style="text-align:center;padding:2px 3px;cursor:pointer;
+        return `<td class="xl-cell" style="text-align:center;padding:2px 4px;cursor:pointer;
             background:${val>0?(b.pos?'#E2EFDA':'#FCE4D6'):'transparent'}"
           onclick="Pages.incBehavior('${s.id}','${b.key}','${this._classId}');LessonMode._refreshBeh('${s.id}')"
           title="${b.label}">
           <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-            <span style="font-size:.85rem;line-height:1">${b.emoji}</span>
-            <span id="lm-beh-${s.id}-${b.key}" style="font-size:.58rem;font-weight:800;
+            <span style="font-size:.9rem;line-height:1">${b.emoji}</span>
+            <span id="lm-beh-${s.id}-${b.key}" style="font-size:.6rem;font-weight:800;
               color:${b.pos?'#375623':'#9C0006'}">${val||''}</span>
           </div></td>`;
       }).join('');
       return `<tr id="lm-row-${s.id}" style="background:${cf.bg}">
         <td class="xl-rownum">${i+2}</td>
-        <td class="xl-cell" style="text-align:center;font-family:monospace;font-weight:700;color:#1F497D">${i+1}</td>
-        <td class="xl-cell" style="font-weight:700;color:${cf.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${s.name}</td>
-        <td class="xl-cell" style="padding:3px 4px">
+        <td class="xl-cell" style="font-weight:700;color:${cf.color};white-space:nowrap">${s.name}</td>
+        <td class="xl-cell" style="padding:3px 5px">
           <div style="display:flex;gap:2px;align-items:center;justify-content:center">${attBtns}</div>
         </td>
         ${behCells}
@@ -4740,8 +4740,8 @@ const LessonMode = {
     }).join('');
 
     const filename = `حضور_${cls.name||'فصل'}.xlsx`;
-    return `<div class="xl-widget" style="border-radius:8px;overflow:hidden;font-size:.78rem;box-shadow:0 2px 12px rgba(0,0,0,.15)">
-      <div class="xl-titlebar" style="display:flex;align-items:center;gap:.5rem;padding:.4rem .7rem;flex-wrap:wrap">
+    return `<div style="display:flex;flex-direction:column;height:100%;font-size:.8rem">
+      <div class="xl-titlebar" style="display:flex;align-items:center;gap:.5rem;padding:.45rem .8rem;flex-wrap:wrap;flex-shrink:0">
         <div class="xl-title-icon">X</div>
         <div class="xl-title-filename">${filename}</div>
         <div style="margin-right:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
@@ -4754,28 +4754,26 @@ const LessonMode = {
             <i class="fas fa-save"></i> حفظ</button>
         </div>
       </div>
-      <div class="xl-formulabar">
-        <div class="xl-fb-cellref">C${n+1}</div>
+      <div class="xl-formulabar" style="flex-shrink:0">
+        <div class="xl-fb-cellref">B${n+1}</div>
         <div class="xl-fb-sep"></div>
         <span class="xl-fb-fx">fx</span>
-        <div class="xl-fb-formula">=COUNTIF(C2:C${n+1},"حاضر")</div>
+        <div class="xl-fb-formula">=COUNTIF(B2:B${n+1},"حاضر")</div>
       </div>
-      <div class="xl-sheet" style="overflow:auto;max-height:62vh">
-        <table class="xl-table" style="min-width:100%">
+      <div style="overflow:auto;flex:1">
+        <table class="xl-table" style="width:100%">
           <thead>
             <tr>
               <td class="xl-col-hdr-cell corner"></td>
               <td class="xl-col-hdr-cell">A</td>
               <td class="xl-col-hdr-cell">B</td>
-              <td class="xl-col-hdr-cell">C</td>
-              ${BEH_TYPES.map((_,i)=>`<td class="xl-col-hdr-cell">${String.fromCharCode(68+i)}</td>`).join('')}
+              ${BEH_TYPES.map((_,i)=>`<td class="xl-col-hdr-cell">${String.fromCharCode(67+i)}</td>`).join('')}
             </tr>
             <tr style="background:#F2F2F2">
               <td class="xl-rownum">1</td>
-              <td class="xl-cell label" style="text-align:center;font-size:.7rem">رقم</td>
               <td class="xl-cell label">الاسم</td>
-              <td class="xl-cell label" style="text-align:center;font-size:.7rem">الحضور</td>
-              ${BEH_TYPES.map(b=>`<td class="xl-cell label" style="text-align:center;font-size:.75rem;padding:2px 3px" title="${b.label}">${b.emoji}</td>`).join('')}
+              <td class="xl-cell label" style="text-align:center;font-size:.72rem">الحضور</td>
+              ${BEH_TYPES.map(b=>`<td class="xl-cell label" style="text-align:center;padding:2px 4px" title="${b.label}">${b.emoji}</td>`).join('')}
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -4867,7 +4865,7 @@ const LessonMode = {
       btn.style.color = active ? kc.color : '#aaa';
     });
     // update the name cell color
-    const nameCell = row?.querySelector('td:nth-child(3)');
+    const nameCell = row?.querySelector('td:nth-child(2)');
     if (nameCell) nameCell.style.color = cf.color;
     // update counter pills
     const students = DB.get('students').filter(s => s.classId === this._classId);
