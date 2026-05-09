@@ -3353,11 +3353,11 @@ const Pages = {
   ],
   _periods: 8,
 
-  _schDragId: null,
-  _schDragStart(ev, id) {
-    this._schDragId = id;
+  _schDrag: null, // { type:'entry'|'class', id }
+  _schDragStart(ev, type, id) {
+    this._schDrag = { type, id };
     ev.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => ev.target.closest('td')?.classList.add('tt-dragging'), 0);
+    setTimeout(() => ev.target.closest('[draggable]')?.classList.add('tt-dragging'), 0);
   },
   _schDragOver(ev) {
     ev.preventDefault();
@@ -3368,24 +3368,41 @@ const Pages = {
   _schDrop(ev, day, period) {
     ev.preventDefault();
     ev.currentTarget.classList.remove('tt-drag-over');
-    const dragId = this._schDragId;
-    this._schDragId = null;
-    if (!dragId) return;
+    const drag = this._schDrag;
+    this._schDrag = null;
+    if (!drag) return;
     const schedule = DB.get('schedule');
-    const src = schedule.find(s => s.id === dragId);
-    if (!src) return;
-    const tgt = schedule.find(s => s.day === day && s.period === period);
-    if (tgt && tgt.id === dragId) return; // same cell
-    if (tgt) {
-      const sd = src.day, sp = src.period;
-      src.day = day; src.period = period;
-      tgt.day = sd; tgt.period = sp;
+
+    if (drag.type === 'entry') {
+      // move/swap existing entry
+      const src = schedule.find(s => s.id === drag.id);
+      if (!src) return;
+      const tgt = schedule.find(s => s.day === day && s.period === period);
+      if (tgt && tgt.id === drag.id) return;
+      if (tgt) {
+        const sd = src.day, sp = src.period;
+        src.day = day; src.period = period;
+        tgt.day = sd; tgt.period = sp;
+        Toast.show('↔ تم التبديل');
+      } else {
+        src.day = day; src.period = period;
+        Toast.show('✓ تم النقل');
+      }
     } else {
-      src.day = day; src.period = period;
+      // drop class from legend bar → place/replace in cell
+      const cls = DB.get('classes').find(c => c.id === drag.id);
+      if (!cls) return;
+      const tgt = schedule.find(s => s.day === day && s.period === period);
+      if (tgt) {
+        tgt.classId = drag.id;
+        tgt.subject = cls.subject || '';
+      } else {
+        schedule.push({ id: Math.random().toString(36).slice(2), day, period, classId: drag.id, subject: cls.subject || '', notes: '' });
+      }
+      Toast.show('✓ تمت الإضافة');
     }
     DB.set('schedule', schedule);
     this.lessons();
-    Toast.show(tgt ? '↔ تم التبديل' : '✓ تم النقل');
   },
 
   lessons() {
@@ -3420,7 +3437,7 @@ const Pages = {
         if (entry && cls) return `
           <td class="tt-cell tt-filled${isToday?' tt-today-col':''}"
             draggable="true"
-            ondragstart="Pages._schDragStart(event,'${entry.id}')"
+            ondragstart="Pages._schDragStart(event,'entry','${entry.id}')"
             ondragover="Pages._schDragOver(event)"
             ondrop="Pages._schDrop(event,'${d.key}',${p})"
             ondragleave="Pages._schDragLeave(event)"
@@ -3455,13 +3472,16 @@ const Pages = {
     }).join('');
 
     const legend = classes.map(c =>
-      `<div class="tt-legend-item" onclick="Pages.changeClassColor('${c.id}')" title="غيّر لون الفصل">
+      `<div class="tt-legend-item" draggable="true"
+        ondragstart="Pages._schDragStart(event,'class','${c.id}')"
+        ondragend="this.classList.remove('tt-dragging')"
+        onclick="Pages.changeClassColor('${c.id}')" title="اسحب لوضع في الجدول / انقر لتغيير اللون">
         <div class="tt-legend-dot" style="background:${clsColor[c.id]};box-shadow:0 0 0 3px ${clsColor[c.id]}30"></div>
         <div style="display:flex;flex-direction:column;gap:.1rem">
           <span>${c.name}</span>
           ${c.subject ? `<small style="font-size:.72em;opacity:.7">${c.subject}</small>` : ''}
         </div>
-        <i class="fas fa-pen" style="font-size:.58rem;color:var(--gray-400)"></i>
+        <i class="fas fa-grip-vertical" style="font-size:.65rem;color:var(--gray-400);cursor:grab"></i>
       </div>`
     ).join('');
 
@@ -3469,9 +3489,6 @@ const Pages = {
       <div class="page-header">
         <h2>جدول الحصص</h2>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <button class="btn btn-sm btn-outline" id="tt-hide-btn" onclick="Pages._ttToggleEmpty()" title="إخفاء/إظهار الحصص الفارغة">
-            <i class="fas fa-eye-slash"></i> إخفاء الفارغة
-          </button>
           <button class="btn btn-sm btn-outline" onclick="Pages.editPeriodsModal()"><i class="fas fa-clock"></i> تعديل الأوقات</button>
           <button class="btn btn-sm btn-outline" onclick="Print.timetable()"><i class="fas fa-print"></i> طباعة</button>
           <button class="btn btn-sm btn-outline-danger" onclick="Pages.clearSchedule()"><i class="fas fa-trash"></i> مسح</button>
@@ -3494,16 +3511,6 @@ const Pages = {
         </div>
         <p class="tt-hint"><i class="fas fa-info-circle"></i> اضغط فصلاً لفتح الحضور — اسحب لنقله — ✎ للتعديل — انقر مرتين على وقت الحصة لتعديل الأوقات</p>`}
     `;
-  },
-
-  _ttHideEmpty: false,
-  _ttToggleEmpty() {
-    this._ttHideEmpty = !this._ttHideEmpty;
-    document.getElementById('tt-table')?.classList.toggle('tt-hide-empty', this._ttHideEmpty);
-    const btn = document.getElementById('tt-hide-btn');
-    if (btn) btn.innerHTML = this._ttHideEmpty
-      ? '<i class="fas fa-eye"></i> إظهار الكل'
-      : '<i class="fas fa-eye-slash"></i> إخفاء الفارغة';
   },
 
   editPeriodsModal() {
