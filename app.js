@@ -1306,99 +1306,33 @@ const Pages = {
     const attDone   = !!att;
     const isNow     = cls.id === activeClsId;
     const warnCount = students.filter(s => s.classId === cls.id && _behWarn(s).length > 0).length;
-    const filename  = `سجل_${cls.name.replace(/\s+/g,'_')}.xlsx`;
-    const formula   = attDone ? '=TRUE()' : '=FALSE()';
-    const cfClass   = attDone ? 'xl-cf-green' : 'xl-cf-red';
-    const cfB       = attDone
-      ? `<span class="xl-formula-text" style="color:#375623">=TRUE()</span>`
-      : `<span class="xl-formula-text" style="color:#9C0006">=FALSE()</span>`;
-    const cfC       = attDone
-      ? `<span style="font-size:.7rem">✓ ${pres} / ${cnt}</span>`
-      : `<span style="font-size:.7rem">⚠ لم يُسجل</span>`;
-    const warnRow   = warnCount ? `
-      <tr>
-        <td class="xl-rownum">5</td>
-        <td class="xl-cell label">تحذيرات</td>
-        <td class="xl-cell xl-cf-orange" style="font-family:monospace;font-weight:700">${warnCount}</td>
-        <td class="xl-cell xl-cf-orange" style="font-size:.7rem">طالب بحاجة انتباه</td>
-      </tr>` : '';
+    const color     = cls.color || 'var(--primary)';
+    const attBadge  = attDone
+      ? `<span style="background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3);padding:.2rem .6rem;border-radius:20px;font-size:.75rem;font-weight:700"><i class="fas fa-check"></i> ${pres}/${cnt} حاضر</span>`
+      : `<span style="background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.25);padding:.2rem .6rem;border-radius:20px;font-size:.75rem;font-weight:700"><i class="fas fa-clock"></i> لم يُسجَّل</span>`;
+    const warnBadge = warnCount
+      ? `<span style="background:rgba(245,158,11,.1);color:#d97706;border:1px solid rgba(245,158,11,.25);padding:.2rem .6rem;border-radius:20px;font-size:.75rem;font-weight:700"><i class="fas fa-exclamation-triangle"></i> ${warnCount} تحذير</span>`
+      : '';
 
     return `
-    <div class="xl-widget${isNow ? ' xl-active-now' : ''}">
-      <div class="xl-titlebar">
-        <div class="xl-title-icon">X</div>
-        ${isNow ? '<div class="xl-live-dot"></div>' : ''}
-        <div class="xl-title-filename">${filename}</div>
-        <div class="xl-winctrl">
-          <span class="xl-wc-min" title="مصغّر">—</span>
-          <span class="xl-wc-max" title="تكبير">□</span>
-          <span class="xl-wc-cls" title="تعديل الفصل" onclick="Pages.editClass('${cls.id}')">✕</span>
+    <div class="cls-card${isNow ? ' cls-card-active' : ''}" style="--cls-color:${color}">
+      <div class="cls-card-top">
+        <div class="cls-card-dot" style="background:${color}"></div>
+        <div class="cls-card-info">
+          <div class="cls-card-name">${cls.name}${isNow ? ' <span class="cls-live-dot"></span>' : ''}</div>
+          <div class="cls-card-sub">${cls.subject || '—'}</div>
         </div>
+        <button class="cls-card-edit" onclick="Pages.editClass('${cls.id}')" title="تعديل"><i class="fas fa-pen"></i></button>
       </div>
-      <div class="xl-formulabar">
-        <div class="xl-fb-cellref">B4</div>
-        <div class="xl-fb-sep"></div>
-        <span class="xl-fb-fx">fx</span>
-        <div class="xl-fb-formula">${formula}</div>
+      <div class="cls-card-stats">
+        <div class="cls-card-stat"><i class="fas fa-users" style="color:var(--primary)"></i> <strong>${cnt}</strong> ${_T.stu}</div>
+        ${attBadge}${warnBadge ? ' ' + warnBadge : ''}
       </div>
-      <div class="xl-sheet">
-        <table class="xl-table">
-          <colgroup>
-            <col style="width:26px">
-            <col style="width:32%">
-            <col style="width:36%">
-            <col>
-          </colgroup>
-          <thead>
-            <tr>
-              <td class="xl-col-hdr-cell corner"></td>
-              <td class="xl-col-hdr-cell">A</td>
-              <td class="xl-col-hdr-cell">B</td>
-              <td class="xl-col-hdr-cell">C</td>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="xl-rownum">1</td>
-              <td class="xl-cell label">الفصل</td>
-              <td class="xl-cell" style="font-weight:800;color:#1D6F42">${cls.name}</td>
-              <td class="xl-cell"></td>
-            </tr>
-            <tr>
-              <td class="xl-rownum">2</td>
-              <td class="xl-cell label">المادة</td>
-              <td class="xl-cell">${cls.subject || '—'}</td>
-              <td class="xl-cell"></td>
-            </tr>
-            <tr>
-              <td class="xl-rownum">3</td>
-              <td class="xl-cell label">الطلاب</td>
-              <td class="xl-cell" style="font-weight:700;color:#1F497D;font-family:monospace">${cnt}</td>
-              <td class="xl-cell" style="color:#888;font-size:.72rem">طالب</td>
-            </tr>
-            <tr>
-              <td class="xl-rownum">4</td>
-              <td class="xl-cell label selected">الحضور</td>
-              <td class="xl-cell selected ${cfClass}">${cfB}</td>
-              <td class="xl-cell ${cfClass}">${cfC}</td>
-            </tr>
-            ${warnRow}
-          </tbody>
-        </table>
-      </div>
-      <div class="xl-actions">
-        <button class="xl-action-btn xl-action-green" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
-          <i class="fas fa-clipboard-check"></i> حضور
-        </button>
-        <button class="xl-action-btn xl-action-blue" onclick="Router.go('grades',{classId:'${cls.id}'})">
-          <i class="fas fa-star"></i> درجات
-        </button>
-        <button class="xl-action-btn xl-action-gray" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'groups'})">
-          <i class="fas fa-object-group"></i> مجموعات
-        </button>
-        <button class="xl-action-btn xl-action-lm" style="margin-right:auto" onclick="LessonMode.open('${cls.id}')">
-          <i class="fas fa-chalkboard"></i> حصة
-        </button>
+      <div class="cls-card-actions">
+        <button class="cls-card-btn" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})"><i class="fas fa-clipboard-check"></i> حضور</button>
+        <button class="cls-card-btn" onclick="Router.go('grades',{classId:'${cls.id}'})"><i class="fas fa-star"></i> درجات</button>
+        <button class="cls-card-btn" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'groups'})"><i class="fas fa-object-group"></i> مجموعات</button>
+        <button class="cls-card-btn cls-card-btn-primary" onclick="LessonMode.open('${cls.id}')"><i class="fas fa-chalkboard"></i> حصة</button>
       </div>
     </div>`;
   },
