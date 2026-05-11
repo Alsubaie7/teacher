@@ -1306,6 +1306,12 @@ const Pages = {
     const _activeHtml = (period, cls) => {
       const left = md(hm, period.e);
       const stuCount = cls ? DB.get('students').filter(s => s.classId === cls.id).length : 0;
+      // When period is empty — find next scheduled class today
+      const allPeriods = TimeAware._periods();
+      const nextWithCls = !cls
+        ? allPeriods.filter(p => p.p > period.p).map(p => ({ period: p, cls: clsForPeriod(p) })).find(x => x.cls)
+        : null;
+      const waitNext = nextWithCls ? md(hm, nextWithCls.period.s) : null;
       const clsActions = cls ? `
         <button class="syswin-act-btn syswin-act-primary" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
           <i class="fas fa-clipboard-check"></i> الحضور والسلوك
@@ -1323,27 +1329,43 @@ const Pages = {
             <span class="syswin-dot syswin-dot-yellow"></span>
             <span class="syswin-dot syswin-dot-green"></span>
           </div>
-          <div class="syswin-title-text"><i class="fas fa-chalkboard-teacher" style="opacity:.7;font-size:.75rem"></i> ${_T.manageTch} — الحصة ${period.p} جارية الآن</div>
+          <div class="syswin-title-text"><i class="fas fa-chalkboard-teacher" style="opacity:.7;font-size:.75rem"></i> ${_T.manageTch} — الحصة ${period.p} ${cls ? 'جارية الآن' : '— وقت حر'}</div>
           <div style="width:52px"></div>
         </div>
         <div class="syswin-body">
           <div class="syswin-main-col">
-            <div class="syswin-moon" style="font-size:2rem">📋</div>
-            <div class="syswin-status-label"><span class="hero-pulse" style="background:#28C840;box-shadow:0 0 6px rgba(40,200,64,.8);display:inline-block"></span> حصة جارية الآن</div>
-            <div class="syswin-headline">${cls ? cls.name : 'حصة فارغة'}</div>
+            <div class="syswin-moon" style="font-size:2rem">${cls ? '📋' : '☕'}</div>
+            <div class="syswin-status-label">
+              <span class="hero-pulse" style="background:${cls ? '#28C840' : '#F59E0B'};box-shadow:0 0 6px ${cls ? 'rgba(40,200,64,.8)' : 'rgba(245,158,11,.8)'};display:inline-block"></span>
+              ${cls ? 'حصة جارية الآن' : 'حصة فارغة — وقت حر'}
+            </div>
+            <div class="syswin-headline">${cls ? cls.name : 'وقت حر'}</div>
             <div class="syswin-sub">${period.s} — ${period.e}${cls?.subject ? ' · ' + cls.subject : ''}</div>
+            ${nextWithCls ? `
+            <div style="margin-top:.9rem;padding:.55rem .75rem;background:rgba(99,102,241,.13);border-radius:.55rem;border:1px solid rgba(99,102,241,.28)">
+              <div style="font-size:.68rem;color:rgba(255,255,255,.55);margin-bottom:.25rem;letter-spacing:.03em">📌 حصتك القادمة</div>
+              <div style="font-weight:800;font-size:.98rem;line-height:1.2">${nextWithCls.cls.name}</div>
+              <div style="font-size:.76rem;color:rgba(255,255,255,.65);margin-top:.15rem">${nextWithCls.cls.subject ? nextWithCls.cls.subject + ' · ' : ''}الساعة ${nextWithCls.period.s}</div>
+            </div>` : (!cls ? `<div style="margin-top:.9rem;font-size:.78rem;color:rgba(255,255,255,.45)">لا توجد حصص قادمة اليوم</div>` : '')}
           </div>
           <div class="syswin-glass">
-            <div class="syswin-glass-title"><i class="fas fa-hourglass-half"></i> الوقت المتبقي</div>
+            <div class="syswin-glass-title">
+              <i class="fas fa-${cls ? 'hourglass-half' : nextWithCls ? 'bell' : 'clock'}"></i>
+              ${cls ? 'الوقت المتبقي' : nextWithCls ? 'حتى الحصة القادمة' : 'الوقت المتبقي'}
+            </div>
             <div class="syswin-stats-row" style="margin-bottom:.6rem">
               <div class="syswin-stat">
-                <div class="syswin-stat-num">${left}</div>
-                <div class="syswin-stat-lbl">دقيقة متبقية</div>
+                <div class="syswin-stat-num">${nextWithCls ? waitNext : left}</div>
+                <div class="syswin-stat-lbl">${nextWithCls ? 'دقيقة للحصة' : 'دقيقة متبقية'}</div>
               </div>
               ${cls ? `<div class="syswin-stat-sep"></div>
               <div class="syswin-stat">
                 <div class="syswin-stat-num">${stuCount}</div>
                 <div class="syswin-stat-lbl">طالب</div>
+              </div>` : nextWithCls ? `<div class="syswin-stat-sep"></div>
+              <div class="syswin-stat">
+                <div class="syswin-stat-num">${nextWithCls.period.p}</div>
+                <div class="syswin-stat-lbl">رقم الحصة</div>
               </div>` : ''}
             </div>
             ${clsActions}
