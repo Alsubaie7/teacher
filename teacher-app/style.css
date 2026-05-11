@@ -628,6 +628,130 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .grade-dist-row:last-child { border-bottom:none; }
 
+/* --- KPI Cards --- */
+.grades-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: .65rem;
+  margin-bottom: 1rem;
+}
+@media (max-width: 900px) { .grades-kpi-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .grades-kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+.grades-kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: .85rem 1rem;
+  display: flex; flex-direction: column; gap: .2rem;
+  box-shadow: var(--shadow);
+  transition: transform .15s;
+}
+.grades-kpi:hover { transform: translateY(-2px); }
+.grades-kpi-val {
+  font-size: 1.55rem; font-weight: 900; line-height: 1;
+}
+.grades-kpi-lbl {
+  font-size: .72rem; color: var(--text-muted); font-weight: 500;
+}
+.grades-kpi-icon {
+  font-size: .9rem; margin-bottom: .15rem;
+}
+.kpi-avg   .grades-kpi-val { color: var(--primary); }
+.kpi-avg   .grades-kpi-icon { color: var(--primary); }
+.kpi-high  .grades-kpi-val { color: var(--green); }
+.kpi-high  .grades-kpi-icon { color: var(--green); }
+.kpi-low   .grades-kpi-val { color: var(--red); }
+.kpi-low   .grades-kpi-icon { color: var(--red); }
+.kpi-pass  .grades-kpi-val { color: var(--blue); }
+.kpi-pass  .grades-kpi-icon { color: var(--blue); }
+.kpi-miss  .grades-kpi-val { color: var(--text-muted); }
+.kpi-miss  .grades-kpi-icon { color: var(--text-muted); }
+
+/* --- Quick Filter Toolbar --- */
+.grades-toolbar {
+  display: flex; align-items: center; gap: .5rem;
+  flex-wrap: wrap; margin-bottom: .75rem;
+}
+.grades-search {
+  flex: 1; min-width: 140px; max-width: 240px;
+  padding: .38rem .8rem; border: 1px solid var(--border);
+  border-radius: var(--radius); font-family: inherit; font-size: .83rem;
+  background: var(--surface); color: var(--text-primary);
+  outline: none; transition: border .15s;
+}
+.grades-search:focus { border-color: var(--primary); }
+.grades-qf {
+  display: flex; gap: .3rem; flex-wrap: wrap;
+}
+.grades-qf-btn {
+  padding: .3rem .75rem; border-radius: 20px; font-size: .75rem; font-weight: 700;
+  font-family: inherit; cursor: pointer; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-muted);
+  transition: all .15s;
+}
+.grades-qf-btn.active, .grades-qf-btn:hover {
+  border-color: var(--primary); color: var(--primary);
+  background: var(--primary-dim);
+}
+.grades-qf-btn.qf-fail.active, .grades-qf-btn.qf-fail:hover {
+  border-color: var(--red); color: var(--red);
+  background: var(--red-light);
+}
+.grades-qf-btn.qf-miss.active, .grades-qf-btn.qf-miss:hover {
+  border-color: var(--text-muted); color: var(--text-secondary);
+  background: rgba(0,0,0,.05);
+}
+
+/* --- Progress bar in total column --- */
+.tot-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.tot-bar-bg {
+  width: 48px; height: 4px; border-radius: 3px;
+  background: var(--border); overflow: hidden;
+}
+.tot-bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width .4s ease;
+}
+
+/* --- Sticky thead --- */
+.grades-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-2);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* --- Distribution bars --- */
+.grades-dist-wrap {
+  padding: 1rem 1.2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  margin-top: 1rem;
+}
+.grades-dist-title {
+  font-size: .78rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em; margin-bottom: .65rem;
+}
+.dist-row {
+  display: flex; align-items: center; gap: .6rem;
+  margin-bottom: .45rem; font-size: .8rem;
+}
+.dist-row:last-child { margin-bottom: 0; }
+.dist-lbl { width: 70px; font-weight: 700; flex-shrink: 0; text-align: right; }
+.dist-bar-bg {
+  flex: 1; height: 10px; border-radius: 6px;
+  background: var(--border); overflow: hidden;
+}
+.dist-bar-fill {
+  height: 100%; border-radius: 6px;
+  transition: width .5s ease;
+}
+.dist-cnt { width: 24px; font-weight: 700; text-align: center; color: var(--text-secondary); }
+
 /* ============================================================
    STUDENT PROFILE
    ============================================================ */
