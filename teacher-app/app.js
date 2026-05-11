@@ -2939,46 +2939,86 @@ const Pages = {
       return;
     }
     const selId  = params.classId || classes[0].id;
+    const qf     = params.qf     || 'all';
+    const search = params.search || '';
     const cls    = classes.find(c => c.id === selId);
     const schema = _schema(cls);
     const total  = schema.reduce((s, c) => s + c.max, 0);
     const clsStu = students.filter(s => s.classId === selId);
     const gData  = DB.get('grades');
-    const tabs   = classes.map(c =>
+
+    // ── per-student stats ──────────────────────────────────────
+    const stuData = clsStu.map(s => {
+      const g       = gData.find(x => x.studentId === s.id && x.classId === selId);
+      const v       = g?.grades || {};
+      const tot     = _sumBySchema(v, schema);
+      const hasSome = schema.some(c => v[c.key] != null);
+      const pct     = hasSome ? Math.round(tot / total * 100) : null;
+      const letter  = hasSome ? _letter(pct) : '—';
+      return { s, v, tot, hasSome, pct, letter };
+    });
+
+    // ── KPI calculations ───────────────────────────────────────
+    const entered = stuData.filter(d => d.hasSome);
+    const tots    = entered.map(d => d.tot);
+    const missing = stuData.length - entered.length;
+    const pass    = entered.filter(d => d.pct >= 50).length;
+    const avg     = tots.length ? Math.round(tots.reduce((a, x) => a + x, 0) / tots.length) : null;
+    const hi      = tots.length ? Math.max(...tots) : null;
+    const lo      = tots.length ? Math.min(...tots) : null;
+
+    // ── grade distribution ──────────────────────────────────────
+    const distLabels = ['ممتاز+','ممتاز','جيد جداً+','جيد جداً','جيد+','جيد','مقبول','راسب'];
+    const distColors = {
+      'ممتاز+':'var(--primary)','ممتاز':'var(--primary)',
+      'جيد جداً+':'var(--blue)','جيد جداً':'var(--blue)',
+      'جيد+':'var(--gold)','جيد':'var(--gold)',
+      'مقبول':'var(--orange)','راسب':'var(--red)'
+    };
+    const distMap = {};
+    distLabels.forEach(l => distMap[l] = 0);
+    entered.forEach(d => { if (distMap[d.letter] != null) distMap[d.letter]++; });
+    const distMax = Math.max(1, ...Object.values(distMap));
+
+    // ── filter + search ─────────────────────────────────────────
+    const filtered = stuData.filter(d => {
+      if (search && !d.s.name.includes(search)) return false;
+      if (qf === 'pass')   return d.hasSome && d.pct >= 50;
+      if (qf === 'fail')   return d.hasSome && d.pct < 50;
+      if (qf === 'miss')   return !d.hasSome;
+      return true;
+    });
+
+    // ── row tint helper ─────────────────────────────────────────
+    const rowCls = d => {
+      if (!d.hasSome) return '';
+      if (d.pct >= 75) return 'row-good';
+      if (d.pct >= 50) return 'row-warn';
+      return 'row-bad';
+    };
+
+    // ── avatar color by performance ─────────────────────────────
+    const avatarStyle = d => {
+      if (!d.hasSome) return '';
+      if (d.pct >= 75) return 'background:linear-gradient(135deg,#047857,#059669)';
+      if (d.pct >= 50) return 'background:linear-gradient(135deg,#B45309,#D97706)';
+      return 'background:linear-gradient(135deg,#B91C1C,#EF4444)';
+    };
+
+    // ── bar fill color ──────────────────────────────────────────
+    const barColor = pct => {
+      if (pct === null) return 'var(--border)';
+      if (pct >= 75) return 'var(--primary)';
+      if (pct >= 50) return 'var(--gold)';
+      return 'var(--red)';
+    };
+
+    // ── build rows ──────────────────────────────────────────────
+    const tabs = classes.map(c =>
       `<button class="filter-btn ${c.id===selId?'active':''}" onclick="Pages.grades({classId:'${c.id}'})">
         <span>${c.name}</span>${c.subject ? `<small style="display:block;font-size:.72em;opacity:.75">${c.subject}</small>` : ''}
       </button>`
     ).join('');
-
-    const mkLetter = (tot, hasSome) => hasSome ? _letter(Math.round(tot / total * 100)) : '—';
-    const rows = clsStu.map((s, i) => {
-      const g   = gData.find(x => x.studentId === s.id && x.classId === selId);
-      const v   = g?.grades || {};
-      const tot = _sumBySchema(v, schema);
-      const hasSome = schema.some(c => v[c.key] != null);
-      const letter  = mkLetter(tot, hasSome);
-      const cells = schema.map(c => `
-        <td style="padding:4px 6px">
-          <input type="number" min="0" max="${c.max}" step=".5"
-            value="${v[c.key] ?? ''}" placeholder="—"
-            data-sid="${s.id}" data-skey="${c.key}"
-            style="width:${Math.max(44, String(c.max).length*10+28)}px;text-align:center;
-                   border:1.5px solid transparent;border-radius:6px;padding:4px;
-                   font-family:inherit;font-size:.88rem;background:transparent;
-                   transition:border .15s"
-            onfocus="this.style.borderColor='var(--primary)';this.style.background='#fff'"
-            onblur="this.style.borderColor='transparent';this.style.background='transparent';
-                    Pages.saveGradeCell('${s.id}','${selId}','${c.key}',this.value,'${total}','${c.max}')"
-            onkeydown="if(event.key==='Enter'){this.blur();event.preventDefault()}">
-        </td>`).join('');
-      return `<tr>
-        <td>${i+1}</td>
-        <td><div class="student-name-cell"><div class="student-avatar-sm">${s.name.charAt(0)}</div>${s.name}</div></td>
-        ${cells}
-        <td class="grade-cell total-grade" id="tot-${s.id}">${hasSome ? tot : '—'}</td>
-        <td id="let-${s.id}"><span class="grade-badge grade-${_letterCss[letter]||'-'}">${letter}</span></td>
-      </tr>`;
-    }).join('');
 
     const schemaHeads = schema.map(c =>
       `<th style="min-width:60px;white-space:nowrap">${c.label}<br><small>/${c.max}</small>
@@ -2990,6 +3030,84 @@ const Pages = {
         </button>
       </th>`).join('');
 
+    const rows = filtered.map((d, i) => {
+      const { s, v, tot, hasSome, pct, letter } = d;
+      const cells = schema.map(c => `
+        <td style="padding:4px 6px">
+          <input type="number" min="0" max="${c.max}" step=".5"
+            value="${v[c.key] ?? ''}" placeholder="—"
+            data-sid="${s.id}" data-skey="${c.key}"
+            style="width:${Math.max(44, String(c.max).length*10+28)}px;text-align:center;
+                   border:1.5px solid transparent;border-radius:6px;padding:4px;
+                   font-family:inherit;font-size:.88rem;background:transparent;transition:border .15s"
+            onfocus="this.style.borderColor='var(--primary)';this.style.background='#fff'"
+            onblur="this.style.borderColor='transparent';this.style.background='transparent';
+                    Pages.saveGradeCell('${s.id}','${selId}','${c.key}',this.value,'${total}','${c.max}')"
+            onkeydown="if(event.key==='Enter'){this.blur();event.preventDefault()}">
+        </td>`).join('');
+
+      const pctVal  = pct ?? 0;
+      const totDisp = hasSome
+        ? `<div class="tot-wrap">
+            <span>${tot}</span>
+            <div class="tot-bar-bg"><div class="tot-bar-fill" style="width:${pctVal}%;background:${barColor(pct)}"></div></div>
+           </div>`
+        : '—';
+
+      return `<tr class="${rowCls(d)}">
+        <td>${i+1}</td>
+        <td><div class="student-name-cell">
+          <div class="student-avatar-sm" style="${avatarStyle(d)}">${s.name.charAt(0)}</div>
+          ${s.name}
+        </div></td>
+        ${cells}
+        <td class="grade-cell total-grade" id="tot-${s.id}">${totDisp}</td>
+        <td id="let-${s.id}"><span class="grade-cell grade-${_letterCss[letter]||'-'}">${letter}</span></td>
+      </tr>`;
+    }).join('');
+
+    // ── distribution bars HTML ──────────────────────────────────
+    const distBars = distLabels
+      .filter(l => distMap[l] > 0 || entered.length === 0)
+      .map(l => `
+        <div class="dist-row">
+          <div class="dist-lbl" style="color:${distColors[l]}">${l}</div>
+          <div class="dist-bar-bg">
+            <div class="dist-bar-fill" style="width:${Math.round(distMap[l]/distMax*100)}%;background:${distColors[l]}"></div>
+          </div>
+          <div class="dist-cnt">${distMap[l]}</div>
+        </div>`).join('');
+
+    // ── KPI cards HTML ──────────────────────────────────────────
+    const kpiHtml = `
+      <div class="grades-kpi-row">
+        <div class="grades-kpi kpi-avg">
+          <div class="grades-kpi-icon"><i class="fas fa-chart-line"></i></div>
+          <div class="grades-kpi-val">${avg ?? '—'}</div>
+          <div class="grades-kpi-lbl">المعدل العام / ${total}</div>
+        </div>
+        <div class="grades-kpi kpi-high">
+          <div class="grades-kpi-icon"><i class="fas fa-arrow-up"></i></div>
+          <div class="grades-kpi-val">${hi ?? '—'}</div>
+          <div class="grades-kpi-lbl">أعلى درجة</div>
+        </div>
+        <div class="grades-kpi kpi-low">
+          <div class="grades-kpi-icon"><i class="fas fa-arrow-down"></i></div>
+          <div class="grades-kpi-val">${lo ?? '—'}</div>
+          <div class="grades-kpi-lbl">أدنى درجة</div>
+        </div>
+        <div class="grades-kpi kpi-pass">
+          <div class="grades-kpi-icon"><i class="fas fa-check-circle"></i></div>
+          <div class="grades-kpi-val">${entered.length ? pass+'/'+entered.length : '—'}</div>
+          <div class="grades-kpi-lbl">ناجح / المُدخلة</div>
+        </div>
+        <div class="grades-kpi kpi-miss">
+          <div class="grades-kpi-icon"><i class="fas fa-clock"></i></div>
+          <div class="grades-kpi-val">${missing}</div>
+          <div class="grades-kpi-lbl">لم تُدخل درجاتهم</div>
+        </div>
+      </div>`;
+
     document.getElementById('content').innerHTML = `
       <div class="page-header">
         <h2>الدرجات | Grades</h2>
@@ -3000,39 +3118,40 @@ const Pages = {
       </div>
       <div class="filter-bar">${tabs}</div>
       ${clsStu.length ? `
-      <div class="section-card">
-        <div class="card-header">
-          <h3><i class="fas fa-star-half-alt"></i> ${cls?.name} — ${cls?.subject}</h3>
-          <span style="font-size:.78rem;color:var(--gray-400)"><i class="fas fa-circle-info"></i> اضغط على أي خانة لتعديلها مباشرةً</span>
+        ${kpiHtml}
+        <div class="grades-toolbar">
+          <input class="grades-search" type="text" placeholder="🔍 ابحث عن طالب..." value="${search}"
+            oninput="Pages.grades({classId:'${selId}',qf:'${qf}',search:this.value})">
+          <div class="grades-qf">
+            <button class="grades-qf-btn ${qf==='all'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'all',search:'${search}'})">الكل (${stuData.length})</button>
+            <button class="grades-qf-btn ${qf==='pass'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'pass',search:'${search}'})">الناجحون (${pass})</button>
+            <button class="grades-qf-btn qf-fail ${qf==='fail'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'fail',search:'${search}'})">الراسبون (${entered.length-pass})</button>
+            <button class="grades-qf-btn qf-miss ${qf==='miss'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'miss',search:'${search}'})">لم تُدخل (${missing})</button>
+          </div>
         </div>
-        <div class="table-container">
-          <table class="data-table">
-            <thead><tr>
-              <th>#</th><th>${_T.theStu}</th>
-              ${schemaHeads}
-              <th>المجموع<br><small>/${total}</small></th>
-              <th>التقدير</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
+        <div class="section-card">
+          <div class="card-header">
+            <h3><i class="fas fa-star-half-alt"></i> ${cls?.name}${cls?.subject ? ' — '+cls.subject : ''}</h3>
+            <span style="font-size:.78rem;color:var(--text-muted)"><i class="fas fa-circle-info"></i> اضغط على أي خانة لتعديلها مباشرةً</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table grades-table">
+              <thead><tr>
+                <th>#</th><th>${_T.theStu}</th>
+                ${schemaHeads}
+                <th>المجموع<br><small>/${total}</small></th>
+                <th>التقدير</th>
+              </tr></thead>
+              <tbody>${rows || '<tr><td colspan="20" style="text-align:center;padding:1.5rem;color:var(--text-muted)">لا يوجد طلاب مطابقون</td></tr>'}</tbody>
+            </table>
+          </div>
         </div>
-        ${(() => {
-          const tots = clsStu.map(s => {
-            const g = gData.find(x=>x.studentId===s.id&&x.classId===selId)?.grades||{};
-            return _sumBySchema(g, schema);
-          }).filter(t=>t>0);
-          if (!tots.length) return '';
-          const avg = Math.round(tots.reduce((a,x)=>a+x,0)/tots.length);
-          const pass = tots.filter(t => Math.round(t/total*100) >= 50).length;
-          return `<div class="grade-stats-bar">
-            <div class="grade-stat-item"><span class="gs-label">المعدل:</span> <span style="color:var(--primary)">${avg}</span></div>
-            <div class="grade-stat-item"><span class="gs-label">الأعلى:</span> <span style="color:var(--green)">${Math.max(...tots)}</span></div>
-            <div class="grade-stat-item"><span class="gs-label">الأدنى:</span> <span style="color:var(--red)">${Math.min(...tots)}</span></div>
-            <div class="grade-stat-item"><span class="gs-label">ناجح:</span> <span style="color:var(--green)">${pass}</span></div>
-            <div class="grade-stat-item"><span class="gs-label">راسب:</span> <span style="color:var(--red)">${tots.length-pass}</span></div>
-          </div>`;
-        })()}
-      </div>` : `<div class="empty-state"><h3>لا يوجد ${_T.theStus} في هذا الفصل</h3></div>`}
+        ${entered.length ? `
+        <div class="grades-dist-wrap">
+          <div class="grades-dist-title"><i class="fas fa-chart-bar"></i> توزيع التقديرات</div>
+          ${distBars}
+        </div>` : ''}
+      ` : `<div class="empty-state"><h3>لا يوجد ${_T.theStus} في هذا الفصل</h3></div>`}
     `;
   },
 
@@ -3209,11 +3328,39 @@ const Pages = {
     const schema  = _schema(cls);
     const tot     = _sumBySchema(grades, schema);
     const hasSome = schema.some(c => grades[c.key] != null);
-    const letter  = hasSome ? _letter(Math.round(tot / Number(totalMax) * 100)) : '—';
+    const pct     = hasSome ? Math.round(tot / Number(totalMax) * 100) : null;
+    const letter  = hasSome ? _letter(pct) : '—';
+
+    const barColor = p => p >= 75 ? 'var(--primary)' : p >= 50 ? 'var(--gold)' : 'var(--red)';
+    const avatarBg = p => p >= 75
+      ? 'background:linear-gradient(135deg,#047857,#059669)'
+      : p >= 50
+        ? 'background:linear-gradient(135deg,#B45309,#D97706)'
+        : 'background:linear-gradient(135deg,#B91C1C,#EF4444)';
+
     const totEl = document.getElementById(`tot-${stuId}`);
     const letEl = document.getElementById(`let-${stuId}`);
-    if (totEl) totEl.textContent = hasSome ? tot : '—';
-    if (letEl) letEl.innerHTML = `<span class="grade-badge grade-${_letterCss[letter]||'-'}">${letter}</span>`;
+
+    if (totEl) {
+      if (hasSome) {
+        totEl.innerHTML = `<div class="tot-wrap">
+          <span>${tot}</span>
+          <div class="tot-bar-bg"><div class="tot-bar-fill" style="width:${pct}%;background:${barColor(pct)}"></div></div>
+        </div>`;
+      } else {
+        totEl.innerHTML = '—';
+      }
+    }
+    if (letEl) letEl.innerHTML = `<span class="grade-cell grade-${_letterCss[letter]||'-'}">${letter}</span>`;
+
+    // update row tint and avatar color
+    const row = totEl?.closest('tr');
+    if (row) {
+      row.classList.remove('row-good','row-warn','row-bad');
+      if (hasSome) row.classList.add(pct >= 75 ? 'row-good' : pct >= 50 ? 'row-warn' : 'row-bad');
+    }
+    const avatar = row?.querySelector('.student-avatar-sm');
+    if (avatar && hasSome) avatar.style.cssText = avatarBg(pct);
   },
 
   bulkSkillModal(clsId, key, label, max) {
