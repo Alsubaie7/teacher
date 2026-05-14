@@ -5281,11 +5281,12 @@ const SBAuth = {
     if (email.toLowerCase() !== _ADMIN_EMAIL) {
       const { data: platRow } = await _sb.from('user_data').select('value').eq('key','platform_open').maybeSingle();
       if (platRow?.value === '0') throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
-      const { data: prof } = await _sb.from('profiles').select('approved').eq('id', data.user.id).maybeSingle();
-      if (!prof || prof.approved !== true) {
-        await _sb.auth.signOut();
-        throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
-      }
+      // Temporarily disabled approval requirement
+      // const { data: prof } = await _sb.from('profiles').select('approved').eq('id', data.user.id).maybeSingle();
+      // if (!prof || prof.approved !== true) {
+      //   await _sb.auth.signOut();
+      //   throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
+      // }
     }
     const prevId = localStorage.getItem('tm_current_user');
     if (prevId && prevId !== data.user.id) {
@@ -5325,10 +5326,11 @@ const App = {
       try {
         await SBAuth.checkSubscription(session.user.id, session.user.email);
         if (session.user.email.toLowerCase() !== _ADMIN_EMAIL) {
-          const { data: prof } = await _sb.from('profiles').select('approved').eq('id', session.user.id).maybeSingle();
-          if (!prof || prof.approved !== true) {
-            throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
-          }
+          // Temporarily disabled approval requirement
+          // const { data: prof } = await _sb.from('profiles').select('approved').eq('id', session.user.id).maybeSingle();
+          // if (!prof || prof.approved !== true) {
+          //   throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
+          // }
         }
       } catch (err) {
         await SBAuth.signOut();
@@ -5377,7 +5379,7 @@ const App = {
           Object.values(DB._k).forEach(k => localStorage.removeItem(k));
           localStorage.removeItem('tm_current_user');
           localStorage.removeItem('tm_user_email');
-          Toast.show('تم إنشاء الحساب بنجاح! سيتم تفعيله بعد موافقة الإدارة والدفع.', 'success');
+          Toast.show('تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.', 'success');
           this.switchAuthMode('login');
           document.getElementById('setup-email').value = email;
           document.getElementById('setup-password').value = '';
