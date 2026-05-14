@@ -865,7 +865,7 @@ const Print = {
         </div>
         <div class="ifield">
           <span class="ifield-lbl">الفصل الدراسي :</span>
-          <div class="ifield-val">${cls?.name||'—'}</div>
+          <div class="ifield-val">${cls?.name ? (cls.subject ? cls.name+' — '+cls.subject : cls.name) : '—'}</div>
         </div>
         <div class="ifield">
           <span class="ifield-lbl">المادة :</span>
@@ -4936,12 +4936,12 @@ const Pages = {
   _refReasonChange() {
     const r = document.getElementById('ref-reason')?.value || '';
     const map = {
-      'ضعف تحصيل دراسي': `${_T._f?'تعاني':'يعاني'} ${_T.theStu} من ضعف ملحوظ في مستوى التحصيل الدراسي، ورُصد تراجع مستمر في أدائه خلال الفترة الماضية. ${_T._f?'حرصت':'حرص'} ${_T.theTch} على تقديم شرح إضافي وتبسيط المادة وتنويع أساليب التدريس، إلا أن الوضع يستدعي تدخلاً من الجهة المختصة لدعم ${_T.theStu} ومتابعة مستواه.`,
-      'كثرة الغياب': `${_T._f?'تُسجّل':'يُسجّل'} ${_T.theStu} غياباً متكرراً عن الحصص مما أثّر سلباً على متابعتها للمادة وتحصيلها الدراسي. تمّت مناصحة ${_T.theStu} مراراً وتنبيهها بأهمية الانتظام، غير أن الغياب لا يزال مستمراً ويستدعي متابعة من الجهة المختصة.`,
-      'سلوك سلبي متكرر': `${_T._f?'تُظهر':'يُظهر'} ${_T.theStu} سلوكاً سلبياً متكرراً داخل الفصل يؤثر على سير الدرس وزملائه. ${_T._f?'اتخذت':'اتخذ'} ${_T.theTch} جملةً من الإجراءات التربوية بما فيها التوجيه المباشر والتنبيه المتكرر، إلا أن السلوك لم يتحسن، مما يستدعي تدخل الجهة المختصة.`,
-      'مشكلة صحية': `لُوحظ على ${_T.theStu} أعراض تشير إلى احتمال وجود مشكلة صحية تؤثر على حضورها الذهني ومتابعتها للدراسة. ${_T._f?'ترى':'يرى'} ${_T.theTch} ضرورة إحالتها للجهة المختصة للكشف على وضعها واتخاذ ما يلزم.`,
-      'مشكلة اجتماعية أو أسرية': `لُوحظ على ${_T.theStu} تغيّرات واضحة في مزاجها ومستوى تفاعلها ومشاركتها، مما يُشير إلى وجود ضغوط أو ظروف خاصة تؤثر على حضورها الذهني. ${_T._f?'قامت':'قام'} ${_T.theTch} بالتحدث مع ${_T.theStu} وتشجيعها، و${_T._f?'ترى':'يرى'} إحالتها لمن يختص لمزيد من المتابعة والدعم.`,
-      'تأخر مستمر': `${_T._f?'تُداوم':'يُداوم'} ${_T.theStu} على التأخر في الوصول للفصل مما يُعيق متابعتها للدروس ويؤثر على تحصيلها. ${_T._f?'وجّهت':'وجّه'} ${_T.theTch} ${_T.theStu} بضرورة الالتزام بمواعيد الحضور أكثر من مرة، إلا أن التأخر لا يزال مستمراً ويستدعي متابعة من الجهة المختصة.`,
+      'ضعف تحصيل دراسي': `${_T._f?'تعاني':'يعاني'} ${_T.theStu} من ضعف ملحوظ في مستوى التحصيل الدراسي، ورُصد تراجع مستمر في أدائه خلال الفترة الماضية. ${_T._f?'حرصت':'حرص'} ${_T.theTch} على تقديم شرح إضافي وتبسيط المادة وتنويع أساليب التدريس، إلا أن الوضع يستدعي تدخلاً من الإدارة لدعم ${_T.theStu} ومتابعة مستواه.`,
+      'كثرة الغياب': `${_T._f?'تُسجّل':'يُسجّل'} ${_T.theStu} غياباً متكرراً عن الحصص مما أثّر سلباً على متابعتها للمادة وتحصيلها الدراسي. تمّت مناصحة ${_T.theStu} مراراً وتنبيهها بأهمية الانتظام، غير أن الغياب لا يزال مستمراً ويستدعي متابعة من الإدارة.`,
+      'سلوك سلبي متكرر': `${_T._f?'تُظهر':'يُظهر'} ${_T.theStu} سلوكاً سلبياً متكرراً داخل الفصل يؤثر على سير الدرس وزملائه. ${_T._f?'اتخذت':'اتخذ'} ${_T.theTch} جملةً من الإجراءات التربوية بما فيها التوجيه المباشر والتنبيه المتكرر، إلا أن السلوك لم يتحسن، مما يستدعي تدخل الإدارة.`,
+      'مشكلة صحية': `لُوحظ على ${_T.theStu} أعراض تشير إلى احتمال وجود مشكلة صحية تؤثر على حضورها الذهني ومتابعتها للدراسة. ${_T._f?'ترى':'يرى'} ${_T.theTch} ضرورة إحالتها للإدارة للكشف على وضعها واتخاذ ما يلزم.`,
+      'مشكلة اجتماعية أو أسرية': `لُوحظ على ${_T.theStu} تغيّرات واضحة في مزاجها ومستوى تفاعلها ومشاركتها، مما يُشير إلى وجود ضغوط أو ظروف خاصة تؤثر على حضورها الذهني. ${_T._f?'قامت':'قام'} ${_T.theTch} بالتحدث مع ${_T.theStu} وتشجيعها، و${_T._f?'ترى':'يرى'} إحالتها للإدارة لمزيد من المتابعة والدعم.`,
+      'تأخر مستمر': `${_T._f?'تُداوم':'يُداوم'} ${_T.theStu} على التأخر في الوصول للفصل مما يُعيق متابعتها للدروس ويؤثر على تحصيلها. ${_T._f?'وجّهت':'وجّه'} ${_T.theTch} ${_T.theStu} بضرورة الالتزام بمواعيد الحضور أكثر من مرة، إلا أن التأخر لا يزال مستمراً ويستدعي متابعة من الإدارة.`,
       'أخرى': ''
     };
     const ta = document.getElementById('ref-notes');
@@ -5245,7 +5245,7 @@ const SBAuth = {
     }
   },
 
-  async signUp(email, password, name, school, subject, gender) {
+  async signUp(email, password, name, school, subject, gender, region) {
     const { data: platRow } = await _sb.from('user_data').select('value').eq('key','platform_open').maybeSingle();
     if (platRow?.value === '0') throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
     const { data, error } = await _sb.auth.signUp({ email, password });
@@ -5257,10 +5257,22 @@ const SBAuth = {
       }
       localStorage.setItem('tm_current_user', data.user.id);
       await _sb.from('profiles').upsert({ id: data.user.id, name, school, subject, gender, email: email.toLowerCase(), approved: false });
-      localStorage.setItem(DB._k.teacher, JSON.stringify({ name, school, subject, gender }));
+      localStorage.setItem(DB._k.teacher, JSON.stringify({ name, school, subject, gender, region }));
       localStorage.setItem('tm_user_email', email.toLowerCase());
     }
     return data;
+  },
+
+  async forgotPassword() {
+    const email = document.getElementById('setup-email')?.value.trim();
+    if (!email) { Toast.show('أدخل بريدك الإلكتروني أولاً', 'error'); document.getElementById('setup-email')?.focus(); return; }
+    try {
+      const { error } = await _sb.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      Toast.show('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني', 'success');
+    } catch (err) {
+      Toast.show(err.message || 'حدث خطأ', 'error');
+    }
   },
 
   async signIn(email, password) {
@@ -5358,8 +5370,9 @@ const App = {
           const school     = document.getElementById('setup-school').value.trim();
           const subject    = document.getElementById('setup-subject').value.trim();
           const gender     = document.querySelector('input[name="setup-gender"]:checked')?.value || 'male';
+          const region     = document.getElementById('setup-region')?.value.trim() || '';
           if (!name || !school || !subject) throw new Error('يرجى تعبئة جميع الحقول');
-          await SBAuth.signUp(email, pwd, name, school, subject, gender);
+          await SBAuth.signUp(email, pwd, name, school, subject, gender, region);
           await _sb.auth.signOut();
           Object.values(DB._k).forEach(k => localStorage.removeItem(k));
           localStorage.removeItem('tm_current_user');

@@ -587,7 +587,7 @@ textarea { resize: vertical; min-height: 80px; }
 .data-table td:first-child { color: var(--text-primary); }
 .data-table tbody tr:hover td { background: rgba(5,150,105,.04); }
 .data-table tbody tr:last-child td { border-bottom: none; }
-.student-name-cell { display: flex; align-items: center; gap: .6rem; font-weight: 600; color: var(--text-primary); }
+.student-name-cell { display: flex; align-items: center; gap: .6rem; font-weight: 600; color: var(--text-primary); min-width: 120px; white-space: nowrap; }
 .student-avatar-sm {
   width: 32px; height: 32px; border-radius: 50%;
   background: linear-gradient(135deg, #047857, #059669);
