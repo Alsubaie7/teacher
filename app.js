@@ -3370,19 +3370,22 @@ const Pages = {
     };
 
     const tabs = classes.map(c =>
-      `<button class="filter-btn ${c.id===selId?'active':''}" onclick="Pages.grades({classId:'${c.id}'})">
-        <span>${c.name}</span>${c.subject ? `<small style="display:block;font-size:.72em;opacity:.75">${c.subject}</small>` : ''}
+      `<button class="grades-class-tab ${c.id===selId?'active':''}" onclick="Pages.grades({classId:'${c.id}'})">
+        <span class="grades-tab-name">${c.name}</span>
+        ${c.subject ? `<span class="grades-tab-subject">${c.subject}</span>` : ''}
       </button>`
     ).join('');
 
     const schemaHeads = schema.map(c =>
-      `<th style="min-width:60px;white-space:nowrap">${c.label}<br><small>/${c.max}</small>
-        <button onclick="Pages.bulkSkillModal('${selId}','${c.key}','${c.label}',${c.max})"
-          title="إدخال جماعي لـ ${c.label}"
-          style="display:block;margin:.2rem auto 0;background:var(--primary)18;border:1px solid var(--primary)40;
-                 color:var(--primary);border-radius:5px;padding:1px 6px;font-size:.68rem;cursor:pointer;width:100%">
-          <i class="fas fa-users"></i> للكل
-        </button>
+      `<th style="min-width:80px;white-space:nowrap">${c.label}<br><small>/${c.max}</small>
+        <div class="bulk-input-row">
+          <input type="number" min="0" max="${c.max}" step=".5" placeholder="—"
+            id="bulk-${c.key}" class="bulk-inline-input"
+            onkeydown="if(event.key==='Enter'){Pages._applyBulkInline('${selId}','${c.key}',${c.max})}">
+          <button class="bulk-inline-btn" onclick="Pages._applyBulkInline('${selId}','${c.key}',${c.max})" title="تطبيق على الكل">
+            ✓
+          </button>
+        </div>
       </th>`).join('');
 
     const rows = filtered.map((d, i) => {
@@ -3469,17 +3472,17 @@ const Pages = {
           <button class="btn btn-sm btn-outline" onclick="Print.grades('${selId}')"><i class="fas fa-print"></i> طباعة</button>
         </div>
       </div>
-      <div class="filter-bar">${tabs}</div>
+      <div class="grades-tabs-bar">${tabs}</div>
       ${clsStu.length ? `
         ${kpiHtml}
         <div class="grades-toolbar">
-          <input class="grades-search" type="text" placeholder="🔍 ابحث عن طالب..." value="${search}"
-            oninput="Pages.grades({classId:'${selId}',qf:'${qf}',search:this.value})">
+          <input class="grades-search" id="grades-search-input" type="text" placeholder="🔍 ابحث عن طالب..." value="${search}"
+            oninput="Pages._filterGradesRows(this.value)">
           <div class="grades-qf">
-            <button class="grades-qf-btn ${qf==='all'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'all',search:'${search}'})">الكل (${stuData.length})</button>
-            <button class="grades-qf-btn ${qf==='pass'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'pass',search:'${search}'})">الناجحون (${pass})</button>
-            <button class="grades-qf-btn qf-fail ${qf==='fail'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'fail',search:'${search}'})">الراسبون (${entered.length-pass})</button>
-            <button class="grades-qf-btn qf-miss ${qf==='miss'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'miss',search:'${search}'})">لم تُدخل (${missing})</button>
+            <button class="grades-qf-btn ${qf==='all'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'all'})">الكل (${stuData.length})</button>
+            <button class="grades-qf-btn ${qf==='pass'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'pass'})">الناجحون (${pass})</button>
+            <button class="grades-qf-btn qf-fail ${qf==='fail'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'fail'})">الراسبون (${entered.length-pass})</button>
+            <button class="grades-qf-btn qf-miss ${qf==='miss'?'active':''}" onclick="Pages.grades({classId:'${selId}',qf:'miss'})">لم تُدخل (${missing})</button>
           </div>
         </div>
         <div class="section-card">
@@ -3727,6 +3730,38 @@ const Pages = {
       <button class="btn btn-primary btn-full" onclick="Pages._applyBulkSkill('${clsId}','${key}',${max})">
         <i class="fas fa-check"></i> تطبيق على الجميع
       </button>`);
+  },
+
+  _applyBulkInline(clsId, key, max) {
+    const inp = document.getElementById(`bulk-${key}`);
+    if (!inp) return;
+    const raw = inp.value;
+    if (raw === '') { Toast.show('أدخل درجة أولاً', 'error'); inp.focus(); return; }
+    const num = Number(raw);
+    if (num < 0 || num > max) { Toast.show(`الدرجة يجب أن تكون بين 0 و ${max}`, 'error'); inp.focus(); return; }
+    const students = DB.get('students').filter(s => s.classId === clsId);
+    const list = DB.get('grades');
+    students.forEach(s => {
+      const idx = list.findIndex(g => g.studentId === s.id && g.classId === clsId);
+      if (idx >= 0) list[idx] = { ...list[idx], grades: { ...list[idx].grades, [key]: num } };
+      else list.push({ studentId: s.id, classId: clsId, grades: { [key]: num } });
+    });
+    DB.set('grades', list);
+    Toast.show(`✓ تم تطبيق ${num} على ${students.length} ${_T.stu}`);
+    this.grades({ classId: clsId });
+  },
+
+  _filterGradesRows(query) {
+    const table = document.querySelector('.grades-table tbody');
+    if (!table) return;
+    const rows = table.querySelectorAll('tr');
+    const q = query.trim();
+    rows.forEach(row => {
+      const nameCell = row.querySelector('.student-name-cell');
+      if (!nameCell) return;
+      const name = nameCell.textContent || '';
+      row.style.display = (!q || name.includes(q)) ? '' : 'none';
+    });
   },
   _applyBulkSkill(clsId, key, max) {
     const raw = document.getElementById('bulk-val').value;
@@ -5023,139 +5058,132 @@ const Pages = {
   /* ---- ADMIN PANEL ---- */
   async admin() {
     const el = document.getElementById('content');
-    el.innerHTML = `<div class="page-header"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة | Admin Panel</h2></div>
-      <div style="text-align:center;padding:4rem"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--primary)"></i></div>`;
-
+    el.innerHTML = `<div class="admin-banner"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2><p>جارِ تحميل البيانات...</p></div>
+      <div style="text-align:center;padding:3rem"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:#7c3aed"></i></div>`;
     const [{ data: profiles, error: profErr }, { data: platRow }] = await Promise.all([
       _sb.rpc('get_all_users'),
       _sb.from('user_data').select('value').eq('key','platform_open').maybeSingle()
     ]);
-
     if (profErr) {
-      el.innerHTML = `<div class="page-header"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2></div>
+      el.innerHTML = `<div class="admin-banner"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2></div>
         <div class="empty-state"><i class="fas fa-exclamation-triangle fa-3x" style="color:#ef4444"></i>
-        <p>تعذّر تحميل البيانات — تحقق من صلاحيات Supabase (RLS)</p>
-        <small style="direction:ltr;opacity:.6">${profErr.message}</small></div>`;
+        <p>تعذّر تحميل البيانات</p><small style="direction:ltr;opacity:.6">${profErr.message}</small></div>`;
       return;
     }
-
-    const isPlatformOpen = !platRow || platRow.value !== '0';
-    const teachers = profiles || [];
-    const males   = teachers.filter(p => p.gender !== 'female').length;
-    const females = teachers.filter(p => p.gender === 'female').length;
-
-    const pending  = teachers.filter(p => !p.approved && p.email !== _ADMIN_EMAIL);
-    const approved = teachers.filter(p => p.approved || p.email === _ADMIN_EMAIL);
-
-    const rows = teachers.map((p, i) => {
-      const pJson = JSON.stringify({ name: p.name||'', school: p.school||'', subject: p.subject||'', gender: p.gender||'male', email: p.email||'' }).replace(/"/g, '&quot;');
-      const isMe = p.email === _ADMIN_EMAIL;
-      const statusBadge = isMe
-        ? '<span class="badge" style="background:#059669;color:#fff">أدمن</span>'
-        : p.approved
-          ? '<span class="badge" style="background:#10b981;color:#fff">مفعّل</span>'
-          : '<span class="badge" style="background:#f59e0b;color:#fff">قيد المراجعة</span>';
-      const actions = isMe ? '' : p.approved
-        ? `<button class="btn btn-sm" style="background:#ef4444;color:#fff" onclick="Pages._setApproval('${p.id}',false)"><i class="fas fa-ban"></i> تعليق</button>`
-        : `<button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="Pages._setApproval('${p.id}',true)"><i class="fas fa-check"></i> تفعيل</button>`;
-      return `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${p.name || '—'}</td>
-        <td style="direction:ltr;text-align:right;font-size:.82rem">${p.email || '—'}</td>
-        <td><span class="badge ${p.gender === 'female' ? 'purple' : 'blue'}">${p.gender === 'female' ? 'معلمة' : 'معلم'}</span></td>
-        <td>${p.school || '—'}</td>
-        <td>${p.subject || '—'}</td>
-        <td>${statusBadge}</td>
-        <td style="font-size:.78rem;color:var(--gray-500)">${p.created_at ? new Date(p.created_at).toLocaleDateString('ar-SA') : '—'}</td>
-        <td style="display:flex;gap:.3rem">
-          ${actions}
-          <button class="btn btn-sm btn-outline" onclick='Pages._previewAs(${pJson})'><i class="fas fa-eye"></i> معاينة</button>
-        </td>
+    const isPO = !platRow || platRow.value !== '0';
+    const T = profiles || [];
+    const M = T.filter(p => p.gender !== 'female').length;
+    const F = T.filter(p => p.gender === 'female').length;
+    const pend = T.filter(p => !p.approved && p.email !== _ADMIN_EMAIL);
+    const appr = T.filter(p => p.approved || p.email === _ADMIN_EMAIL);
+    const tot = M + F || 1;
+    const mD = (M/tot)*251.2, fD = (F/tot)*251.2;
+    const donut = `<svg width="110" height="110" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" stroke-width="14"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="#3b82f6" stroke-width="14" stroke-dasharray="${mD} ${251.2-mD}" stroke-dashoffset="62.8" stroke-linecap="round"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="#ec4899" stroke-width="14" stroke-dasharray="${fD} ${251.2-fD}" stroke-dashoffset="${62.8-mD}" stroke-linecap="round"/>
+      <text x="50" y="50" text-anchor="middle" dy=".35em" font-size="16" font-weight="900" fill="#1e293b">${T.length}</text>
+    </svg>`;
+    const pendHtml = pend.length ? `<div class="admin-pending-alert">
+      <div class="admin-pending-icon"><i class="fas fa-user-clock"></i></div>
+      <div class="admin-pending-info"><strong>🔔 ${pend.length} طلب بانتظار الموافقة</strong>
+        <p>${pend.map(p=>p.name||p.email).slice(0,3).join('، ')}${pend.length>3?` و ${pend.length-3} آخرين`:''}</p></div>
+      <div class="admin-pending-actions"><button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="Pages._approveAll()"><i class="fas fa-check-double"></i> قبول الكل</button></div>
+    </div>` : '';
+    const logHtml = [...T].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,8).map(p=>{
+      const d=p.created_at?new Date(p.created_at):null;
+      const ts=d?d.toLocaleDateString('ar-SA')+' '+d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'—';
+      const ic=p.approved?'fa-user-check':'fa-user-plus';
+      const bg=p.approved?'background:#d1fae5;color:#059669':'background:#fef3c7;color:#d97706';
+      return `<div class="admin-log-item"><div class="admin-log-icon" style="${bg}"><i class="fas ${ic}"></i></div>
+        <div class="admin-log-text"><strong>${p.name||'مستخدم'}</strong> ${p.approved?'حساب مفعّل':'سجّل حساباً جديداً'}</div>
+        <div class="admin-log-time">${ts}</div></div>`;
+    }).join('');
+    const rows = T.map((p,i)=>{
+      const pJ=JSON.stringify({name:p.name||'',school:p.school||'',subject:p.subject||'',gender:p.gender||'male',email:p.email||''}).replace(/"/g,'&quot;');
+      const isMe=p.email===_ADMIN_EMAIL;
+      const stB=isMe?'<span class="badge" style="background:#7c3aed;color:#fff">أدمن</span>':p.approved?'<span class="badge badge-green">مفعّل</span>':'<span class="badge badge-gold">قيد المراجعة</span>';
+      const act=isMe?'':p.approved
+        ?`<button class="btn btn-sm btn-danger" onclick="Pages._setApproval('${p.id}',false)"><i class="fas fa-ban"></i> تعليق</button>`
+        :`<button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="Pages._setApproval('${p.id}',true)"><i class="fas fa-check"></i> تفعيل</button>`;
+      const ac=p.gender==='female'?'female':'male';
+      return `<tr data-name="${(p.name||'').toLowerCase()}" data-status="${isMe?'admin':p.approved?'approved':'pending'}">
+        <td>${i+1}</td>
+        <td><div class="admin-teacher-cell"><div class="admin-teacher-avatar ${ac}">${(p.name||'؟').charAt(0)}</div>
+          <div><div>${p.name||'—'}</div><div style="font-size:.72rem;color:var(--text-muted);font-weight:400">${p.email||''}</div></div></div></td>
+        <td><span class="badge ${p.gender==='female'?'badge-purple':'badge-blue'}">${p.gender==='female'?'معلمة':'معلم'}</span></td>
+        <td>${p.school||'—'}</td><td>${p.subject||'—'}</td><td>${stB}</td>
+        <td style="font-size:.76rem;color:var(--text-muted)">${p.created_at?new Date(p.created_at).toLocaleDateString('ar-SA'):'—'}</td>
+        <td><div style="display:flex;gap:.3rem">${act}<button class="btn btn-sm btn-outline" onclick='Pages._previewAs(${pJ})'><i class="fas fa-eye"></i></button></div></td>
       </tr>`;
     }).join('');
-
     el.innerHTML = `
-      <div class="page-header">
-        <h2><i class="fas fa-shield-alt"></i> لوحة الإدارة | Admin Panel</h2>
-      </div>
-
-      <div class="stats-grid" style="margin-bottom:1.5rem">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#e0e7ff;color:#4f46e5"><i class="fas fa-users"></i></div>
-          <div class="stat-info"><div class="stat-val">${teachers.length}</div><div class="stat-lbl">إجمالي المعلمين</div></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#dbeafe;color:#2563EB"><i class="fas fa-male"></i></div>
-          <div class="stat-info"><div class="stat-val">${males}</div><div class="stat-lbl">معلم</div></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#fce7f3;color:#db2777"><i class="fas fa-female"></i></div>
-          <div class="stat-info"><div class="stat-val">${females}</div><div class="stat-lbl">معلمة</div></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#fef3c7;color:#d97706"><i class="fas fa-clock"></i></div>
-          <div class="stat-info"><div class="stat-val">${pending.length}</div><div class="stat-lbl">طلبات معلّقة</div></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:${isPlatformOpen ? '#d1fae5' : '#fee2e2'};color:${isPlatformOpen ? '#059669' : '#dc2626'}">
-            <i class="fas fa-${isPlatformOpen ? 'lock-open' : 'lock'}"></i>
-          </div>
-          <div class="stat-info">
-            <div class="stat-val" style="font-size:1rem;color:${isPlatformOpen ? '#059669' : '#dc2626'}">${isPlatformOpen ? 'مفتوحة' : 'مغلقة'}</div>
-            <div class="stat-lbl">حالة المنصة</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="settings-card" style="margin-bottom:1.5rem">
-        <div class="settings-card-hdr"><i class="fas fa-toggle-on"></i> التحكم في المنصة</div>
-        <div class="settings-row">
-          <div>
-            <div style="font-weight:600">حالة المنصة</div>
-            <div style="font-size:.82rem;color:var(--gray-500)">عند الإغلاق لن يتمكن أحد من التسجيل أو الدخول (عدا الأدمن)</div>
-          </div>
+      <div class="admin-banner">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;position:relative;z-index:1">
+          <div><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2>
+            <p>إدارة المعلمين والتحكم بالمنصة — <span class="badge">${isPO?'🟢 مفتوحة':'🔴 مغلقة'}</span></p></div>
           <div style="display:flex;gap:.5rem">
-            <button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="Pages._adminSetPlatform(true)" ${isPlatformOpen ? 'disabled' : ''}>
-              <i class="fas fa-lock-open"></i> فتح
-            </button>
-            <button class="btn btn-sm" style="background:#ef4444;color:#fff" onclick="Pages._adminSetPlatform(false)" ${!isPlatformOpen ? 'disabled' : ''}>
-              <i class="fas fa-lock"></i> إغلاق
-            </button>
+            <button class="btn btn-sm" style="background:${isPO?'rgba(255,255,255,.15)':'#10b981'};color:#fff;border:1px solid rgba(255,255,255,.25)" onclick="Pages._adminSetPlatform(true)" ${isPO?'disabled':''}><i class="fas fa-lock-open"></i> فتح</button>
+            <button class="btn btn-sm" style="background:${!isPO?'rgba(255,255,255,.15)':'#ef4444'};color:#fff;border:1px solid rgba(255,255,255,.25)" onclick="Pages._adminSetPlatform(false)" ${!isPO?'disabled':''}><i class="fas fa-lock"></i> إغلاق</button>
           </div>
         </div>
       </div>
-
-      <div class="settings-card" style="margin-bottom:1.5rem">
-        <div class="settings-card-hdr"><i class="fas fa-eye"></i> معاينة سريعة للمنصة</div>
-        <div class="settings-row">
-          <div>
-            <div style="font-weight:600">استعرض المنصة كمعلم أو معلمة</div>
-            <div style="font-size:.82rem;color:var(--gray-500)">ستنتقل للرئيسية وتقدر تتنقل في كل الصفحات — اضغط "خروج من المعاينة" للعودة</div>
-          </div>
-          <div style="display:flex;gap:.5rem">
-            <button class="btn btn-sm" style="background:#2563EB;color:#fff"
-              onclick='Pages._previewAs({name:"معلم (تجريبي)",school:"مدرسة تجريبية",subject:"مادة تجريبية",gender:"male"})'>
-              <i class="fas fa-male"></i> معاينة كمعلم
-            </button>
-            <button class="btn btn-sm" style="background:#db2777;color:#fff"
-              onclick='Pages._previewAs({name:"معلمة (تجريبية)",school:"مدرسة تجريبية",subject:"مادة تجريبية",gender:"female"})'>
-              <i class="fas fa-female"></i> معاينة كمعلمة
-            </button>
+      ${pendHtml}
+      <div class="admin-stats">
+        <div class="admin-stat" style="--stat-accent:#4f46e5"><div class="admin-stat-icon" style="background:#e0e7ff;color:#4f46e5"><i class="fas fa-users"></i></div><div><div class="admin-stat-val">${T.length}</div><div class="admin-stat-lbl">إجمالي المعلمين</div></div></div>
+        <div class="admin-stat" style="--stat-accent:#3b82f6"><div class="admin-stat-icon" style="background:#dbeafe;color:#2563eb"><i class="fas fa-male"></i></div><div><div class="admin-stat-val">${M}</div><div class="admin-stat-lbl">معلم</div></div></div>
+        <div class="admin-stat" style="--stat-accent:#ec4899"><div class="admin-stat-icon" style="background:#fce7f3;color:#db2777"><i class="fas fa-female"></i></div><div><div class="admin-stat-val">${F}</div><div class="admin-stat-lbl">معلمة</div></div></div>
+        <div class="admin-stat" style="--stat-accent:#10b981"><div class="admin-stat-icon" style="background:#d1fae5;color:#059669"><i class="fas fa-user-check"></i></div><div><div class="admin-stat-val">${appr.length}</div><div class="admin-stat-lbl">مفعّل</div></div></div>
+        <div class="admin-stat" style="--stat-accent:#f59e0b"><div class="admin-stat-icon" style="background:#fef3c7;color:#d97706"><i class="fas fa-user-clock"></i></div><div><div class="admin-stat-val">${pend.length}</div><div class="admin-stat-lbl">معلّق</div></div></div>
+      </div>
+      <div class="admin-grid-2">
+        <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chart-pie"></i> توزيع المعلمين</h3></div>
+          <div class="admin-donut-wrap">${donut}
+            <div class="admin-donut-legend">
+              <div class="admin-donut-item"><div class="admin-donut-dot" style="background:#3b82f6"></div> معلم <strong>${M}</strong> (${Math.round(M/tot*100)}%)</div>
+              <div class="admin-donut-item"><div class="admin-donut-dot" style="background:#ec4899"></div> معلمة <strong>${F}</strong> (${Math.round(F/tot*100)}%)</div>
+              <div class="admin-donut-item"><div class="admin-donut-dot" style="background:#10b981"></div> مفعّل <strong>${appr.length}</strong></div>
+              <div class="admin-donut-item"><div class="admin-donut-dot" style="background:#f59e0b"></div> معلّق <strong>${pend.length}</strong></div>
+            </div>
           </div>
         </div>
+        <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-history"></i> سجل النشاط</h3></div>
+          <div class="admin-log">${logHtml||'<p style="text-align:center;color:var(--text-muted);padding:1rem">لا يوجد نشاط</p>'}</div>
+        </div>
       </div>
-
-      <div class="settings-card">
-        <div class="settings-card-hdr"><i class="fas fa-chalkboard-teacher"></i> قائمة المعلمين المسجلين (${teachers.length})</div>
-        ${teachers.length === 0
-          ? `<div class="empty-state"><i class="fas fa-users fa-2x"></i><p>لا يوجد معلمون مسجلون بعد</p></div>`
-          : `<div style="overflow-x:auto"><table class="data-table">
-              <thead><tr><th>#</th><th>الاسم</th><th>البريد الإلكتروني</th><th>الجنس</th><th>المدرسة</th><th>المادة</th><th>الحالة</th><th>تاريخ الإنشاء</th><th></th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table></div>`
-        }
+      <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chalkboard-teacher"></i> قائمة المعلمين (${T.length})</h3></div>
+        <div class="admin-toolbar">
+          <input class="admin-search" type="text" placeholder="🔍 ابحث بالاسم..." oninput="Pages._filterAdminRows(this.value)">
+          <button class="admin-filter-btn active" onclick="Pages._filterAdminStatus(this,'all')">الكل (${T.length})</button>
+          <button class="admin-filter-btn" onclick="Pages._filterAdminStatus(this,'approved')">مفعّل (${appr.length})</button>
+          <button class="admin-filter-btn" onclick="Pages._filterAdminStatus(this,'pending')">معلّق (${pend.length})</button>
+        </div>
+        ${T.length?`<div style="overflow-x:auto"><table class="admin-table">
+          <thead><tr><th>#</th><th>المعلم</th><th>الجنس</th><th>المدرسة</th><th>المادة</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead>
+          <tbody id="admin-tbody">${rows}</tbody></table></div>`
+        :`<div class="empty-state"><i class="fas fa-users fa-2x"></i><p>لا يوجد معلمون</p></div>`}
       </div>`;
+  },
+
+  _filterAdminRows(q) {
+    const rows = document.querySelectorAll('#admin-tbody tr');
+    q = q.trim().toLowerCase();
+    rows.forEach(r => { r.style.display = (!q || (r.dataset.name||'').includes(q)) ? '' : 'none'; });
+  },
+  _filterAdminStatus(btn, status) {
+    document.querySelectorAll('.admin-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('#admin-tbody tr').forEach(r => {
+      r.style.display = (status==='all' || r.dataset.status===status) ? '' : 'none';
+    });
+  },
+  async _approveAll() {
+    const T = ((await _sb.rpc('get_all_users')).data||[]).filter(p => !p.approved && p.email !== _ADMIN_EMAIL);
+    if (!T.length) { Toast.show('لا يوجد طلبات معلّقة'); return; }
+    if (!confirm(`تفعيل ${T.length} حساب؟`)) return;
+    for (const p of T) { await _sb.from('profiles').update({approved:true}).eq('id',p.id); }
+    Toast.show(`✓ تم تفعيل ${T.length} حساب`);
+    Pages.admin();
   },
 
   async _setApproval(userId, approve) {
@@ -5180,7 +5208,9 @@ const Pages = {
   }
 };
 
-/* ==================== ADMIN ==================== */
+
+
+
 const _ADMIN_EMAIL = 'nassserf999@gmail.com';
 const _isAdmin = () => (localStorage.getItem('tm_user_email') || '').toLowerCase() === _ADMIN_EMAIL;
 
