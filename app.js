@@ -3512,37 +3512,24 @@ const Pages = {
   },
 
   _xlRefreshRow(stuId, status) {
-    const cfColors = {
-      present: { bg: '#E2EFDA', color: '#375623', border: '#A9D18E' },
-      late:    { bg: '#FCEACC', color: '#7A4F1C', border: '#F4B942' },
-      absent:  { bg: '#FCE4D6', color: '#9C0006', border: '#FF7676' },
-    };
-    const cf = cfColors[status];
     const row = document.getElementById(`ar-${stuId}`);
     if (row) {
-      row.style.background = cf.bg;
-      const nameCell = row.querySelector('td:nth-child(2)');
-      if (nameCell) nameCell.style.color = cf.color;
+      row.classList.remove('att2-present','att2-late','att2-absent');
+      row.classList.add('att2-' + status);
     }
     ['present','late','absent'].forEach(key => {
       const btn = document.getElementById(`ar-att-${stuId}-${key}`);
-      if (!btn) return;
-      const active = key === status;
-      const kc = cfColors[key];
-      btn.style.background = active ? kc.bg : '#fff';
-      btn.style.borderColor = active ? kc.border : '#C0C0C0';
-      btn.style.color = active ? kc.color : '#aaa';
+      if (btn) btn.classList.toggle('active', key === status);
     });
-    // update counter badges
     const students = Pages._attStudents || [];
     const counts = { present: 0, late: 0, absent: 0 };
     students.forEach(s => counts[Pages._currentAtt?.[s.id] || 'present']++);
     const pEl = document.getElementById('ar-cnt-present');
     const lEl = document.getElementById('ar-cnt-late');
     const aEl = document.getElementById('ar-cnt-absent');
-    if (pEl) pEl.textContent = `✓ ${counts.present} حاضر`;
-    if (lEl) lEl.textContent = `⏰ ${counts.late} متأخر`;
-    if (aEl) aEl.textContent = `✗ ${counts.absent} غائب`;
+    if (pEl) pEl.textContent = `حاضر ${counts.present}`;
+    if (lEl) lEl.textContent = `متأخر ${counts.late}`;
+    if (aEl) aEl.textContent = `غائب ${counts.absent}`;
   },
 
   markAll(status) {
