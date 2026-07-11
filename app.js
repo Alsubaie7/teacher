@@ -1523,7 +1523,7 @@ const Router = {
     clearInterval(this._nowTimer);
     // update sub-nav active state
     const navPage = page === 'classDetail' ? 'classes' : page;
-    document.querySelectorAll('.sub-nav-link').forEach(l =>
+    document.querySelectorAll('.nav-link').forEach(l =>
       l.classList.toggle('active', l.dataset.page === navPage)
     );
     const content = document.getElementById('content');
@@ -5965,9 +5965,10 @@ const App = {
     document.getElementById('sb-school').textContent = teacher.school || '—';
     document.getElementById('sb-email').textContent  = localStorage.getItem('tm_user_email') || '—';
     if (_isAdmin()) {
-      document.getElementById('admin-subnav-link').style.display = '';
-      document.getElementById('admin-nav-btn').style.display     = '';
-      document.getElementById('admin-divider').style.display     = '';
+      const _adminBtn = document.getElementById('admin-nav-btn');
+      const _adminDiv = document.getElementById('admin-divider');
+      if (_adminBtn) _adminBtn.style.display = '';
+      if (_adminDiv) _adminDiv.style.display = '';
     }
     CmdPalette.init();
     TimeAware.init();
@@ -6043,9 +6044,11 @@ const FontSize = {
   apply(size) {
     document.documentElement.style.fontSize = size + 'px';
     localStorage.setItem(this._key, size);
-    const idx = this._sizes.indexOf(size);
-    document.getElementById('fs-down').disabled = idx === 0;
-    document.getElementById('fs-up').disabled   = idx === this._sizes.length - 1;
+    const idx  = this._sizes.indexOf(size);
+    const down = document.getElementById('fs-down');
+    const up   = document.getElementById('fs-up');
+    if (down) down.disabled = idx === 0;
+    if (up)   up.disabled   = idx === this._sizes.length - 1;
   },
   change(delta) {
     const idx  = this._sizes.indexOf(this.current());
