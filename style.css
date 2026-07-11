@@ -359,6 +359,42 @@ textarea { resize: vertical; min-height: 80px; }
 .att2-foot i { color: var(--green); }
 
 /* ============================================================
+   ANALYTICS (clean, replaces excel)
+   ============================================================ */
+.an2-kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 1.2rem; }
+.an2-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.1rem; }
+.an2-kpi-top { margin-bottom: .5rem; }
+.an2-kpi-val { font-size: 1.7rem; font-weight: 900; }
+.an2-kpi-lbl { font-size: .82rem; color: var(--text-muted); font-weight: 700; margin-top: .2rem; }
+.an2-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem; }
+.an2-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 1.2rem; }
+.an2-hd { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .85rem 1.1rem; border-bottom: 1px solid var(--border); }
+.an2-hd h3 { font-size: .95rem; font-weight: 800; display: flex; align-items: center; gap: .5rem; }
+.an2-hd h3 i { color: var(--primary); }
+.an2-hd-meta { font-size: .78rem; color: var(--text-muted); font-weight: 700; }
+.an2-bd { padding: 1.1rem; }
+.an2-table { width: 100%; border-collapse: collapse; min-width: 520px; }
+.an2-table thead th { text-align: right; font-size: .76rem; color: var(--text-muted); font-weight: 800; padding: .7rem .8rem; background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; }
+.an2-table td { padding: .6rem .8rem; border-bottom: 1px solid var(--border-subtle); font-size: .85rem; }
+.an2-table tbody tr:last-child td { border-bottom: 0; }
+.an2-table tbody tr:hover { background: var(--surface-hover); cursor: pointer; }
+.an2-pill { display: inline-block; border-radius: 8px; padding: .2rem .5rem; font-weight: 800; font-size: .8rem; }
+.an2-pill.ok { background: var(--green-soft); color: var(--green); }
+.an2-pill.mid { background: var(--orange-soft); color: var(--orange); }
+.an2-pill.bad { background: var(--red-soft); color: var(--red); }
+.an2-att-row { display: flex; align-items: center; gap: .75rem; padding: .7rem .3rem; border-bottom: 1px solid var(--border-subtle); cursor: pointer; }
+.an2-att-row:last-child { border-bottom: 0; }
+.an2-att-row:hover { background: var(--surface-hover); }
+.an2-att-avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .85rem; flex-shrink: 0; border: 1px solid; }
+.an2-att-name { font-weight: 800; font-size: .9rem; }
+.an2-att-meta { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+.an2-att-tag { border-radius: 8px; padding: .12rem .45rem; font-size: .7rem; font-weight: 800; }
+.an2-att-tag.tag-abs { background: var(--red-soft); color: var(--red); }
+.an2-att-tag.tag-fail { background: var(--orange-soft); color: var(--orange); }
+.an2-att-tag.tag-beh { background: #f3e8ff; color: #7c3aed; }
+@media (max-width: 860px) { .an2-kpi-grid { grid-template-columns: repeat(2,1fr); } .an2-two-col { grid-template-columns: 1fr; } }
+
+/* ============================================================
    SETUP / AUTH SCREEN
    ============================================================ */
 .setup-overlay {
