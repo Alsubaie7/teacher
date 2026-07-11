@@ -2108,12 +2108,12 @@ select option { background: #fff; color: var(--text-primary); }
    ============================================================ */
 [data-theme="dark"] {
   /* Surfaces */
-  --body-bg:        #0F172A;
-  --surface:        #1E293B;
-  --surface-2:      #0F172A;
-  --surface-solid:  #1E293B;
-  --surface-hover:  rgba(5,150,105,.12);
-  --surface-active: rgba(5,150,105,.16);
+  --body-bg:        #12142a;
+  --surface:        #1c2036;
+  --surface-2:      #12142a;
+  --surface-solid:  #1c2036;
+  --surface-hover:  rgba(99,102,241,.12);
+  --surface-active: rgba(99,102,241,.16);
 
   /* Text */
   --text-primary:   #F1F5F9;
@@ -2122,8 +2122,8 @@ select option { background: #fff; color: var(--text-primary); }
   --text-dim:       #64748B;
 
   /* Borders */
-  --border:         #334155;
-  --border-subtle:  rgba(51,65,85,.7);
+  --border:         #2a2f4c;
+  --border-subtle:  rgba(42,47,76,.7);
 
   /* Shadows */
   --shadow:         0 2px 8px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.25);
@@ -2147,11 +2147,22 @@ select option { background: #fff; color: var(--text-primary); }
   background: var(--body-bg);
 }
 [data-theme="dark"] body::before {
-  background:
-    radial-gradient(ellipse 60% 50% at 0% 0%, rgba(5,150,105,.06) 0%, transparent 65%),
-    radial-gradient(ellipse 40% 35% at 100% 100%, rgba(5,150,105,.04) 0%, transparent 55%),
-    #0F172A;
+  background: #12142a;
 }
+
+/* Shell — dark */
+[data-theme="dark"] .side-nav { background: #171a2e; border-color: #262a44; }
+[data-theme="dark"] .topbar { background: transparent; }
+[data-theme="dark"] .nav-link { color: var(--text-muted); }
+[data-theme="dark"] .nav-link:hover { background: rgba(255,255,255,.05); color: #fff; }
+[data-theme="dark"] .nav-link.active { background: rgba(99,102,241,.18); color: #a5b4fc; }
+[data-theme="dark"] .cmd-trigger-btn,
+[data-theme="dark"] .tb-icon-btn { background: #1c2036; border-color: #2a2f4c; color: var(--text-secondary); }
+[data-theme="dark"] .cmd-trigger-kbd { background: #12142a; }
+[data-theme="dark"] .sn-account:hover { background: rgba(255,255,255,.05); }
+[data-theme="dark"] .st-avatar-dropdown { background: #1c2036; border-color: #2a2f4c; }
+[data-theme="dark"] .st-avatar-action:hover { background: rgba(255,255,255,.05); }
+[data-theme="dark"] .bottom-nav { background: #171a2e; border-color: #262a44; }
 
 /* Content area */
 [data-theme="dark"] .content {
@@ -2200,12 +2211,6 @@ select option { background: #fff; color: var(--text-primary); }
 [data-theme="dark"] .xl-tab { color: #94A3B8; border-color: #334155; }
 [data-theme="dark"] .xl-tab.active { background: #1E293B; color: var(--primary); }
 [data-theme="dark"] .xl-actions { background: #1A2535; border-top-color: #334155; }
-
-/* Avatar dropdown */
-[data-theme="dark"] .st-avatar-dropdown {
-  background: #1E293B;
-  border-color: #334155;
-}
 
 /* Modal overlay */
 [data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,.7); }

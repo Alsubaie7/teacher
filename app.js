@@ -6028,8 +6028,7 @@ const DarkMode = {
   },
   init() {
     const saved = localStorage.getItem(this._key);
-    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-    this.apply(saved !== null ? saved === '1' : prefersDark);
+    this.apply(saved === '1');
   }
 };
 
