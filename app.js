@@ -2056,7 +2056,7 @@ const Pages = {
 
     const clr = cls.color || '#4f46e5';
     const cnt = list.length;
-    const initials = (cls.name||'').replace(/[^0-9ء-ي]/g,'').slice(0,2);
+    const initials = (((cls.gradeLevel||cls.name||'').replace(/الصف|صف/g,'').trim().replace(/^ال/,'').match(/[ء-ي]/)||[''])[0]) + (cls.section||'');
     const bookTab = Books.forClass(cls)
       ? `<button class="cw-tab ${tab==='book'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'book'})"><i class="fas fa-book-open"></i> الكتاب والعروض</button>`
       : '';
@@ -2412,7 +2412,7 @@ const Pages = {
       const pres = att ? att.records.filter(r => r.status === 'present').length : 0;
       const rate = att && att.records.length ? Math.round(pres/att.records.length*100) : null;
       const clr  = c.color || '#4f46e5';
-      const initials = (c.name||'').replace(/[^0-9ء-ي]/g,'').slice(0,2);
+      const initials = (((c.gradeLevel||c.name||'').replace(/الصف|صف/g,'').trim().replace(/^ال/,'').match(/[ء-ي]/)||[''])[0]) + (c.section||'');
       return `
       <div class="cls-card">
         <div class="cls-card-top" style="background:${clr}"></div>
