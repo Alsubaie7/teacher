@@ -4185,7 +4185,7 @@ const Pages = {
             onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})"
             style="--cell-color:${color}">
             <div class="tt-chip" style="background:${color}20;border-color:${color}40;color:${color}">${cls.name}</div>
-            <div class="tt-subject">${entry.subject}</div>
+            <div class="tt-subject">${entry.subject || cls.subject || ''}</div>
             ${entry.notes?`<div class="tt-notes"><i class="fas fa-tag"></i>${entry.notes}</div>`:''}
             <button class="tt-edit-btn" onclick="event.stopPropagation();Pages.editScheduleModal('${entry.id}')" title="تعديل">
               <i class="fas fa-pen"></i>
