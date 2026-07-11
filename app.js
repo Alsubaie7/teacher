@@ -4850,159 +4850,109 @@ const Pages = {
       low:  { bg:'#E0F2FE', color:'#0369A1', border:'rgba(3,105,161,.3)',  badge:'background:#E0F2FE;color:#075985', label:'ℹ خفيف' },
     }[sev]);
 
-    document.getElementById('content').innerHTML = `
-      <div class="page-header">
-        <h2><i class="fas fa-chart-bar"></i> لوحة التحليلات</h2>
-      </div>
+    const _pill = (v, type) => {
+      if (v === null) return '<span style="color:var(--text-muted)">—</span>';
+      const thr = type === 'att' ? [85,70] : [80,60];
+      const c = v >= thr[0] ? 'ok' : v >= thr[1] ? 'mid' : 'bad';
+      return `<span class="an2-pill ${c}">${v}${type==='att'?'%':''}</span>`;
+    };
 
-      <!-- KPI Cards -->
-      <div class="an-kpi-grid">
+    document.getElementById('content').innerHTML = `
+      <div class="dash-greet"><h1><i class="fas fa-chart-bar" style="color:var(--primary)"></i> لوحة التحليلات</h1></div>
+      <div class="an2-kpi-grid">
         ${[
-          {file:'إجمالي_الطلاب.xlsx',    val:totalStudents,                                              lbl:'إجمالي الطلاب',       icon:'fa-users',          color:'#1F497D'},
-          {file:'الفصول_الدراسية.xlsx',  val:classes.length,                                             lbl:'الفصول الدراسية',     icon:'fa-door-open',      color:'#1D6F42'},
-          {file:'متوسط_الحضور.xlsx',     val:avgAttRate!==null?avgAttRate+'%':'—',                       lbl:'متوسط الحضور',        icon:'fa-clipboard-check', color:avgAttRate===null?'#9ca3af':avgAttRate>=80?'#1D6F42':avgAttRate>=60?'#9C5700':'#9C0006'},
-          {file:'إجمالي_الغيابات.xlsx',  val:totalAbs,                                                   lbl:'إجمالي الغيابات',     icon:'fa-user-times',     color:'#9C0006'},
+          {val:totalStudents, lbl:'إجمالي الطلاب', icon:'fa-users', ic:'indigo'},
+          {val:classes.length, lbl:'الفصول الدراسية', icon:'fa-door-open', ic:'blue'},
+          {val:avgAttRate!==null?avgAttRate+'%':'—', lbl:'متوسط الحضور', icon:'fa-clipboard-check', ic:avgAttRate===null?'blue':avgAttRate>=80?'green':avgAttRate>=60?'orange':'red'},
+          {val:totalAbs, lbl:'إجمالي الغيابات', icon:'fa-user-xmark', ic:'red'},
         ].map(k => `
-          <div class="an-kpi-card">
-            <div class="xl-titlebar" style="padding:.28rem .6rem">
-              <div class="xl-title-icon">X</div>
-              <div class="xl-title-filename">${k.file}</div>
-            </div>
-            <div class="an-kpi-body">
-              <div class="an-kpi-val" style="color:${k.color}">${k.val}</div>
-              <div class="an-kpi-lbl"><i class="fas ${k.icon}"></i> ${k.lbl}</div>
-            </div>
+          <div class="an2-kpi">
+            <div class="an2-kpi-top"><span class="dash-stat-ic ${k.ic}"><i class="fas ${k.icon}"></i></span></div>
+            <div class="an2-kpi-val">${k.val}</div>
+            <div class="an2-kpi-lbl">${k.lbl}</div>
           </div>`).join('')}
       </div>
 
-      <!-- Charts Row -->
-      <div class="an-two-col">
-
-        <!-- Sparkline trend -->
-        <div class="an-section">
-          <div class="xl-titlebar" style="padding:.28rem .6rem">
-            <div class="xl-title-icon">X</div>
-            <div class="xl-title-filename">اتجاه_الحضور_14_يوم.xlsx</div>
-            ${avgTrend!==null?`<div style="font-size:.68rem;color:rgba(255,255,255,.8);flex-shrink:0">متوسط: ${avgTrend}%</div>`:''}
-          </div>
-          <div class="an-section-body">
+      <div class="an2-two-col">
+        <div class="an2-card" style="margin-bottom:0">
+          <div class="an2-hd"><h3><i class="fas fa-chart-line"></i> اتجاه الحضور — ١٤ يوم</h3>${avgTrend!==null?`<span class="an2-hd-meta">متوسط ${avgTrend}%</span>`:''}</div>
+          <div class="an2-bd">
             ${_spark(trendData)}
-            <div style="display:flex;justify-content:space-between;font-size:.62rem;color:#9ca3af;margin-top:.2rem">
-              <span>${trendLabels[0]}</span><span>${trendLabels[6]}</span><span>${trendLabels[13]}</span>
-            </div>
+            <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--text-muted);margin-top:.3rem"><span>${trendLabels[0]}</span><span>${trendLabels[6]}</span><span>${trendLabels[13]}</span></div>
           </div>
         </div>
-
-        <!-- Donut chart -->
-        <div class="an-section">
-          <div class="xl-titlebar" style="padding:.28rem .6rem">
-            <div class="xl-title-icon">X</div>
-            <div class="xl-title-filename">توزيع_التقديرات.xlsx</div>
-            ${distTotal>0?`<div style="font-size:.68rem;color:rgba(255,255,255,.8);flex-shrink:0">${distTotal} طالب</div>`:''}
-          </div>
-          <div class="an-section-body" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <div class="an2-card" style="margin-bottom:0">
+          <div class="an2-hd"><h3><i class="fas fa-chart-pie"></i> توزيع التقديرات</h3>${distTotal>0?`<span class="an2-hd-meta">${distTotal} طالب</span>`:''}</div>
+          <div class="an2-bd" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
             ${distTotal===0
-              ? `<div style="color:#9ca3af;font-size:.8rem;text-align:center;width:100%;padding:1.5rem">لا توجد درجات مسجّلة</div>`
-              : `<div style="flex-shrink:0">
-                  <svg viewBox="0 0 100 100" width="110" height="110">
-                    <circle cx="50" cy="50" r="36" fill="none" stroke="#f0f0f0" stroke-width="16"/>
-                    ${_donut(donutSegs)}
-                    <text x="50" y="46" text-anchor="middle" font-size="10" font-weight="800" fill="#1e293b">${distTotal>0?Math.round(passingCount/distTotal*100):0}%</text>
-                    <text x="50" y="58" text-anchor="middle" font-size="6.5" fill="#64748b">ناجحون</text>
-                  </svg>
-                </div>
+              ? `<div style="color:var(--text-muted);font-size:.85rem;text-align:center;width:100%;padding:1rem">لا توجد درجات مسجّلة</div>`
+              : `<div style="flex-shrink:0"><svg viewBox="0 0 100 100" width="110" height="110">
+                  <circle cx="50" cy="50" r="36" fill="none" stroke="var(--surface-2)" stroke-width="16"/>
+                  ${_donut(donutSegs)}
+                  <text x="50" y="46" text-anchor="middle" font-size="10" font-weight="800" fill="var(--text-primary)">${distTotal>0?Math.round(passingCount/distTotal*100):0}%</text>
+                  <text x="50" y="58" text-anchor="middle" font-size="6.5" fill="var(--text-muted)">ناجحون</text>
+                </svg></div>
                 <div style="flex:1;min-width:80px">
-                  ${donutSegs.map(s=>`
-                    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
-                      <span style="width:10px;height:10px;border-radius:2px;background:${s.color};flex-shrink:0;display:inline-block"></span>
-                      <span style="font-size:.73rem;color:#374151;font-weight:600;flex:1">${s.label}</span>
-                      <span style="font-size:.73rem;color:#6b7280">${s.count}</span>
-                    </div>`).join('')}
+                  ${donutSegs.map(s=>`<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem">
+                    <span style="width:11px;height:11px;border-radius:3px;background:${s.color};flex-shrink:0;display:inline-block"></span>
+                    <span style="font-size:.78rem;color:var(--text-secondary);font-weight:700;flex:1">${s.label}</span>
+                    <span style="font-size:.78rem;color:var(--text-muted);font-weight:800">${s.count}</span>
+                  </div>`).join('')}
                 </div>`}
           </div>
         </div>
       </div>
 
-      <!-- Class comparison table -->
-      <div class="an-section" style="margin-bottom:1.1rem">
-        <div class="xl-titlebar" style="padding:.28rem .6rem">
-          <div class="xl-title-icon">X</div>
-          <div class="xl-title-filename">مقارنة_الفصول.xlsx</div>
-          <div style="font-size:.68rem;color:rgba(255,255,255,.8);flex-shrink:0">${classes.length} فصل</div>
-        </div>
-        <div class="an-section-body" style="padding:0;overflow-x:auto">
-          <table class="xl-table" style="min-width:480px">
-            <colgroup>
-              <col style="width:26px"><col style="min-width:100px">
-              <col style="width:60px"><col style="width:65px">
-              <col style="width:80px"><col style="width:90px"><col style="width:70px">
-            </colgroup>
-            <thead>
-              <tr>
-                <td class="xl-col-hdr-cell corner"></td>
-                <td class="xl-col-hdr-cell">A</td><td class="xl-col-hdr-cell">B</td>
-                <td class="xl-col-hdr-cell">C</td><td class="xl-col-hdr-cell">D</td>
-                <td class="xl-col-hdr-cell">E</td><td class="xl-col-hdr-cell">F</td>
-              </tr>
-              <tr>
-                <td class="xl-rownum" style="background:#1D6F42;color:#fff">#</td>
-                <td class="xl-cell label" style="background:#E8F5E9;font-weight:800">اسم الفصل</td>
-                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('stus')">الطلاب ${arrow('stus')}</td>
-                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('sessions')">الجلسات ${arrow('sessions')}</td>
-                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('attRate')">الحضور% ${arrow('attRate')}</td>
-                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('avgGrade')">متوسط الدرجة ${arrow('avgGrade')}</td>
-                <td class="xl-cell label an-sort-hdr" onclick="Pages.sortAnalytics('posBeh')">التفاعل ${arrow('posBeh')}</td>
-              </tr>
-            </thead>
+      <div class="an2-card">
+        <div class="an2-hd"><h3><i class="fas fa-table-columns"></i> مقارنة الفصول</h3><span class="an2-hd-meta">${classes.length} فصل</span></div>
+        <div style="overflow-x:auto">
+          <table class="an2-table">
+            <thead><tr>
+              <th style="width:32px">#</th>
+              <th>اسم الفصل</th>
+              <th onclick="Pages.sortAnalytics('stus')">الطلاب ${arrow('stus')}</th>
+              <th onclick="Pages.sortAnalytics('sessions')">الجلسات ${arrow('sessions')}</th>
+              <th onclick="Pages.sortAnalytics('attRate')">الحضور ${arrow('attRate')}</th>
+              <th onclick="Pages.sortAnalytics('avgGrade')">متوسط الدرجة ${arrow('avgGrade')}</th>
+              <th onclick="Pages.sortAnalytics('posBeh')">التفاعل ${arrow('posBeh')}</th>
+            </tr></thead>
             <tbody>
-              ${sorted.map((x,i) => `
-                <tr onclick="Router.go('classDetail',{classId:'${x.cls.id}'})" style="cursor:pointer">
-                  <td class="xl-rownum">${i+1}</td>
-                  <td class="xl-cell" style="font-weight:700;color:#1D6F42">${x.cls.name}</td>
-                  <td class="xl-cell" style="text-align:center;font-family:monospace;font-weight:700">${x.stus}</td>
-                  <td class="xl-cell" style="text-align:center;color:#6b7280">${x.sessions}</td>
-                  <td class="xl-cell" style="${cf(x.attRate,'att')};text-align:center;font-weight:700;font-family:monospace">${x.attRate!==null?x.attRate+'%':'—'}</td>
-                  <td class="xl-cell" style="${cf(x.avgGrade,'grade')};text-align:center;font-weight:700;font-family:monospace">${x.avgGrade!==null?x.avgGrade:'—'}</td>
-                  <td class="xl-cell" style="text-align:center;font-family:monospace;color:#7C3AED;font-weight:700">${x.posBeh}</td>
-                </tr>`).join('')}
+              ${sorted.map((x,i) => `<tr onclick="Router.go('classDetail',{classId:'${x.cls.id}'})">
+                <td style="color:var(--text-muted)">${i+1}</td>
+                <td style="font-weight:800;color:var(--primary)">${x.cls.name}</td>
+                <td>${x.stus}</td>
+                <td style="color:var(--text-muted)">${x.sessions}</td>
+                <td>${_pill(x.attRate,'att')}</td>
+                <td>${_pill(x.avgGrade,'grade')}</td>
+                <td style="font-weight:800;color:#7c3aed">${x.posBeh}</td>
+              </tr>`).join('')}
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Students needing attention -->
-      <div class="an-section">
-        <div class="xl-titlebar" style="padding:.28rem .6rem">
-          <div class="xl-title-icon">X</div>
-          <div class="xl-title-filename">طلاب_يحتاجون_اهتمام.xlsx</div>
-          ${needsAtt.length?`<div style="font-size:.68rem;color:rgba(255,255,255,.8);flex-shrink:0">${needsAtt.length} طالب</div>`:''}
-        </div>
-        <div class="an-section-body" style="padding:.5rem .75rem">
+      <div class="an2-card">
+        <div class="an2-hd"><h3><i class="fas fa-bell"></i> طلاب يحتاجون اهتمام</h3>${needsAtt.length?`<span class="an2-hd-meta">${needsAtt.length} طالب</span>`:''}</div>
+        <div class="an2-bd" style="padding:.4rem 1.1rem">
           ${needsAtt.length===0
-            ? `<div style="text-align:center;padding:1.5rem;color:#9ca3af">
-                <i class="fas fa-check-circle" style="color:#1D6F42;font-size:1.5rem"></i>
-                <p style="margin-top:.5rem;font-size:.85rem">ممتاز — لا يوجد طلاب بحاجة لتدخل حالياً</p>
-               </div>`
+            ? `<div style="text-align:center;padding:1.2rem;color:var(--text-muted)"><i class="fas fa-circle-check" style="color:var(--green)"></i> ممتاز — لا يوجد طلاب بحاجة لتدخل حالياً</div>`
             : needsAtt.map(({s,cls,absCount,tot,negBeh,sev}) => {
                 const st = sevStyle(sev);
-                return `
-                <div class="attention-row" onclick="Pages.studentProfile('${s.id}')" style="cursor:pointer">
-                  <div class="attention-avatar" style="background:${st.bg};color:${st.color};border-color:${st.border}">
-                    ${s.name.charAt(0)}
-                  </div>
+                return `<div class="an2-att-row" onclick="Pages.studentProfile('${s.id}')">
+                  <div class="an2-att-avatar" style="background:${st.bg};color:${st.color};border-color:${st.border}">${s.name.charAt(0)}</div>
                   <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-                      <div class="attention-name">${s.name}</div>
-                      <span style="padding:.1rem .45rem;border-radius:10px;font-size:.65rem;font-weight:700;${st.badge}">${st.label}</span>
+                      <div class="an2-att-name">${s.name}</div>
+                      <span style="padding:.12rem .5rem;border-radius:8px;font-size:.68rem;font-weight:800;${st.badge}">${st.label}</span>
                     </div>
-                    <div class="attention-meta">
-                      <span style="color:#6b7280;font-size:.75rem">${cls?.name||'—'}</span>
-                      ${absCount>=1?`<span class="attention-tag tag-abs">غاب ${absCount}</span>`:''}
-                      ${tot!==null&&tot<60?`<span class="attention-tag tag-fail">درجة ${tot}</span>`:''}
-                      ${negBeh>=2?`<span class="attention-tag tag-beh">سلوك ${negBeh}</span>`:''}
+                    <div class="an2-att-meta">
+                      <span style="color:var(--text-muted);font-size:.78rem">${cls?.name||'—'}</span>
+                      ${absCount>=1?`<span class="an2-att-tag tag-abs">غاب ${absCount}</span>`:''}
+                      ${tot!==null&&tot<60?`<span class="an2-att-tag tag-fail">درجة ${tot}</span>`:''}
+                      ${negBeh>=2?`<span class="an2-att-tag tag-beh">سلوك ${negBeh}</span>`:''}
                     </div>
                   </div>
-                  <i class="fas fa-chevron-left" style="color:#d1d5db;font-size:.75rem;flex-shrink:0"></i>
+                  <i class="fas fa-chevron-left" style="color:var(--text-dim);font-size:.75rem;flex-shrink:0"></i>
                 </div>`;
               }).join('')}
         </div>
