@@ -2054,39 +2054,38 @@ const Pages = {
       }
     }
 
-    const clrDot = cls.color || '#3B82F6';
-    const cnt    = list.length;
+    const clr = cls.color || '#4f46e5';
+    const cnt = list.length;
+    const initials = (cls.name||'').replace(/[^0-9ء-ي]/g,'').slice(0,2);
+    const bookTab = Books.forClass(cls)
+      ? `<button class="cw-tab ${tab==='book'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'book'})"><i class="fas fa-book-open"></i> الكتاب والعروض</button>`
+      : '';
     const header = `
-      <div class="cd-header">
-        <button class="cd-back" onclick="Router.go('classes')" title="الفصول">
-          <i class="fas fa-arrow-right"></i>
-        </button>
-        <div class="cd-title-wrap">
-          <div class="cd-dot" style="background:${clrDot}"></div>
-          <div>
-            <div class="cd-class-name">${cls.name}</div>
-            ${cls.subject ? `<div class="cd-class-sub">${cls.subject}</div>` : ''}
+      <div class="cw-crumb"><b onclick="Router.go('classes')">فصولي</b> ‹ ${cls.name}</div>
+      <div class="cw-head">
+        <div class="cw-avatar" style="background:${clr}">${initials}</div>
+        <div class="cw-title">
+          <div class="cw-name">${cls.name}</div>
+          <div class="cw-sub">${cls.subject ? cls.subject + ' · ' : ''}${cnt} ${_T.stu}</div>
+        </div>
+        <div class="cw-switch" id="cw-switch">
+          <button class="cw-switch-btn" onclick="document.getElementById('cw-switch').classList.toggle('open')">
+            <i class="fas fa-repeat"></i> تبديل الفصل <i class="fas fa-chevron-down" style="font-size:.7rem"></i>
+          </button>
+          <div class="cw-switch-menu">
+            ${classes.map(c => `<div class="cw-switch-item" onclick="Router.go('classDetail',{classId:'${c.id}',tab:'${tab==='book' && !Books.forClass(c) ? 'att' : tab}'})">
+              <span class="dot" style="background:${c.color||'#4f46e5'}"></span> ${c.name}${c.id===selId?' <i class="fas fa-check" style="margin-inline-start:auto;color:var(--primary)"></i>':''}
+            </div>`).join('')}
           </div>
-          <div class="cd-cnt-badge">${cnt} ${_T.stu}</div>
         </div>
-        <div class="cd-tabs">
-          <button class="cd-tab ${tab==='att'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'att',date:'${selDate}'})">
-            <i class="fas fa-clipboard-check"></i> الحضور والسلوك
-          </button>
-          <button class="cd-tab ${tab==='groups'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'groups'})">
-            <i class="fas fa-object-group"></i> المجموعات
-          </button>
-          ${Books.forClass(cls) ? `
-          <button class="cd-tab ${tab==='book'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'book'})">
-            <i class="fas fa-book-open"></i> الكتاب
-          </button>` : ''}
-          <button class="cd-tab ${tab==='manage'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'manage'})">
-            <i class="fas fa-cog"></i> الإدارة
-          </button>
-        </div>
-        <div class="cd-header-actions">
-          <button class="btn btn-sm btn-outline" onclick="Pages.addClassModal('${selId}')"><i class="fas fa-edit"></i></button>
-        </div>
+        <button class="cls-btn icon" style="flex:0 0 auto" onclick="Pages.addClassModal('${selId}')" title="تعديل الفصل"><i class="fas fa-edit"></i></button>
+      </div>
+      <div class="cw-tabs">
+        <button class="cw-tab ${tab==='att'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'att',date:'${selDate}'})"><i class="fas fa-clipboard-check"></i> الحضور والسلوك</button>
+        <button class="cw-tab" onclick="Router.go('grades',{classId:'${selId}'})"><i class="fas fa-star"></i> الدرجات</button>
+        <button class="cw-tab ${tab==='groups'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'groups'})"><i class="fas fa-object-group"></i> المجموعات</button>
+        ${bookTab}
+        <button class="cw-tab ${tab==='manage'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'manage'})"><i class="fas fa-users-gear"></i> الطلاب</button>
       </div>`;
 
     let body = '';
@@ -5677,6 +5676,7 @@ const App = {
 
     document.addEventListener('click', e => {
       if (!e.target.closest('.st-avatar-wrap')) document.getElementById('st-avatar-wrap')?.classList.remove('open');
+      if (!e.target.closest('.cw-switch')) document.getElementById('cw-switch')?.classList.remove('open');
       if (!e.target.closest('.dot-menu')) document.querySelectorAll('.dot-drop:not(.hidden)').forEach(d => d.classList.add('hidden'));
     });
 
