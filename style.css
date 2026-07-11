@@ -90,8 +90,8 @@ body::before {
   content: '';
   position: fixed; inset: 0; z-index: -2;
   background:
-    radial-gradient(ellipse 60% 50% at 0% 0%, rgba(5,150,105,.04) 0%, transparent 65%),
-    radial-gradient(ellipse 40% 35% at 100% 100%, rgba(5,150,105,.03) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 0% 0%, rgba(79,70,229,.04) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 35% at 100% 100%, rgba(79,70,229,.03) 0%, transparent 55%),
     #F8FAFC;
   pointer-events: none;
 }
@@ -965,7 +965,7 @@ textarea { resize: vertical; min-height: 80px; }
 .grades-table .total-grade {
   font-weight: 900;
   font-size: .92rem;
-  background: rgba(5,150,105,.04);
+  background: rgba(79,70,229,.04);
   border-left: 2px solid #d1d5db !important;
 }
 
@@ -2498,7 +2498,7 @@ select option { background: #fff; color: var(--text-primary); }
   font-size: .6rem; font-weight: 800; padding: 1px 6px; border-radius: 10px;
   margin-right: .35rem; vertical-align: middle;
 }
-.tt-today-col { background: rgba(5,150,105,.04) !important; }
+.tt-today-col { background: rgba(79,70,229,.04) !important; }
 .tt-today-col.tt-filled { background: rgba(5,150,105,.06) !important; }
 
 /* Active period row */
