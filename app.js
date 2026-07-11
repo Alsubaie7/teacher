@@ -103,6 +103,12 @@ const SECTIONS_LETTERS = ['أ','ب','ج','د','هـ','و','ز','ح'];
 const SECTIONS_NUMS    = ['1','2','3','4','5','6','7','8'];
 const _normAr = s => (s || '').split(' ').map(w => w.replace(/^ال/, '')).join(' ').trim().replace(/[اإ]/g, 'أ');
 const _esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const _ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+// يوحّد نص عربي للمقارنة المرنة: يشيل "ال" من بداية كل كلمة، يوحّد الألف والتاء المربوطة، ويشيل الفراغات الزائدة
+const _bookNorm = s => (s || '')
+  .split(' ').map(w => w.replace(/^ال/, '')).join(' ')
+  .replace(/[إأآ]/g, 'ا').replace(/ة/g, 'ه')
+  .replace(/\s+/g, ' ').trim();
 const _gradeIdx = cls => {
   let i = GRADE_LEVELS.indexOf(cls.gradeLevel ?? '');
   if (i !== -1) return i;
@@ -1047,6 +1053,73 @@ const ActiveClass = {
   }
 };
 
+/* ==================== الكتب الدراسية ==================== */
+/* يُربط الكتاب بالفصل عبر (gradeLevel + subject). صفحات الكتاب صور WebP في books/<key>/pages */
+const Books = {
+  catalog: [
+    {
+      key: 'g4',
+      matchGrade: 'رابع ابتدائي',
+      matchSubject: 'المهارات الرقمية',
+      title: 'المهارات الرقمية',
+      grade: 'الصف الرابع الابتدائي',
+      edition: 'طبعة ١٤٤٧ﻫ',
+      totalPages: 311,
+      units: [
+        {
+          n: 1, title: 'تعلم الأساسيات', part: 1,
+          goals: [
+            'الأجهزة الرئيسة والملحقة بالحاسب واستخداماتها.',
+            'الملفات والمجلدات وكيفية استخدامها.',
+            'فتح أحد برامج الويندوز.',
+            'طرق تعديل الإعدادات الأساسية في الحاسب.'
+          ],
+          lessons: [
+            { n: 1, title: 'الحاسب', from: 14, to: 19, presentation: 'presentations/g4/u1-l1.html', topics: [
+              ['ما الحاسب؟',14],['الحاسب المكتبي',14],['المكونات الرئيسة للحاسب المكتبي',15],
+              ['الأجهزة الملحقة بالحاسب',15],['استخدام الأجهزة الملحقة',16],['الطباعة',17],['لنطبق معاً',18,1]
+            ]},
+            { n: 2, title: 'سطح المكتب', from: 20, to: 32, presentation: null, topics: [
+              ['سطح المكتب',20],['الملفات',20],['اسم الملف',21],['نقل الملفات',21],['امتداد الملف',21],
+              ['إنشاء الملفات',22],['فتح ملف',23],['حذف الملف',23],['وضع ملفاتك في مجلدات',24],
+              ['اسم المجلد',25],['المجلدات الرئيسة والفرعية',25],['نقل أو نسخ المجلد',26],
+              ['استخدام سلة المحذوفات',27],['الحاسبة',27],['البحث عن مساعدة',28],['لنطبق معاً',29,1]
+            ]},
+            { n: 3, title: 'إعدادات جهاز الحاسب', from: 33, to: 38, presentation: null, topics: [
+              ['التاريخ والوقت',33],['إعدادات الشاشة',34],['تغيير خلفية سطح المكتب',35],
+              ['أصوات النظام',35],['لنطبق معاً',36,1]
+            ]}
+          ],
+          project: 39,
+          terms: [['لوحة المفاتيح','Keyboard'],['شاشة','Monitor'],['صندوق الحاسب','Computer case'],
+                  ['دقة الشاشة','Screen resolution'],['مكبر الصوت','Speaker'],['كاميرا الويب','Webcam'],
+                  ['ملف','File'],['مجلد','Folder'],['سلة المحذوفات','Recycle bin']]
+        },
+        { n: 2, title: 'العمل على النص',        part: 1, lessons: [], goals: [], terms: [] },
+        { n: 3, title: 'عالمي المتصل',          part: 1, lessons: [], goals: [], terms: [] },
+        { n: 4, title: 'البرمجة باستخدام سكراتش', part: 1, lessons: [], goals: [], terms: [] }
+      ]
+    }
+  ],
+
+  // يعثر على كتاب الفصل من مرحلته ومادته، بمقارنة متسامحة مع فروقات الكتابة (ال، ة/ه)
+  forClass(cls) {
+    if (!cls) return null;
+    const grade = cls.gradeLevel || GRADE_LEVELS.find(g => (cls.name || '').startsWith(g)) || cls.grade || '';
+    const subj  = cls.subject || '';
+    const g = _bookNorm(grade), s = _bookNorm(subj);
+    if (!g || !s) return null;
+    return this.catalog.find(b => _bookNorm(b.matchGrade) === g && _bookNorm(b.matchSubject) === s) || null;
+  },
+
+  // يفتح السبورة الذكية على صفحة محددة في تبويب جديد
+  open(bookKey, page) {
+    window.open(`whiteboard.html?p=${page}`, '_blank');
+  },
+
+  init() {}
+};
+
 const Router = {
   current: 'dashboard',
   title(page) {
@@ -1754,6 +1827,10 @@ const Pages = {
           <button class="cd-tab ${tab==='groups'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'groups'})">
             <i class="fas fa-object-group"></i> المجموعات
           </button>
+          ${Books.forClass(cls) ? `
+          <button class="cd-tab ${tab==='book'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'book'})">
+            <i class="fas fa-book-open"></i> الكتاب
+          </button>` : ''}
           <button class="cd-tab ${tab==='manage'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'manage'})">
             <i class="fas fa-cog"></i> الإدارة
           </button>
@@ -1766,6 +1843,7 @@ const Pages = {
     let body = '';
     if (tab === 'att')          body = this._cdAttBody(selId, list, map, selDate);
     else if (tab === 'groups')  body = this._cdGroupsBody(selId, saved);
+    else if (tab === 'book')    body = this._cdBookBody(cls);
     else                        body = this._cdManageBody(selId, list);
 
     const content = document.getElementById('content');
@@ -1774,6 +1852,106 @@ const Pages = {
     content.style.display = tab === 'att' ? 'flex' : '';
     content.style.flexDirection = tab === 'att' ? 'column' : '';
     content.style.overflow = tab === 'att' ? 'hidden' : '';
+  },
+
+  _cdBookBody(cls) {
+    const book = Books.forClass(cls);
+    if (!book) return `
+      <div class="empty-state"><div class="empty-icon"><i class="fas fa-book"></i></div>
+      <h3>لا يوجد كتاب مرتبط بهذا الفصل</h3>
+      <p style="color:var(--text-muted)">تأكد من ضبط المرحلة والمادة في إعدادات الفصل.</p></div>`;
+
+    const unitIdx = this._bookUnit || 0;
+    const unit    = book.units[unitIdx];
+    const bk       = book.key;
+    const lessonCount = book.units.reduce((s,u)=>s+(u.lessons?.length||0),0);
+
+    const unitPills = book.units.map((u,i) => {
+      const ready = (u.lessons && u.lessons.length);
+      return `<button class="bk-unit ${i===unitIdx?'active':''} ${ready?'':'locked'}"
+        ${ready?`onclick="Pages._bookUnit=${i};Pages.classDetail({classId:'${cls.id}',tab:'book'})"`:'disabled'}>
+        <span class="bk-unit-n">${_ar(u.n)}</span> ${u.title}
+        ${ready?'':'<i class="fas fa-lock" style="font-size:.62rem;opacity:.6"></i>'}
+      </button>`;
+    }).join('');
+
+    const goals = (unit.goals||[]).map(g =>
+      `<li><i class="fas fa-circle"></i> ${g}</li>`).join('');
+
+    const lessons = (unit.lessons||[]).map(l => {
+      const label = `الدرس ${_ar(l.n)}: ${l.title} · من ص ${_ar(l.from)} إلى ص ${_ar(l.to)}`;
+      const topics = l.topics.map(t => {
+        const [name, pg, apply] = t;
+        return `<li class="${apply?'apply':''}" onclick="Books.open('${bk}',${pg},'${_esc(label)}')" title="افتح ص ${_ar(pg)}">
+          <span class="bk-dot"></span><span>${name}</span><span class="bk-pg">ص ${_ar(pg)}</span></li>`;
+      }).join('');
+      const pres = l.presentation
+        ? `<a class="btn btn-sm btn-primary" href="${l.presentation}" target="_blank"><i class="fas fa-play"></i> عرض تقديمي</a>`
+        : `<button class="btn btn-sm btn-outline" disabled><i class="fas fa-display"></i> عرض تقديمي — قريباً</button>`;
+      return `
+        <div class="bk-lesson">
+          <div class="bk-lesson-hd" onclick="this.parentElement.classList.toggle('open')">
+            <div class="bk-lnum">${_ar(l.n)}</div>
+            <div class="bk-ltitle">
+              <div class="t">الدرس ${_ar(l.n)}: ${l.title}</div>
+              <div class="m">${_ar(l.topics.length)} موضوعاً · ${l.presentation?'عرض تقديمي متاح':'بلا عرض تقديمي'}</div>
+            </div>
+            <div class="bk-lpage">ص ${_ar(l.from)}</div>
+            <i class="fas fa-chevron-down bk-caret"></i>
+          </div>
+          <div class="bk-lesson-bd">
+            <ul class="bk-topics">${topics}</ul>
+            <div class="bk-lactions">
+              ${pres}
+              <button class="btn btn-sm btn-outline" onclick="Books.open('${bk}',${l.from},'${_esc(label)}')"><i class="fas fa-book-open"></i> افتح الكتاب</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const terms = (unit.terms||[]).map(([a,e]) =>
+      `<div class="bk-term"><span class="a">${a}</span><span class="e">${e}</span></div>`).join('');
+
+    return `
+      <div class="bk-wrap">
+        <div class="bk-hero">
+          <div class="bk-cover"><i class="fas fa-laptop-code"></i></div>
+          <div class="bk-meta">
+            <h2>${book.title}</h2>
+            <div class="bk-sub">${book.grade} · ${book.edition}</div>
+            <div class="bk-chips">
+              <span><i class="fas fa-layer-group"></i> ${_ar(book.units.length)} وحدات</span>
+              <span><i class="fas fa-chalkboard"></i> ${_ar(lessonCount)} دروس</span>
+              <span><i class="fas fa-file-lines"></i> ${_ar(book.totalPages)} صفحة</span>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-light" onclick="Books.open('${bk}',1,'${_esc(book.title)} — ${_esc(book.grade)}')">
+            <i class="fas fa-book-open"></i> تصفّح الكتاب
+          </button>
+        </div>
+
+        <div class="bk-units">${unitPills}</div>
+
+        ${goals ? `
+        <div class="bk-card">
+          <div class="bk-card-hd"><i class="fas fa-bullseye" style="color:var(--primary)"></i> أهداف الوحدة ${_ar(unit.n)}: ${unit.title}</div>
+          <ul class="bk-goals">${goals}</ul>
+        </div>` : ''}
+
+        ${lessons ? `
+        <div class="bk-card">
+          <div class="bk-card-hd"><i class="fas fa-list-ol" style="color:var(--primary)"></i> الدروس</div>
+          ${lessons}
+        </div>` : `
+        <div class="empty-state" style="padding:2rem"><div class="empty-icon"><i class="fas fa-hourglass-half"></i></div>
+        <h3>محتوى هذه الوحدة قيد الإعداد</h3></div>`}
+
+        ${terms ? `
+        <div class="bk-card">
+          <div class="bk-card-hd"><i class="fas fa-language" style="color:var(--primary)"></i> المصطلحات</div>
+          <div class="bk-terms">${terms}</div>
+        </div>` : ''}
+      </div>`;
   },
 
   _cdAttBody(selId, list, map, selDate) {
@@ -5725,4 +5903,4 @@ const Notify = {
   },
 };
 
-document.addEventListener('DOMContentLoaded', () => { DarkMode.init(); FontSize.init(); App.init(); Notify.init(); ActiveClass.init(); });
+document.addEventListener('DOMContentLoaded', () => { DarkMode.init(); FontSize.init(); App.init(); Notify.init(); ActiveClass.init(); Books.init(); });

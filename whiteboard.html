@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>السبورة الذكية | المهارات الرقمية — رابع ابتدائي</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#006738;--primary-light:#00894d;--primary-dark:#004d2a;--accent:#f59e0b;
+  --bg:#0f1117;--bg-card:#1a1d27;--text:#e2e8f0;--text-muted:#64748b;--border:#2a2d3a;
+  --glass:rgba(30,33,48,.85);--radius:12px;--shadow:0 8px 32px rgba(0,0,0,.4);
+  --toolbar-h:64px;--topbar-h:50px;
+}
+.hidden{display:none !important}
+body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;width:100vw;user-select:none;-webkit-user-select:none}
+
+#top-bar{position:fixed;top:0;left:0;right:0;height:var(--topbar-h);background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:100}
+.top-bar-right,.top-bar-left{display:flex;align-items:center;gap:8px}
+.top-btn{width:36px;height:36px;border:none;background:rgba(255,255,255,.06);color:var(--text);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s}
+.top-btn:hover{background:rgba(255,255,255,.12);transform:scale(1.05)}
+.back-btn{background:var(--primary);color:#fff}
+.back-btn:hover{background:var(--primary-light)}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px}
+.bc-item{color:var(--text-muted);cursor:pointer;transition:color .2s}
+.bc-item:hover{color:var(--text)}
+.bc-item.active{color:var(--text);font-weight:600}
+.bc-sep{font-size:9px;color:var(--text-muted);opacity:.5}
+.page-indicator{font-size:13px;font-weight:700;color:var(--accent);background:rgba(245,158,11,.12);padding:4px 12px;border-radius:20px;letter-spacing:1px;direction:ltr}
+
+.sidebar{position:fixed;top:0;right:-340px;width:340px;height:100vh;background:var(--bg-card);border-left:1px solid var(--border);z-index:200;transition:right .35s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.5)}
+.sidebar.open{right:0}
+.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:190;opacity:0;pointer-events:none;transition:opacity .3s}
+.sidebar-overlay.open{opacity:1;pointer-events:auto}
+.sidebar-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.sidebar-header h3{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;color:var(--accent)}
+.sidebar-close{width:32px;height:32px;border:none;background:rgba(255,255,255,.06);color:var(--text);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sidebar-close:hover{background:rgba(239,68,68,.2);color:#ef4444}
+.sidebar-content{flex:1;overflow-y:auto;padding:12px}
+.sidebar-content::-webkit-scrollbar{width:4px}
+.sidebar-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.unit-group{margin-bottom:8px}
+.unit-title{display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(255,255,255,.04);border-radius:10px;cursor:pointer;font-weight:700;font-size:13.5px;transition:all .2s;border:1px solid transparent}
+.unit-title:hover{background:rgba(255,255,255,.07);border-color:var(--border)}
+.unit-title.active{background:rgba(0,103,56,.15);border-color:rgba(0,103,56,.3);color:#4ade80}
+.unit-title i{font-size:10px;color:var(--text-muted);transition:transform .3s}
+.unit-title.active i{color:#4ade80}
+.unit-badge{margin-right:auto;font-size:11px;font-weight:500;color:var(--text-muted);background:rgba(255,255,255,.06);padding:2px 8px;border-radius:10px}
+.unit-lessons{padding:6px 0 6px 14px;max-height:800px;overflow:hidden;transition:max-height .4s ease,opacity .3s}
+.unit-lessons.collapsed{max-height:0;opacity:0;padding:0}
+.lesson-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;cursor:pointer;transition:all .2s;position:relative;margin-bottom:2px}
+.lesson-item:hover{background:rgba(255,255,255,.05)}
+.lesson-item.active{background:rgba(0,103,56,.2)}
+.lesson-item.active .lesson-dot{background:var(--primary-light);box-shadow:0 0 8px rgba(0,137,77,.5)}
+.lesson-dot{width:8px;height:8px;border-radius:50%;background:var(--text-muted);flex-shrink:0}
+.lesson-info{display:flex;flex-direction:column;gap:2px}
+.lesson-name{font-size:13px;font-weight:600}
+.lesson-pages{font-size:11px;color:var(--text-muted)}
+.lesson-pres{font-size:10px;color:var(--accent);margin-right:auto;flex-shrink:0}
+
+#board-area{position:fixed;top:var(--topbar-h);left:0;right:0;bottom:var(--toolbar-h);display:flex;align-items:center;justify-content:center;background:var(--bg);overflow:hidden}
+#page-container{position:relative;max-height:100%;max-width:100%;display:flex;align-items:center;justify-content:center}
+#page-image{max-height:calc(100vh - var(--topbar-h) - var(--toolbar-h) - 20px);max-width:calc(100vw - 120px);object-fit:contain;border-radius:4px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:block;pointer-events:none;background:#fff}
+#draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
+.laser-dot{position:absolute;width:14px;height:14px;background:radial-gradient(circle,#ff0000 30%,rgba(255,0,0,.5) 60%,transparent 100%);border-radius:50%;pointer-events:none;z-index:50;box-shadow:0 0 20px rgba(255,0,0,.8),0 0 60px rgba(255,0,0,.3);animation:laserPulse .8s ease-in-out infinite alternate;transform:translate(-50%,-50%)}
+@keyframes laserPulse{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(-50%,-50%) scale(1.3);opacity:.8}}
+.spotlight-overlay{position:absolute;inset:0;z-index:40;pointer-events:none;background:rgba(0,0,0,.85);-webkit-mask-image:radial-gradient(circle 120px at var(--sx,50%) var(--sy,50%),transparent 0%,transparent 99%,black 100%);mask-image:radial-gradient(circle 120px at var(--sx,50%) var(--sy,50%),transparent 0%,transparent 99%,black 100%);transition:opacity .3s}
+.floating-text{position:absolute;min-width:120px;min-height:36px;padding:6px 10px;font-family:'Tajawal',sans-serif;font-size:18px;font-weight:700;color:#e74c3c;background:rgba(255,255,255,.05);border:2px dashed rgba(255,255,255,.2);border-radius:6px;outline:none;resize:both;z-index:55;direction:rtl;backdrop-filter:blur(4px)}
+.nav-arrow{position:fixed;top:50%;transform:translateY(-50%);width:44px;height:80px;background:var(--glass);backdrop-filter:blur(10px);border:1px solid var(--border);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s;z-index:60}
+.nav-next{left:10px;border-radius:0 12px 12px 0}
+.nav-prev{right:10px;border-radius:12px 0 0 12px}
+.nav-arrow:hover{background:var(--primary);color:#fff;width:52px}
+.nav-arrow:disabled{opacity:.2;pointer-events:none}
+
+#toolbar{position:fixed;bottom:0;left:0;right:0;height:var(--toolbar-h);background:var(--glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;z-index:100;overflow-x:auto}
+#toolbar::-webkit-scrollbar{display:none}
+.tool-group{display:flex;align-items:center;gap:3px}
+.tool-separator{width:1px;height:32px;background:var(--border);margin:0 6px;flex-shrink:0}
+.tool-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:50px;height:50px;border:none;background:transparent;color:var(--text-muted);border-radius:10px;cursor:pointer;font-size:16px;transition:all .2s;position:relative;flex-shrink:0}
+.tool-btn:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.tool-btn.active{background:rgba(0,103,56,.25);color:#4ade80;box-shadow:inset 0 0 0 1.5px rgba(74,222,128,.4)}
+.tool-label{font-size:9px;font-weight:600;line-height:1}
+.color-group{gap:4px}
+.color-dot{width:24px;height:24px;border-radius:50%;border:2px solid transparent;background:var(--dot-color);cursor:pointer;transition:all .2s;flex-shrink:0}
+.color-dot:hover{transform:scale(1.15)}
+.color-dot.active{border-color:#fff;box-shadow:0 0 0 2px var(--dot-color),0 0 12px var(--dot-color);transform:scale(1.15)}
+.color-dot[data-color="#ffffff"]{border:2px solid var(--border)}
+.size-group{gap:8px}
+.size-icon-sm{font-size:6px;color:var(--text-muted)}
+.size-icon-lg{font-size:12px;color:var(--text-muted)}
+.size-slider{-webkit-appearance:none;appearance:none;width:80px;height:4px;background:var(--border);border-radius:4px;outline:none}
+.size-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--primary-light);cursor:pointer;box-shadow:0 0 8px rgba(0,137,77,.5)}
+.action-btn{color:var(--text-muted)}
+.action-btn:hover{color:var(--text)}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:500;display:flex;align-items:center;justify-content:center;animation:fadeIn .3s}
+.modal-overlay.hidden{display:none}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.timer-card,.random-card{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:40px;text-align:center;box-shadow:var(--shadow);min-width:320px}
+.timer-display{font-size:72px;font-weight:900;color:var(--accent);letter-spacing:4px;direction:ltr;font-variant-numeric:tabular-nums;text-shadow:0 0 30px rgba(245,158,11,.3);margin-bottom:24px}
+.timer-presets{display:flex;gap:8px;justify-content:center;margin-bottom:24px;flex-wrap:wrap}
+.timer-preset{padding:8px 16px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text);border-radius:20px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:600;transition:all .2s}
+.timer-preset:hover{border-color:var(--accent)}
+.timer-preset.active{background:rgba(245,158,11,.15);border-color:var(--accent);color:var(--accent)}
+.timer-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.timer-btn{padding:10px 24px;border:none;border-radius:12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;transition:all .2s}
+.timer-btn.start{background:var(--primary);color:#fff}
+.timer-btn.start:hover{background:var(--primary-light)}
+.timer-btn.reset{background:rgba(255,255,255,.08);color:var(--text)}
+.timer-btn.close{background:rgba(239,68,68,.15);color:#ef4444}
+.random-icon{font-size:48px;color:var(--accent);margin-bottom:12px}
+.random-card h3{font-size:18px;margin-bottom:20px;color:var(--text)}
+.random-result{font-size:32px;font-weight:900;color:var(--primary-light);padding:20px;background:rgba(0,103,56,.1);border-radius:16px;border:2px dashed rgba(0,103,56,.3);margin-bottom:20px;min-height:80px;display:flex;align-items:center;justify-content:center;transition:all .3s}
+.random-result.spinning{animation:spinText .1s steps(1) infinite;color:var(--accent)}
+@keyframes spinText{0%{opacity:1}50%{opacity:.5}}
+.random-spin-btn{padding:12px 32px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px;margin-bottom:12px}
+.random-spin-btn:hover{transform:scale(1.05);box-shadow:0 4px 20px rgba(0,103,56,.4)}
+.random-close{display:block;margin:0 auto;padding:8px 20px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-family:'Tajawal',sans-serif;font-size:14px}
+.random-close:hover{color:var(--text)}
+.toast{position:fixed;bottom:calc(var(--toolbar-h) + 16px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg-card);color:var(--text);padding:10px 24px;border-radius:12px;font-size:14px;font-weight:600;border:1px solid var(--border);box-shadow:var(--shadow);z-index:999;opacity:0;transition:all .3s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.hidden{display:none}
+
+body.fullscreen #top-bar{display:none}
+body.fullscreen #toolbar{bottom:-80px;transition:bottom .3s}
+body.fullscreen:hover #toolbar,body.fullscreen #toolbar:focus-within{bottom:0}
+body.fullscreen #board-area{top:0;bottom:0}
+body.fullscreen #page-image{max-height:calc(100vh - 20px);max-width:calc(100vw - 100px)}
+body[data-tool="eraser"] #draw-canvas{cursor:cell}
+body[data-tool="laser"] #draw-canvas,body[data-tool="spotlight"] #draw-canvas{cursor:none}
+body[data-tool="pointer"] #draw-canvas{cursor:default}
+body[data-tool="text"] #draw-canvas{cursor:text}
+#page-image.slide-out-left{animation:slideOutLeft .25s ease-out forwards}
+#page-image.slide-in-right{animation:slideInRight .25s ease-out forwards}
+#page-image.slide-out-right{animation:slideOutRight .25s ease-out forwards}
+#page-image.slide-in-left{animation:slideInLeft .25s ease-out forwards}
+@keyframes slideOutLeft{to{transform:translateX(-40px);opacity:0}}
+@keyframes slideInRight{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes slideOutRight{to{transform:translateX(40px);opacity:0}}
+@keyframes slideInLeft{from{transform:translateX(-40px);opacity:0}to{transform:translateX(0);opacity:1}}
+@media(max-width:768px){
+  .breadcrumb .bc-item:not(.active){display:none}.breadcrumb .bc-sep{display:none}
+  #toolbar{gap:2px;padding:0 8px}.tool-btn{width:40px;height:44px;font-size:14px}.tool-label{font-size:8px}
+  .tool-separator{margin:0 3px}.color-dot{width:20px;height:20px}.size-slider{width:50px}
+  .nav-arrow{width:36px;height:60px;font-size:14px}.sidebar{width:300px;right:-300px}
+  .timer-display{font-size:56px}.special-tools{display:none}
+}
+</style>
+</head>
+<body>
+  <header id="top-bar">
+    <div class="top-bar-right">
+      <button class="top-btn back-btn" onclick="goBack()" title="رجوع"><i class="fas fa-arrow-right"></i></button>
+      <div class="breadcrumb">
+        <span class="bc-item" onclick="Sidebar.toggle()"><i class="fas fa-book"></i> رابع ابتدائي</span>
+        <i class="fas fa-chevron-left bc-sep"></i>
+        <span class="bc-item active" id="bc-unit">الوحدة الأولى</span>
+        <i class="fas fa-chevron-left bc-sep"></i>
+        <span class="bc-item active" id="bc-lesson">الدرس الأول: الحاسب</span>
+      </div>
+    </div>
+    <div class="top-bar-left">
+      <span class="page-indicator" id="page-indicator">1 / 311</span>
+      <button class="top-btn" id="pres-btn" onclick="openPresentation()" title="العرض التفاعلي" style="background:var(--accent);color:#fff;width:auto;padding:0 12px;font-weight:700;font-size:12px;gap:6px">
+        <i class="fas fa-play"></i> العرض التفاعلي
+      </button>
+      <button class="top-btn" onclick="Board.toggleFullscreen()" title="شاشة كاملة" id="fs-btn"><i class="fas fa-expand"></i></button>
+      <button class="top-btn" onclick="Board.saveAsImage()" title="حفظ كصورة"><i class="fas fa-camera"></i></button>
+      <button class="top-btn" onclick="Sidebar.toggle()" title="فهرس الدروس"><i class="fas fa-list"></i></button>
+    </div>
+  </header>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <h3><i class="fas fa-book-open"></i> فهرس المنهج</h3>
+      <button class="sidebar-close" onclick="Sidebar.toggle()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="sidebar-content" id="sidebar-content"></div>
+  </aside>
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="Sidebar.toggle()"></div>
+
+  <main id="board-area">
+    <div id="page-container">
+      <img id="page-image" src="" alt="صفحة الكتاب" draggable="false">
+      <canvas id="draw-canvas"></canvas>
+      <div id="laser-dot" class="laser-dot hidden"></div>
+      <div id="spotlight-overlay" class="spotlight-overlay hidden"></div>
+      <textarea id="floating-text" class="floating-text hidden" placeholder="اكتب هنا..."></textarea>
+    </div>
+    <button class="nav-arrow nav-next" onclick="Board.nextPage()" title="التالية" id="nav-next"><i class="fas fa-chevron-left"></i></button>
+    <button class="nav-arrow nav-prev" onclick="Board.prevPage()" title="السابقة" id="nav-prev"><i class="fas fa-chevron-right"></i></button>
+  </main>
+
+  <div id="toolbar">
+    <div class="tool-group main-tools">
+      <button class="tool-btn" data-tool="pointer" onclick="Tools.select('pointer')" title="مؤشر"><i class="fas fa-mouse-pointer"></i><span class="tool-label">مؤشر</span></button>
+      <button class="tool-btn" data-tool="pen" onclick="Tools.select('pen')" title="قلم"><i class="fas fa-pen"></i><span class="tool-label">قلم</span></button>
+      <button class="tool-btn" data-tool="highlighter" onclick="Tools.select('highlighter')" title="تظليل"><i class="fas fa-highlighter"></i><span class="tool-label">تظليل</span></button>
+      <button class="tool-btn" data-tool="laser" onclick="Tools.select('laser')" title="ليزر"><i class="fas fa-dot-circle"></i><span class="tool-label">ليزر</span></button>
+      <button class="tool-btn" data-tool="text" onclick="Tools.select('text')" title="نص"><i class="fas fa-font"></i><span class="tool-label">نص</span></button>
+      <button class="tool-btn" data-tool="arrow" onclick="Tools.select('arrow')" title="سهم"><i class="fas fa-long-arrow-alt-up"></i><span class="tool-label">سهم</span></button>
+      <button class="tool-btn" data-tool="rect" onclick="Tools.select('rect')" title="مربع"><i class="far fa-square"></i><span class="tool-label">مربع</span></button>
+      <button class="tool-btn" data-tool="circle" onclick="Tools.select('circle')" title="دائرة"><i class="far fa-circle"></i><span class="tool-label">دائرة</span></button>
+      <button class="tool-btn" data-tool="eraser" onclick="Tools.select('eraser')" title="ممحاة"><i class="fas fa-eraser"></i><span class="tool-label">ممحاة</span></button>
+    </div>
+    <div class="tool-separator"></div>
+    <div class="tool-group color-group">
+      <button class="color-dot active" data-color="#e74c3c" style="--dot-color:#e74c3c" onclick="Tools.setColor('#e74c3c')"></button>
+      <button class="color-dot" data-color="#2563eb" style="--dot-color:#2563eb" onclick="Tools.setColor('#2563eb')"></button>
+      <button class="color-dot" data-color="#10b981" style="--dot-color:#10b981" onclick="Tools.setColor('#10b981')"></button>
+      <button class="color-dot" data-color="#f59e0b" style="--dot-color:#f59e0b" onclick="Tools.setColor('#f59e0b')"></button>
+      <button class="color-dot" data-color="#8b5cf6" style="--dot-color:#8b5cf6" onclick="Tools.setColor('#8b5cf6')"></button>
+      <button class="color-dot" data-color="#1e293b" style="--dot-color:#1e293b" onclick="Tools.setColor('#1e293b')"></button>
+      <button class="color-dot" data-color="#ffffff" style="--dot-color:#ffffff" onclick="Tools.setColor('#ffffff')"></button>
+    </div>
+    <div class="tool-separator"></div>
+    <div class="tool-group size-group">
+      <i class="fas fa-circle size-icon-sm"></i>
+      <input type="range" id="size-slider" min="2" max="20" value="3" oninput="Tools.setSize(this.value)" class="size-slider">
+      <i class="fas fa-circle size-icon-lg"></i>
+    </div>
+    <div class="tool-separator"></div>
+    <div class="tool-group action-tools">
+      <button class="tool-btn action-btn" onclick="Board.undo()" title="تراجع"><i class="fas fa-undo"></i><span class="tool-label">تراجع</span></button>
+      <button class="tool-btn action-btn" onclick="Board.redo()" title="إعادة"><i class="fas fa-redo"></i><span class="tool-label">إعادة</span></button>
+      <button class="tool-btn action-btn" onclick="Board.clearPage()" title="مسح الكل"><i class="fas fa-trash-alt"></i><span class="tool-label">مسح</span></button>
+    </div>
+    <div class="tool-separator"></div>
+    <div class="tool-group special-tools">
+      <button class="tool-btn" data-tool="spotlight" onclick="Tools.select('spotlight')" title="تركيز"><i class="fas fa-lightbulb"></i><span class="tool-label">تركيز</span></button>
+      <button class="tool-btn" onclick="Timer.show()" title="مؤقت"><i class="fas fa-stopwatch"></i><span class="tool-label">مؤقت</span></button>
+      <button class="tool-btn" onclick="RandomStudent.show()" title="طالب عشوائي"><i class="fas fa-dice"></i><span class="tool-label">عشوائي</span></button>
+    </div>
+  </div>
+
+  <div id="timer-modal" class="modal-overlay hidden">
+    <div class="timer-card">
+      <div class="timer-display" id="timer-display">03:00</div>
+      <div class="timer-presets">
+        <button class="timer-preset" onclick="Timer.set(60)">1 دقيقة</button>
+        <button class="timer-preset active" onclick="Timer.set(180)">3 دقائق</button>
+        <button class="timer-preset" onclick="Timer.set(300)">5 دقائق</button>
+        <button class="timer-preset" onclick="Timer.set(600)">10 دقائق</button>
+      </div>
+      <div class="timer-actions">
+        <button class="timer-btn start" onclick="Timer.toggle()" id="timer-toggle-btn"><i class="fas fa-play"></i> ابدأ</button>
+        <button class="timer-btn reset" onclick="Timer.reset()"><i class="fas fa-redo"></i> إعادة</button>
+        <button class="timer-btn close" onclick="Timer.hide()"><i class="fas fa-times"></i> إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="random-modal" class="modal-overlay hidden">
+    <div class="random-card">
+      <div class="random-icon"><i class="fas fa-dice"></i></div>
+      <h3>اختيار طالب عشوائي</h3>
+      <div class="random-result" id="random-result">اضغط للاختيار</div>
+      <button class="random-spin-btn" onclick="RandomStudent.spin()" id="spin-btn"><i class="fas fa-sync-alt"></i> اختر طالب</button>
+      <button class="random-close" onclick="RandomStudent.hide()">إغلاق</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+<script>
+'use strict';
+
+/* ==================== بيانات المنهج ==================== */
+const BOOK = {
+  dir: 'books/g4/pages',
+  totalPages: 311,
+  units: [
+    { n:'الأولى', title:'تعلم الأساسيات', lessons:[
+      { name:'الدرس الأول: الحاسب',        from:14, to:19, presentation:'presentations/g4/u1-l1.html' },
+      { name:'الدرس الثاني: سطح المكتب',    from:20, to:32, presentation:null },
+      { name:'الدرس الثالث: إعدادات الحاسب', from:33, to:38, presentation:null },
+    ]},
+    { n:'الثانية', title:'العمل على النص', lessons:[
+      { name:'الدرس الأول: لوحة المفاتيح', from:44, to:52, presentation:null },
+      { name:'الدرس الثاني: تحرير النص',   from:53, to:65, presentation:null },
+      { name:'الدرس الثالث: تنسيق النص',   from:66, to:73, presentation:null },
+      { name:'الدرس الرابع: تنسيق الفقرة',  from:74, to:85, presentation:null },
+    ]},
+    { n:'الثالثة', title:'عالمي المتصل', lessons:[
+      { name:'الدرس الأول: الموقع الإلكتروني', from:88,  to:93,  presentation:null },
+      { name:'الدرس الثاني: البحث في الإنترنت', from:94,  to:99,  presentation:null },
+      { name:'الدرس الثالث: مصادر المعلومات',  from:100, to:106, presentation:null },
+      { name:'الدرس الرابع: السلامة على الإنترنت', from:107, to:117, presentation:null },
+    ]},
+    { n:'الرابعة', title:'البرمجة باستخدام سكراتش', lessons:[
+      { name:'الدرس الأول: أساسيات سكراتش',   from:120, to:129, presentation:null },
+      { name:'الدرس الثاني: استخدام اللبنات', from:130, to:140, presentation:null },
+      { name:'الدرس الثالث: التكرارات',       from:141, to:146, presentation:null },
+      { name:'الدرس الرابع: الرسم بسكراتش',    from:147, to:159, presentation:null },
+    ]},
+  ]
+};
+
+const pagePath = p => `${BOOK.dir}/p${String(p).padStart(3,'0')}.webp`;
+
+/* الصفحة الحالية = رقم صفحة الكتاب (1..311) */
+let currentPage = 1;
+const drawHistory = {};
+const redoStack = {};
+
+/* يجد الدرس الذي تقع فيه صفحة ما */
+function lessonForPage(p) {
+  for (const u of BOOK.units)
+    for (const l of u.lessons)
+      if (p >= l.from && p <= l.to) return { unit:u, lesson:l };
+  return null;
+}
+
+/* ==================== السبورة ==================== */
+const Board = {
+  _canvas:null,_ctx:null,_img:null,_isDrawing:false,_startX:0,_startY:0,_tempCanvas:null,
+
+  init() {
+    this._canvas = document.getElementById('draw-canvas');
+    this._ctx = this._canvas.getContext('2d');
+    this._img = document.getElementById('page-image');
+    this._canvas.addEventListener('pointerdown', e => this._onDown(e));
+    this._canvas.addEventListener('pointermove', e => this._onMove(e));
+    this._canvas.addEventListener('pointerup', e => this._onUp(e));
+    this._canvas.addEventListener('pointerleave', e => this._onUp(e));
+    document.addEventListener('keydown', e => {
+      if (document.activeElement.tagName === 'TEXTAREA') { if (e.key==='Escape') this._img.focus?.(); else return; }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { this.nextPage(); e.preventDefault(); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { this.prevPage(); e.preventDefault(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.shiftKey ? this.redo() : this.undo(); e.preventDefault(); }
+      if (e.key === 'Escape') {
+        if (document.fullscreenElement) document.exitFullscreen();
+        document.getElementById('floating-text').classList.add('hidden');
+        document.getElementById('spotlight-overlay').classList.add('hidden');
+        document.getElementById('laser-dot').classList.add('hidden');
+        if (Tools.current === 'spotlight' || Tools.current === 'laser') Tools.select('pointer');
+      }
+      if (e.key === 'f' && !e.metaKey && !e.ctrlKey && document.activeElement.tagName !== 'TEXTAREA') this.toggleFullscreen();
+    });
+    new ResizeObserver(() => this._syncCanvasSize()).observe(this._img);
+    this.goToPage(currentPage);
+  },
+
+  _syncCanvasSize() {
+    const rect = this._img.getBoundingClientRect();
+    const container = document.getElementById('page-container');
+    this._canvas.width = rect.width;
+    this._canvas.height = rect.height;
+    container.style.width = rect.width + 'px';
+    container.style.height = rect.height + 'px';
+    this._redrawFromHistory();
+  },
+
+  goToPage(p) {
+    if (p < 1 || p > BOOK.totalPages) return;
+    const direction = p > currentPage ? 'left' : 'right';
+    const img = this._img;
+    if (currentPage !== p) {
+      img.classList.add(direction === 'left' ? 'slide-out-left' : 'slide-out-right');
+      setTimeout(() => { currentPage = p; this._loadCurrentPage(direction); }, 200);
+    } else {
+      currentPage = p; this._loadCurrentPage(direction);
+    }
+  },
+
+  _loadCurrentPage(direction) {
+    const img = this._img;
+    img.classList.remove('slide-out-left','slide-out-right','slide-in-left','slide-in-right');
+    img.src = pagePath(currentPage);
+    img.onload = () => {
+      this._syncCanvasSize();
+      img.classList.add(direction === 'left' ? 'slide-in-right' : 'slide-in-left');
+      setTimeout(() => img.classList.remove('slide-in-right','slide-in-left'), 300);
+    };
+    document.getElementById('page-indicator').textContent = `${currentPage} / ${BOOK.totalPages}`;
+    document.getElementById('nav-prev').disabled = currentPage === 1;
+    document.getElementById('nav-next').disabled = currentPage === BOOK.totalPages;
+    document.getElementById('floating-text').classList.add('hidden');
+    this._syncContext();
+  },
+
+  _syncContext() {
+    const ctx = lessonForPage(currentPage);
+    const presBtn = document.getElementById('pres-btn');
+    if (ctx) {
+      document.getElementById('bc-unit').textContent = 'الوحدة ' + ctx.unit.n;
+      document.getElementById('bc-lesson').textContent = ctx.lesson.name;
+      Sidebar.markActive(ctx.lesson);
+      this._curPres = ctx.lesson.presentation;
+    } else {
+      document.getElementById('bc-lesson').textContent = 'صفحة ' + currentPage;
+      this._curPres = null;
+    }
+    presBtn.style.display = this._curPres ? 'flex' : 'none';
+  },
+
+  nextPage() { this.goToPage(currentPage + 1); },
+  prevPage() { this.goToPage(currentPage - 1); },
+
+  _getPos(e) { const r = this._canvas.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; },
+
+  _onDown(e) {
+    const tool = Tools.current, pos = this._getPos(e);
+    if (tool === 'pointer') return;
+    if (tool === 'laser')     { this._isDrawing = true; this._showLaser(e); return; }
+    if (tool === 'spotlight') { this._isDrawing = true; this._showSpotlight(e); return; }
+    if (tool === 'text')      { this._placeText(pos); return; }
+    this._isDrawing = true; this._startX = pos.x; this._startY = pos.y;
+    if (tool === 'pen' || tool === 'highlighter' || tool === 'eraser') {
+      this._ctx.beginPath(); this._ctx.moveTo(pos.x, pos.y);
+      if (tool === 'eraser') { this._ctx.globalCompositeOperation='destination-out'; this._ctx.lineWidth=Tools.size*4; }
+      else if (tool === 'highlighter') { this._ctx.globalCompositeOperation='source-over'; this._ctx.globalAlpha=.3; this._ctx.lineWidth=Tools.size*3; }
+      else { this._ctx.globalCompositeOperation='source-over'; this._ctx.globalAlpha=1; this._ctx.lineWidth=Tools.size; }
+      this._ctx.strokeStyle = Tools.color; this._ctx.lineCap='round'; this._ctx.lineJoin='round';
+    }
+    if (tool === 'arrow' || tool === 'rect' || tool === 'circle') {
+      this._tempCanvas = document.createElement('canvas');
+      this._tempCanvas.width = this._canvas.width; this._tempCanvas.height = this._canvas.height;
+      this._tempCanvas.getContext('2d').drawImage(this._canvas, 0, 0);
+    }
+  },
+
+  _onMove(e) {
+    const tool = Tools.current, pos = this._getPos(e);
+    if (tool === 'laser') { this._showLaser(e); return; }
+    if (tool === 'spotlight') { this._showSpotlight(e); return; }
+    if (!this._isDrawing) return;
+    if (tool === 'pen' || tool === 'highlighter' || tool === 'eraser') { this._ctx.lineTo(pos.x, pos.y); this._ctx.stroke(); }
+    if (tool === 'arrow' || tool === 'rect' || tool === 'circle') {
+      this._ctx.clearRect(0,0,this._canvas.width,this._canvas.height);
+      this._ctx.drawImage(this._tempCanvas, 0, 0);
+      this._ctx.globalCompositeOperation='source-over'; this._ctx.globalAlpha=1;
+      this._ctx.strokeStyle=Tools.color; this._ctx.lineWidth=Tools.size; this._ctx.lineCap='round'; this._ctx.lineJoin='round';
+      if (tool === 'rect') this._ctx.strokeRect(this._startX, this._startY, pos.x-this._startX, pos.y-this._startY);
+      else if (tool === 'circle') {
+        const rx=Math.abs(pos.x-this._startX)/2, ry=Math.abs(pos.y-this._startY)/2;
+        const cx=this._startX+(pos.x-this._startX)/2, cy=this._startY+(pos.y-this._startY)/2;
+        this._ctx.beginPath(); this._ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); this._ctx.stroke();
+      } else if (tool === 'arrow') this._drawArrow(this._startX,this._startY,pos.x,pos.y);
+    }
+  },
+
+  _onUp() {
+    if (!this._isDrawing) return;
+    this._isDrawing = false;
+    const tool = Tools.current;
+    this._ctx.globalCompositeOperation='source-over'; this._ctx.globalAlpha=1;
+    if (tool === 'laser' || tool === 'spotlight') return;
+    if (['pen','highlighter','eraser','arrow','rect','circle'].includes(tool)) this._saveToHistory();
+    this._tempCanvas = null;
+  },
+
+  _drawArrow(x1,y1,x2,y2) {
+    const headLen=16, angle=Math.atan2(y2-y1,x2-x1);
+    this._ctx.beginPath(); this._ctx.moveTo(x1,y1); this._ctx.lineTo(x2,y2); this._ctx.stroke();
+    this._ctx.beginPath(); this._ctx.moveTo(x2,y2);
+    this._ctx.lineTo(x2-headLen*Math.cos(angle-Math.PI/6), y2-headLen*Math.sin(angle-Math.PI/6));
+    this._ctx.moveTo(x2,y2);
+    this._ctx.lineTo(x2-headLen*Math.cos(angle+Math.PI/6), y2-headLen*Math.sin(angle+Math.PI/6));
+    this._ctx.stroke();
+  },
+
+  _showLaser(e) {
+    const dot=document.getElementById('laser-dot'), r=document.getElementById('page-container').getBoundingClientRect();
+    dot.classList.remove('hidden'); dot.style.left=(e.clientX-r.left)+'px'; dot.style.top=(e.clientY-r.top)+'px';
+    clearTimeout(this._laserTimer); this._laserTimer=setTimeout(()=>dot.classList.add('hidden'),2000);
+  },
+
+  _showSpotlight(e) {
+    const overlay=document.getElementById('spotlight-overlay'), r=document.getElementById('page-container').getBoundingClientRect();
+    overlay.classList.remove('hidden');
+    overlay.style.setProperty('--sx', ((e.clientX-r.left)/r.width*100)+'%');
+    overlay.style.setProperty('--sy', ((e.clientY-r.top)/r.height*100)+'%');
+  },
+
+  _placeText(pos) {
+    const ft=document.getElementById('floating-text');
+    ft.classList.remove('hidden'); ft.style.left=pos.x+'px'; ft.style.top=pos.y+'px'; ft.style.color=Tools.color; ft.value=''; ft.focus();
+    ft.onblur = () => {
+      if (ft.value.trim()) {
+        this._ctx.font=`bold 18px 'Tajawal', sans-serif`; this._ctx.fillStyle=Tools.color; this._ctx.direction='rtl'; this._ctx.textAlign='right';
+        ft.value.split('\n').forEach((line,i)=>this._ctx.fillText(line, pos.x+ft.offsetWidth-10, pos.y+22+i*24));
+        this._saveToHistory();
+      }
+      ft.classList.add('hidden');
+    };
+  },
+
+  _saveToHistory() {
+    if (!drawHistory[currentPage]) drawHistory[currentPage]=[];
+    drawHistory[currentPage].push(this._canvas.toDataURL());
+    redoStack[currentPage]=[];
+  },
+
+  _redrawFromHistory() {
+    const hist=drawHistory[currentPage];
+    if (!hist || !hist.length) { this._ctx.clearRect(0,0,this._canvas.width,this._canvas.height); return; }
+    const img=new Image();
+    img.onload=()=>{ this._ctx.clearRect(0,0,this._canvas.width,this._canvas.height); this._ctx.drawImage(img,0,0,this._canvas.width,this._canvas.height); };
+    img.src=hist[hist.length-1];
+  },
+
+  undo() {
+    const hist=drawHistory[currentPage];
+    if (!hist || !hist.length) return;
+    if (!redoStack[currentPage]) redoStack[currentPage]=[];
+    redoStack[currentPage].push(hist.pop()); this._redrawFromHistory(); showToast('↩️ تراجع');
+  },
+
+  redo() {
+    const rs=redoStack[currentPage];
+    if (!rs || !rs.length) return;
+    if (!drawHistory[currentPage]) drawHistory[currentPage]=[];
+    drawHistory[currentPage].push(rs.pop()); this._redrawFromHistory(); showToast('↪️ إعادة');
+  },
+
+  clearPage() {
+    if (!confirm('مسح كل الرسومات على هذه الصفحة؟')) return;
+    this._ctx.clearRect(0,0,this._canvas.width,this._canvas.height);
+    drawHistory[currentPage]=[]; redoStack[currentPage]=[]; showToast('🗑️ تم مسح الصفحة');
+  },
+
+  toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen(); document.body.classList.remove('fullscreen');
+      document.getElementById('fs-btn').innerHTML='<i class="fas fa-expand"></i>';
+    } else {
+      document.documentElement.requestFullscreen(); document.body.classList.add('fullscreen');
+      document.getElementById('fs-btn').innerHTML='<i class="fas fa-compress"></i>';
+    }
+  },
+
+  saveAsImage() {
+    const combined=document.createElement('canvas'), img=this._img;
+    combined.width=img.naturalWidth; combined.height=img.naturalHeight;
+    const cctx=combined.getContext('2d');
+    cctx.drawImage(img,0,0);
+    cctx.drawImage(this._canvas,0,0,combined.width,combined.height);
+    const link=document.createElement('a');
+    link.download=`صفحة_${currentPage}.png`; link.href=combined.toDataURL('image/png'); link.click();
+    showToast('📸 تم حفظ الصورة');
+  }
+};
+
+/* ==================== الأدوات ==================== */
+const Tools = {
+  current:'pointer', color:'#e74c3c', size:3,
+  select(tool) {
+    if (this.current === tool && tool !== 'pointer') tool='pointer';
+    this.current=tool; document.body.setAttribute('data-tool',tool);
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.classList.toggle('active', b.dataset.tool===tool));
+    if (tool!=='spotlight') document.getElementById('spotlight-overlay').classList.add('hidden');
+    if (tool!=='laser')     document.getElementById('laser-dot').classList.add('hidden');
+    if (tool!=='text')      document.getElementById('floating-text').classList.add('hidden');
+  },
+  setColor(c){ this.color=c; document.querySelectorAll('.color-dot').forEach(d=>d.classList.toggle('active', d.dataset.color===c)); },
+  setSize(v){ this.size=parseInt(v); }
+};
+
+/* ==================== الفهرس ==================== */
+const Sidebar = {
+  _open:false,
+  build() {
+    const html = BOOK.units.map((u,ui) => `
+      <div class="unit-group">
+        <div class="unit-title ${ui===0?'active':''}" onclick="Sidebar.toggleUnit(this)">
+          <i class="fas fa-chevron-${ui===0?'down':'left'}"></i>
+          <span>الوحدة ${u.n}: ${u.title}</span>
+          <span class="unit-badge">${toAr(u.lessons.length)} دروس</span>
+        </div>
+        <div class="unit-lessons ${ui===0?'':'collapsed'}">
+          ${u.lessons.map(l => `
+            <div class="lesson-item" data-from="${l.from}" onclick="Sidebar.goto(${l.from})">
+              <div class="lesson-dot"></div>
+              <div class="lesson-info">
+                <span class="lesson-name">${l.name}</span>
+                <span class="lesson-pages">ص ${toAr(l.from)}-${toAr(l.to)}</span>
+              </div>
+              ${l.presentation ? '<i class="fas fa-play lesson-pres" title="عرض تفاعلي متاح"></i>' : ''}
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+    document.getElementById('sidebar-content').innerHTML = html;
+  },
+  goto(from) { Board.goToPage(from); if (window.innerWidth < 900) this.toggle(); },
+  markActive(lesson) {
+    document.querySelectorAll('.lesson-item').forEach(el =>
+      el.classList.toggle('active', +el.dataset.from === lesson.from));
+  },
+  toggle() {
+    this._open=!this._open;
+    document.getElementById('sidebar').classList.toggle('open', this._open);
+    document.getElementById('sidebar-overlay').classList.toggle('open', this._open);
+  },
+  toggleUnit(el) {
+    const lessons=el.nextElementSibling, isCollapsed=lessons.classList.contains('collapsed');
+    lessons.classList.toggle('collapsed'); el.classList.toggle('active');
+    el.querySelector('i').className = isCollapsed ? 'fas fa-chevron-down' : 'fas fa-chevron-left';
+  }
+};
+
+/* ==================== المؤقّت ==================== */
+const Timer = {
+  _seconds:180,_remaining:180,_interval:null,_running:false,
+  show(){ document.getElementById('timer-modal').classList.remove('hidden'); },
+  hide(){ document.getElementById('timer-modal').classList.add('hidden'); },
+  set(s){ this._seconds=s; this._remaining=s; this._running=false; clearInterval(this._interval); this._updateDisplay();
+    document.getElementById('timer-toggle-btn').innerHTML='<i class="fas fa-play"></i> ابدأ';
+    document.querySelectorAll('.timer-preset').forEach(b=>b.classList.toggle('active', parseInt(b.onclick.toString().match(/\d+/)?.[0])===s)); },
+  toggle(){ if(this._running){ clearInterval(this._interval); this._running=false; document.getElementById('timer-toggle-btn').innerHTML='<i class="fas fa-play"></i> استمر'; }
+    else { this._running=true; document.getElementById('timer-toggle-btn').innerHTML='<i class="fas fa-pause"></i> إيقاف';
+      this._interval=setInterval(()=>{ this._remaining--; this._updateDisplay();
+        if(this._remaining<=0){ clearInterval(this._interval); this._running=false; document.getElementById('timer-toggle-btn').innerHTML='<i class="fas fa-play"></i> ابدأ'; this._playAlarm(); } },1000); } },
+  reset(){ clearInterval(this._interval); this._remaining=this._seconds; this._running=false; this._updateDisplay(); document.getElementById('timer-toggle-btn').innerHTML='<i class="fas fa-play"></i> ابدأ'; },
+  _updateDisplay(){ const m=Math.floor(this._remaining/60).toString().padStart(2,'0'), s=(this._remaining%60).toString().padStart(2,'0');
+    const el=document.getElementById('timer-display'); el.textContent=`${m}:${s}`;
+    if(this._remaining<=10 && this._remaining>0){ el.style.color='#ef4444'; el.style.textShadow='0 0 30px rgba(239,68,68,.5)'; } else { el.style.color=''; el.style.textShadow=''; } },
+  _playAlarm(){ showToast('⏰ انتهى الوقت!'); try{ const ac=new (window.AudioContext||window.webkitAudioContext)();
+    for(let i=0;i<3;i++){ const o=ac.createOscillator(), g=ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value=880; g.gain.value=.3; o.start(ac.currentTime+i*.3); o.stop(ac.currentTime+i*.3+.15); } }catch(e){} }
+};
+
+/* ==================== طالب عشوائي ==================== */
+const RandomStudent = {
+  _names:['أحمد','محمد','عبدالله','خالد','سعود','فهد','ناصر','عبدالرحمن','سلطان','تركي','بندر','مشاري','نواف','يوسف','عمر','حمد','ماجد','وليد','صالح','إبراهيم'],
+  show(){ document.getElementById('random-modal').classList.remove('hidden'); },
+  hide(){ document.getElementById('random-modal').classList.add('hidden'); },
+  spin(){ const result=document.getElementById('random-result'), btn=document.getElementById('spin-btn');
+    btn.disabled=true; result.classList.add('spinning'); let count=0;
+    const iv=setInterval(()=>{ result.textContent=this._names[Math.floor(Math.random()*this._names.length)]; count++;
+      if(count>20){ clearInterval(iv); result.classList.remove('spinning'); result.textContent='🎉 '+this._names[Math.floor(Math.random()*this._names.length)];
+        result.style.transform='scale(1.1)'; setTimeout(()=>result.style.transform='',300); btn.disabled=false; } },80); }
+};
+
+/* ==================== أدوات ==================== */
+const toAr = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); t.classList.add('show');
+  clearTimeout(t._timer); t._timer=setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.classList.add('hidden'),300); },2000); }
+function goBack(){ if (history.length > 1) history.back(); else window.close(); }
+function openPresentation(){ if (Board._curPres) window.open(Board._curPres, '_blank'); }
+
+/* ==================== التشغيل ==================== */
+document.addEventListener('DOMContentLoaded', () => {
+  // صفحة البداية من الرابط: whiteboard.html?p=17
+  const p = parseInt(new URLSearchParams(location.search).get('p'));
+  if (p >= 1 && p <= BOOK.totalPages) currentPage = p;
+  Sidebar.build();
+  Board.init();
+  Tools.select('pointer');
+  document.addEventListener('touchmove', e => { if (e.target.closest('#draw-canvas')) e.preventDefault(); }, { passive:false });
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) { document.body.classList.remove('fullscreen'); document.getElementById('fs-btn').innerHTML='<i class="fas fa-expand"></i>'; }
+  });
+});
+</script>
+</body>
+</html>
