@@ -1750,195 +1750,76 @@ const Pages = {
     const hm  = TimeAware._hhmm();
     const sch = DB.get('schedule');
     const dayKey = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
-
     const clsForPeriod = p => {
       const slot = sch.find(s => s.day === dayKey && s.period == p.p);
       return slot ? DB.get('classes').find(c => c.id === slot.classId) : null;
     };
-
-    const _activeHtml = (period, cls) => {
-      const left = md(hm, period.e);
-      const stuCount = cls ? DB.get('students').filter(s => s.classId === cls.id).length : 0;
-      // When period is empty — find next scheduled class today
-      const allPeriods = TimeAware._periods();
-      const nextWithCls = !cls
-        ? allPeriods.filter(p => p.p > period.p).map(p => ({ period: p, cls: clsForPeriod(p) })).find(x => x.cls)
-        : null;
-      const waitNext = nextWithCls ? md(hm, nextWithCls.period.s) : null;
-      const clsActions = cls ? `
-        <button class="syswin-act-btn syswin-act-primary" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
-          <i class="fas fa-clipboard-check"></i> الحضور والسلوك
-        </button>
-        <button class="syswin-act-btn" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'groups'})">
-          <i class="fas fa-object-group"></i> المجموعات
-        </button>
-        <button class="syswin-act-btn" onclick="Pages.diceRoll('${cls.id}')">
-          <i class="fas fa-dice"></i> نرد
-        </button>` : `<button class="syswin-act-btn" onclick="Router.go('lessons')"><i class="fas fa-calendar-alt"></i> الجدول</button>`;
-      return `<div class="syswin-card">
-        <div class="syswin-titlebar">
-          <div class="syswin-dots">
-            <span class="syswin-dot syswin-dot-red"></span>
-            <span class="syswin-dot syswin-dot-yellow"></span>
-            <span class="syswin-dot syswin-dot-green"></span>
-          </div>
-          <div class="syswin-title-text"><i class="fas fa-chalkboard-teacher" style="opacity:.7;font-size:.75rem"></i> ${_T.manageTch} — الحصة ${period.p} ${cls ? 'جارية الآن' : '— وقت حر'}</div>
-          <div style="width:52px"></div>
+    const card = (accent, icon, lbl, title, meta, actions) => `
+      <div class="now-card accent-${accent}">
+        <div class="now-main">
+          <div class="now-lbl"><i class="fas ${icon}"></i> ${lbl}</div>
+          <div class="now-title">${title}</div>
+          ${meta ? `<div class="now-meta">${meta}</div>` : ''}
         </div>
-        <div class="syswin-body">
-          <div class="syswin-main-col">
-            <div class="syswin-moon" style="font-size:2rem">${cls ? '📋' : '☕'}</div>
-            <div class="syswin-status-label">
-              <span class="hero-pulse" style="background:${cls ? '#28C840' : '#F59E0B'};box-shadow:0 0 6px ${cls ? 'rgba(40,200,64,.8)' : 'rgba(245,158,11,.8)'};display:inline-block"></span>
-              ${cls ? 'حصة جارية الآن' : 'حصة فارغة — وقت حر'}
-            </div>
-            <div class="syswin-headline">${cls ? cls.name : 'وقت حر'}</div>
-            <div class="syswin-sub">${period.s} — ${period.e}${cls?.subject ? ' · ' + cls.subject : ''}</div>
-            ${nextWithCls ? `
-            <div style="margin-top:.9rem;padding:.55rem .75rem;background:rgba(99,102,241,.13);border-radius:.55rem;border:1px solid rgba(99,102,241,.28)">
-              <div style="font-size:.68rem;color:rgba(255,255,255,.55);margin-bottom:.25rem;letter-spacing:.03em">📌 حصتك القادمة</div>
-              <div style="font-weight:800;font-size:.98rem;line-height:1.2">${nextWithCls.cls.name}</div>
-              <div style="font-size:.76rem;color:rgba(255,255,255,.65);margin-top:.15rem">${nextWithCls.cls.subject ? nextWithCls.cls.subject + ' · ' : ''}الساعة ${nextWithCls.period.s}</div>
-            </div>` : (!cls ? `<div style="margin-top:.9rem;font-size:.78rem;color:rgba(255,255,255,.45)">لا توجد حصص قادمة اليوم</div>` : '')}
-          </div>
-          <div class="syswin-glass">
-            <div class="syswin-glass-title">
-              <i class="fas fa-${cls ? 'hourglass-half' : nextWithCls ? 'bell' : 'clock'}"></i>
-              ${cls ? 'الوقت المتبقي' : nextWithCls ? 'حتى الحصة القادمة' : 'الوقت المتبقي'}
-            </div>
-            <div class="syswin-stats-row" style="margin-bottom:.6rem">
-              <div class="syswin-stat">
-                <div class="syswin-stat-num">${nextWithCls ? waitNext : left}</div>
-                <div class="syswin-stat-lbl">${nextWithCls ? 'دقيقة للحصة' : 'دقيقة متبقية'}</div>
-              </div>
-              ${cls ? `<div class="syswin-stat-sep"></div>
-              <div class="syswin-stat">
-                <div class="syswin-stat-num">${stuCount}</div>
-                <div class="syswin-stat-lbl">طالب</div>
-              </div>` : nextWithCls ? `<div class="syswin-stat-sep"></div>
-              <div class="syswin-stat">
-                <div class="syswin-stat-num">${nextWithCls.period.p}</div>
-                <div class="syswin-stat-lbl">رقم الحصة</div>
-              </div>` : ''}
-            </div>
-            ${clsActions}
-          </div>
-        </div>
+        ${actions ? `<div class="now-actions">${actions}</div>` : ''}
       </div>`;
+
+    const activeCard = (period, cls) => {
+      const left = md(hm, period.e);
+      if (!cls) {
+        const allPeriods = TimeAware._periods();
+        const nextWithCls = allPeriods.filter(p => p.p > period.p)
+          .map(p => ({ period: p, cls: clsForPeriod(p) })).find(x => x.cls);
+        const meta = `الحصة ${period.p} · ${period.s} — ${period.e}`
+          + (nextWithCls ? ` · القادمة: ${nextWithCls.cls.name} الساعة ${nextWithCls.period.s}` : '');
+        return card('muted','fa-mug-hot','وقت حر الآن','لا حصة هذه الفترة', meta,
+          `<button class="now-btn outline" onclick="Router.go('lessons')"><i class="fas fa-calendar-alt"></i> الجدول</button>`);
+      }
+      const stuCount = DB.get('students').filter(s => s.classId === cls.id).length;
+      const book = Books.forClass(cls);
+      const meta = `${cls.subject ? cls.subject + ' · ' : ''}${stuCount} ${_T.stu} · متبقٍ ${left} دقيقة`;
+      const bookBtn = book
+        ? `<button class="now-btn" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'book'})"><i class="fas fa-book-open"></i> افتح الكتاب</button>`
+        : '';
+      return card('primary','fa-circle-play',`الحصة الآن · ${period.s} – ${period.e}`, cls.name, meta,
+        `${bookBtn}<button class="now-btn solid" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})"><i class="fas fa-clipboard-check"></i> سجّل الحضور</button>`);
     };
 
-    // Primary check: ActiveClass (more reliable — respects periodCount + schedule)
     const activeCls = ActiveClass.get();
-    if (activeCls) {
-      return _activeHtml(activeCls.period, activeCls.cls);
-    }
+    if (activeCls) return activeCard(activeCls.period, activeCls.cls);
 
-    // Secondary check: TimeAware (detects active period even without a scheduled class)
-    const z   = TimeAware.zone();
-    const cur = TimeAware.currentPeriod();
-    const nxt = TimeAware.nextPeriod();
-
-    if (z === 'active' && cur) {
-      return _activeHtml(cur, clsForPeriod(cur));
-    }
+    const z = TimeAware.zone(), cur = TimeAware.currentPeriod(), nxt = TimeAware.nextPeriod();
+    if (z === 'active' && cur) return activeCard(cur, clsForPeriod(cur));
 
     if (z === 'between' && nxt) {
-      const cls  = clsForPeriod(nxt);
-      const wait = md(hm, nxt.s);
-      return `<div class="hero-card hero-break">
-        <div class="hero-icon"><i class="fas fa-coffee"></i></div>
-        <div class="hero-body">
-          <div class="hero-period-label" style="color:#F59E0B"><i class="fas fa-hourglass-half"></i> استراحة</div>
-          <div class="hero-title">الحصة ${nxt.p} قادمة${cls ? ' — ' + cls.name : ''}</div>
-          <div class="hero-sub">تبدأ الساعة ${nxt.s} (بعد ${wait} دقيقة)</div>
-          <div class="hero-actions">
-            ${cls ? `<button class="hero-btn hero-btn-outline" style="color:#F59E0B;border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.1)" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})"><i class="fas fa-clipboard-check"></i> الحضور</button>` : ''}
-            <button class="hero-btn hero-btn-outline" style="color:#F59E0B;border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.1)" onclick="Router.go('lessons')"><i class="fas fa-calendar-alt"></i> الجدول الكامل</button>
-          </div>
-        </div>
-        <div class="hero-timer" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.15)">
-          <div class="hero-timer-num" style="color:#F59E0B">${wait}</div>
-          <div class="hero-timer-lbl">دقيقة للبدء</div>
-        </div>
-      </div>`;
+      const cls = clsForPeriod(nxt), wait = md(hm, nxt.s);
+      return card('amber','fa-hourglass-half','استراحة',
+        `الحصة ${nxt.p} قادمة${cls ? ' — ' + cls.name : ''}`,
+        `تبدأ الساعة ${nxt.s} · بعد ${wait} دقيقة`,
+        (cls ? `<button class="now-btn outline" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})"><i class="fas fa-clipboard-check"></i> الحضور</button>` : '')
+        + `<button class="now-btn outline" onclick="Router.go('lessons')"><i class="fas fa-calendar-alt"></i> الجدول</button>`);
     }
 
     if (z === 'pre' && nxt) {
       const wait = md(hm, nxt.s);
-      return `<div class="hero-card hero-pre">
-        <div class="hero-icon"><i class="fas fa-sun"></i></div>
-        <div class="hero-body">
-          <div class="hero-period-label" style="color:#60A5FA"><i class="fas fa-sun"></i> ${_T.morningGr}</div>
-          <div class="hero-title">${_T.preHdr}</div>
-          <div class="hero-sub">${_T.preSub} — الحصة الأولى الساعة ${nxt.s} (بعد ${wait} دقيقة)</div>
-          <div class="hero-actions">
-            <button class="hero-btn hero-btn-outline" style="color:#60A5FA;border-color:rgba(96,165,250,.3);background:rgba(96,165,250,.1)" onclick="Router.go('lessons')"><i class="fas fa-calendar-alt"></i> جدول اليوم</button>
-          </div>
-        </div>
-      </div>`;
+      return card('blue','fa-sun', _T.morningGr, _T.preHdr,
+        `${_T.preSub} — الحصة الأولى ${nxt.s} · بعد ${wait} دقيقة`,
+        `<button class="now-btn outline" onclick="Router.go('lessons')"><i class="fas fa-calendar-alt"></i> جدول اليوم</button>`);
     }
 
     if (z === 'post') {
-      const todaySch    = DB.get('schedule').filter(s => s.day === dayKey);
-      const totalPeriods = todaySch.length;
-      const today       = new Date().toISOString().slice(0,10);
-      const todayAtt    = DB.get('attendance').filter(a => a.date === today);
-      const completedCount = todayAtt.length;
-      const totalPresent   = todayAtt.reduce((n,a) => n + a.records.filter(r=>r.status==='present').length, 0);
-      const totalExpected  = todayAtt.reduce((n,a) => n + a.records.length, 0);
-      const attRate        = totalExpected ? Math.round(totalPresent/totalExpected*100) : 0;
-      const totalStudents  = DB.get('students').length;
-
-      return `<div class="syswin-card">
-        <div class="syswin-titlebar">
-          <div class="syswin-dots">
-            <span class="syswin-dot syswin-dot-red"></span>
-            <span class="syswin-dot syswin-dot-yellow"></span>
-            <span class="syswin-dot syswin-dot-green"></span>
-          </div>
-          <div class="syswin-title-text"><i class="fas fa-graduation-cap" style="opacity:.7;font-size:.75rem"></i> ${_T.manageTch} — انتهى الدوام</div>
-          <div style="width:52px"></div>
-        </div>
-        <div class="syswin-body">
-          <div class="syswin-main-col">
-            <div class="syswin-moon">🌙</div>
-            <div class="syswin-status-label">انتهى الدوام المدرسي</div>
-            <div class="syswin-headline">${_T.dayDone}</div>
-            <div class="syswin-sub">${_T.dayDoneSub}</div>
-          </div>
-          <div class="syswin-glass">
-            <div class="syswin-glass-title"><i class="fas fa-chart-pie"></i> ملخص اليوم</div>
-            <div class="syswin-stats-row">
-              <div class="syswin-stat">
-                <div class="syswin-stat-num">${completedCount}${totalPeriods ? '<span class="syswin-stat-of">/' + totalPeriods + '</span>' : ''}</div>
-                <div class="syswin-stat-lbl">فصول منجزة</div>
-              </div>
-              <div class="syswin-stat-sep"></div>
-              <div class="syswin-stat">
-                <div class="syswin-stat-num">${attRate}<span class="syswin-stat-of">%</span></div>
-                <div class="syswin-stat-lbl">نسبة الحضور</div>
-              </div>
-              <div class="syswin-stat-sep"></div>
-              <div class="syswin-stat">
-                <div class="syswin-stat-num">${totalStudents}</div>
-                <div class="syswin-stat-lbl">إجمالي الطلاب</div>
-              </div>
-            </div>
-            <button class="syswin-report-btn" onclick="Router.go('analytics')">
-              <i class="fas fa-chart-bar"></i> عرض تقارير اليوم
-            </button>
-          </div>
-        </div>
-      </div>`;
+      const todaySch = sch.filter(s => s.day === dayKey);
+      const today = new Date().toISOString().slice(0,10);
+      const todayAtt = DB.get('attendance').filter(a => a.date === today);
+      const pres = todayAtt.reduce((n,a) => n + a.records.filter(r => r.status==='present').length, 0);
+      const exp  = todayAtt.reduce((n,a) => n + a.records.length, 0);
+      const rate = exp ? Math.round(pres/exp*100) : 0;
+      return card('muted','fa-moon','انتهى الدوام', _T.dayDone,
+        `${todayAtt.length}/${todaySch.length} فصول مُسجّلة · حضور ${rate}%`,
+        `<button class="now-btn outline" onclick="Router.go('analytics')"><i class="fas fa-chart-bar"></i> تقارير اليوم</button>`);
     }
 
-    return `<div class="hero-card hero-off">
-      <div class="hero-icon"><i class="fas fa-moon"></i></div>
-      <div class="hero-body">
-        <div class="hero-title">إجازة</div>
-        <div class="hero-sub">${_T._f ? 'استمتعي بوقتك' : 'استمتع بوقتك'}</div>
-      </div>
-    </div>`;
+    return card('muted','fa-mug-hot','إجازة', _T._f ? 'استمتعي بوقتك' : 'استمتع بوقتك', '', '');
   },
 
   _xlWidget(cls, students, todayAtt, activeClsId) {
