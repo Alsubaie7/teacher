@@ -1930,92 +1930,80 @@ const Pages = {
     const classes  = DB.get('classes');
     const students = DB.get('students');
     const today    = new Date().toISOString().slice(0,10);
-    const allAtt   = DB.get('attendance');
-    const todayAtt = allAtt.filter(a => a.date === today);
+    const todayAtt = DB.get('attendance').filter(a => a.date === today);
     const dayKey   = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
     const todayLessons = DB.get('schedule').filter(l => l.day === dayKey);
-
     const totalPresent  = todayAtt.reduce((n,a) => n + a.records.filter(r => r.status==='present').length, 0);
     const totalExpected = todayAtt.reduce((n,a) => n + a.records.length, 0);
     const attRate = totalExpected ? Math.round(totalPresent/totalExpected*100) : 0;
 
-    // Weekly warnings: only students with negative behavior events in last 7 days
-    const sevenAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+    const sevenAgo   = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
     const recentEvts = DB.get('behaviorEvents').filter(e => e.date >= sevenAgo);
     const recentIds  = new Set(recentEvts.map(e => e.studentId));
     const dismissed  = new Set(DB.get('dismissedWarnings').filter(d => d.date >= sevenAgo).map(d => d.studentId));
     const allWarned  = students.filter(s => recentIds.has(s.id) && !dismissed.has(s.id));
 
-    const curPeriod = TimeAware.currentPeriod();
-    const curSlot   = curPeriod ? DB.get('schedule').find(s => s.day===dayKey && s.period===curPeriod.p) : null;
-    const activeClsId = curSlot?.classId || null;
+    const greetName = (DB.teacher()?.name || '').split(' ').slice(0,2).join(' ');
+    let dateStr = '';
+    try { dateStr = new Date().toLocaleDateString('ar-SA-u-ca-islamic-umalqura', { weekday:'long', day:'numeric', month:'long' }); } catch (e) { dateStr = new Date().toLocaleDateString('ar'); }
+    const lessonWord = todayLessons.length === 1 ? 'حصة' : 'حصص';
 
-    const clsCards = classes.map(cls => this._xlWidget(cls, students, todayAtt, activeClsId)).join('');
+    if (!classes.length) {
+      document.getElementById('content').innerHTML = `
+        <div class="dash-greet"><h1>مرحباً ${greetName || _T.tch} 👋</h1><p>${dateStr}</p></div>
+        <div id="home-hero-wrap">${this._heroCard()}</div>
+        <div class="home-empty">
+          <div class="home-empty-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+          <h3>${_T.hi} ${_T.addFirstCls}</h3>
+          <p>أضف فصلاً دراسياً لتتمكن من إدارة ${_T.theStus} والحضور والدرجات</p>
+          <button class="btn btn-primary" onclick="Pages.addClassModal()"><i class="fas fa-plus"></i> إضافة فصل</button>
+        </div>`;
+      return;
+    }
 
-    const warnSection = allWarned.length ? `
-      <div class="home-warn-card" id="home-warn-card">
-        <div class="home-warn-hdr">
-          <h3><i class="fas fa-triangle-exclamation"></i> تحذيرات هذا الأسبوع — ${allWarned.length} ${_T.stu}</h3>
-          <button class="hcc-btn hcc-btn-att" style="background:rgba(248,113,113,.1);color:#F87171;border-color:rgba(248,113,113,.25)" onclick="Router.go('referrals')"><i class="fas fa-file-medical-alt"></i> إحالات</button>
-        </div>
-        <div class="home-warn-list">
-          ${allWarned.slice(0,6).map(s => {
-            const cls  = classes.find(c => c.id===s.classId);
-            const evts = recentEvts.filter(e => e.studentId === s.id);
-            const behKeys = [...new Set(evts.map(e => e.key))];
-            const behs = behKeys.map(k => BEH_TYPES.find(b => b.key === k)).filter(Boolean);
-            return `<div class="home-warn-item" id="wi-${s.id}">
-              <div class="home-warn-avatar">${s.name.charAt(0)}</div>
-              <div style="flex:1;min-width:0">
-                <div class="home-warn-name">${s.name}</div>
-                <div class="home-warn-cls">${cls?.name||'—'}</div>
-              </div>
-              <div class="home-warn-behs">${behs.map(b=>`<span title="${b.label}">${b.emoji}</span>`).join('')}</div>
-              <button onclick="Pages.dismissWarning('${s.id}')"
-                style="background:none;border:1px solid #D0D0D0;border-radius:6px;padding:3px 8px;
-                  font-size:.72rem;color:#888;cursor:pointer;white-space:nowrap;font-family:inherit;margin-right:.3rem"
-                title="تجاهل لأسبوع">تجاهل ✕</button>
-            </div>`;
-          }).join('')}
-          ${allWarned.length>6 ? `<div style="text-align:center;font-size:.78rem;color:var(--text-muted);padding:.3rem">و ${allWarned.length-6} ${_T.others}...</div>` : ''}
-        </div>
-      </div>` : '';
+    const clsList = classes.map(cls => {
+      const cnt  = students.filter(s => s.classId === cls.id).length;
+      const att  = todayAtt.find(a => a.classId === cls.id);
+      const rate = att && att.records.length ? Math.round(att.records.filter(r=>r.status==='present').length/att.records.length*100) : null;
+      return `<div class="dash-cls" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
+        <span class="dash-cls-dot" style="background:${cls.color||'#4f46e5'}"></span>
+        <div style="min-width:0"><div class="dash-cls-name">${cls.name}</div><div class="dash-cls-sub">${cls.subject ? cls.subject + ' · ' : ''}${cnt} ${_T.stu}</div></div>
+        <span class="dash-cls-badge">${rate !== null ? 'حضور ' + rate + '%' : 'لم يُسجّل'}</span>
+      </div>`;
+    }).join('');
 
-    document.getElementById('content').innerHTML = classes.length ? `
+    const alerts = [];
+    if (allWarned.length) alerts.push(`<div class="dash-alert">
+      <span class="dash-alert-ic" style="background:var(--red-soft);color:var(--red)"><i class="fas fa-triangle-exclamation"></i></span>
+      <div class="dash-alert-tx">${allWarned.length} ${_T.stu} بحاجة انتباه هذا الأسبوع<small>سلوك سلبي متكرر</small></div>
+      <button class="dash-link" onclick="Router.go('referrals')">إحالات ‹</button>
+    </div>`);
+    const notTaken = todayLessons.filter(l => !todayAtt.find(a => a.classId === l.classId)).length;
+    if (notTaken) alerts.push(`<div class="dash-alert">
+      <span class="dash-alert-ic" style="background:var(--orange-soft);color:var(--orange)"><i class="fas fa-clipboard-list"></i></span>
+      <div class="dash-alert-tx">${notTaken} ${notTaken===1?'حصة':'حصص'} لم يُسجّل حضورها اليوم<small>من جدول اليوم</small></div>
+    </div>`);
+    const alertsHtml = alerts.length ? alerts.join('') : `<div class="dash-alert-ok"><i class="fas fa-circle-check"></i> ممتاز — لا شيء يحتاج انتباهك الآن</div>`;
+
+    document.getElementById('content').innerHTML = `
+      <div class="dash-greet"><h1>مرحباً ${greetName || _T.tch} 👋</h1><p>${dateStr} · لديك ${todayLessons.length} ${lessonWord} اليوم</p></div>
       <div id="home-hero-wrap">${this._heroCard()}</div>
-      <div class="home-stats">
-        <div class="home-stat">
-          <div class="home-stat-icon blue"><i class="fas fa-door-open"></i></div>
-          <div><div class="home-stat-val">${classes.length}</div><div class="home-stat-lbl">الفصول</div></div>
-        </div>
-        <div class="home-stat">
-          <div class="home-stat-icon green"><i class="fas fa-users"></i></div>
-          <div><div class="home-stat-val">${students.length}</div><div class="home-stat-lbl">${_T.theStus}</div></div>
-        </div>
-        <div class="home-stat">
-          <div class="home-stat-icon ${attRate>=80?'green':attRate>=60?'orange':'red'}"><i class="fas fa-clipboard-check"></i></div>
-          <div><div class="home-stat-val">${attRate}%</div><div class="home-stat-lbl">حضور اليوم</div></div>
-        </div>
-        <div class="home-stat">
-          <div class="home-stat-icon purple"><i class="fas fa-book-open"></i></div>
-          <div><div class="home-stat-val">${todayLessons.length}</div><div class="home-stat-lbl">حصص اليوم</div></div>
-        </div>
+      <div class="dash-stats">
+        <div class="dash-stat"><div><div class="dash-stat-val">${classes.length}</div><div class="dash-stat-lbl">الفصول</div></div><div class="dash-stat-ic indigo"><i class="fas fa-door-open"></i></div></div>
+        <div class="dash-stat"><div><div class="dash-stat-val">${students.length}</div><div class="dash-stat-lbl">${_T.theStus}</div></div><div class="dash-stat-ic green"><i class="fas fa-users"></i></div></div>
+        <div class="dash-stat"><div><div class="dash-stat-val">${attRate}%</div><div class="dash-stat-lbl">حضور اليوم</div></div><div class="dash-stat-ic ${attRate>=80?'green':attRate>=60?'orange':'red'}"><i class="fas fa-clipboard-check"></i></div></div>
+        <div class="dash-stat"><div><div class="dash-stat-val">${todayLessons.length}</div><div class="dash-stat-lbl">حصص اليوم</div></div><div class="dash-stat-ic purple"><i class="fas fa-book-open"></i></div></div>
       </div>
-      ${warnSection}
-      <div class="home-section-hdr">
-        <h3><i class="fas fa-door-open"></i> ${_T.yourCls}</h3>
-        <button class="hcc-btn hcc-btn-grp" onclick="Pages.addClassModal()"><i class="fas fa-plus"></i> فصل جديد</button>
-      </div>
-      <div class="xl-grid-section">${clsCards}</div>
-    ` : `
-      <div id="home-hero-wrap">${this._heroCard()}</div>
-      <div class="home-empty">
-        <div class="home-empty-icon"><i class="fas fa-chalkboard-teacher"></i></div>
-        <h3>${_T.hi} ${_T.addFirstCls}</h3>
-        <p>أضف فصلاً دراسياً لتتمكن من إدارة ${_T.theStus} والحضور والدرجات</p>
-        <button class="btn btn-primary" onclick="Pages.addClassModal()"><i class="fas fa-plus"></i> إضافة فصل</button>
-      </div>
-    `;
+      <div class="dash-row">
+        <div class="dash-panel">
+          <div class="dash-panel-hdr"><h3><i class="fas fa-door-open"></i> فصولي</h3><button class="dash-link" onclick="Router.go('classes')">عرض الكل ‹</button></div>
+          ${clsList}
+        </div>
+        <div class="dash-panel">
+          <div class="dash-panel-hdr"><h3><i class="fas fa-bell"></i> يحتاج انتباهك</h3></div>
+          ${alertsHtml}
+        </div>
+      </div>`;
   },
 
   /* ---- CLASS DETAIL ---- */
