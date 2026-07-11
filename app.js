@@ -3747,14 +3747,33 @@ const Pages = {
       </div>`;
 
     document.getElementById('content').innerHTML = `
-      <div class="page-header">
-        <h2>الدرجات | Grades</h2>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <button class="btn btn-sm btn-outline" onclick="Pages.editSchemaModal('${selId}')"><i class="fas fa-sliders"></i> مخطط الدرجات</button>
-          <button class="btn btn-sm btn-outline" onclick="Print.grades('${selId}')"><i class="fas fa-print"></i> طباعة</button>
+      <div class="cw-crumb"><b onclick="Router.go('classes')">فصولي</b> ‹ ${cls.name}</div>
+      <div class="cw-head">
+        <div class="cw-avatar" style="background:${cls.color||'#4f46e5'}">${(((cls.gradeLevel||cls.name||'').replace(/الصف|صف/g,'').trim().replace(/^ال/,'').match(/[ء-ي]/)||[''])[0]) + (cls.section||'')}</div>
+        <div class="cw-title">
+          <div class="cw-name">${cls.name}</div>
+          <div class="cw-sub">${cls.subject ? cls.subject + ' · ' : ''}${clsStu.length} ${_T.stu}</div>
         </div>
+        <div class="cw-switch" id="cw-switch">
+          <button class="cw-switch-btn" onclick="document.getElementById('cw-switch').classList.toggle('open')">
+            <i class="fas fa-repeat"></i> تبديل الفصل <i class="fas fa-chevron-down" style="font-size:.7rem"></i>
+          </button>
+          <div class="cw-switch-menu">
+            ${classes.map(c => `<div class="cw-switch-item" onclick="Router.go('grades',{classId:'${c.id}'})">
+              <span class="dot" style="background:${c.color||'#4f46e5'}"></span> ${c.name}${c.id===selId?' <i class="fas fa-check" style="margin-inline-start:auto;color:var(--primary)"></i>':''}
+            </div>`).join('')}
+          </div>
+        </div>
+        <button class="cls-btn icon" style="flex:0 0 auto" onclick="Pages.editSchemaModal('${selId}')" title="مخطط الدرجات"><i class="fas fa-sliders"></i></button>
+        <button class="cls-btn icon" style="flex:0 0 auto" onclick="Print.grades('${selId}')" title="طباعة"><i class="fas fa-print"></i></button>
       </div>
-      <div class="grades-tabs-bar">${tabs}</div>
+      <div class="cw-tabs">
+        <button class="cw-tab" onclick="Router.go('classDetail',{classId:'${selId}',tab:'att'})"><i class="fas fa-clipboard-check"></i> الحضور والسلوك</button>
+        <button class="cw-tab active"><i class="fas fa-star"></i> الدرجات</button>
+        <button class="cw-tab" onclick="Router.go('classDetail',{classId:'${selId}',tab:'groups'})"><i class="fas fa-object-group"></i> المجموعات</button>
+        ${Books.forClass(cls) ? `<button class="cw-tab" onclick="Router.go('classDetail',{classId:'${selId}',tab:'book'})"><i class="fas fa-book-open"></i> الكتاب والعروض</button>` : ''}
+        <button class="cw-tab" onclick="Router.go('classDetail',{classId:'${selId}',tab:'manage'})"><i class="fas fa-users-gear"></i> الطلاب</button>
+      </div>
       ${clsStu.length ? `
         ${kpiHtml}
         <div class="grades-toolbar">
