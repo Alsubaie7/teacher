@@ -3,80 +3,74 @@
    Clean UI · emerald-700 Header · slate-50 Background
    ============================================================ */
 
-/* ===== VARIABLES ===== */
+/* ===== VARIABLES — Indigo Modern Design System ===== */
 :root {
-  /* === Emerald (Primary) === */
-  --primary:         #059669;   /* emerald-600 */
-  --primary-dark:    #047857;   /* emerald-700 */
-  --primary-mid:     #10b981;   /* emerald-500 */
-  --primary-dim:     rgba(5,150,105,.10);
-  --primary-light:   rgba(5,150,105,.08);
-  --primary-glow:    rgba(5,150,105,.15);
-  --gold:            #C8962A;
-  --gold-dim:        rgba(200,150,42,.10);
-  --gold-glow:       rgba(200,150,42,.18);
+  /* === Indigo (Primary) === */
+  --primary:         #4f46e5;   /* indigo-600 */
+  --primary-dark:    #4338ca;   /* indigo-700 */
+  --primary-mid:     #6366f1;   /* indigo-500 */
+  --primary-dim:     rgba(79,70,229,.10);
+  --primary-light:   rgba(79,70,229,.07);
+  --primary-glow:    rgba(79,70,229,.15);
+  --primary-soft:    #eceafe;   /* indigo-50-ish */
+  --gold:            #d97706;
+  --gold-dim:        rgba(217,119,6,.10);
+  --gold-glow:       rgba(217,119,6,.18);
 
   /* === Semantic Colors === */
-  --green:           #059669;
-  --green-light:     rgba(5,150,105,.10);
-  --orange:          #D97706;
+  --green:           #16a34a;
+  --green-light:     rgba(22,163,74,.10);
+  --green-soft:      #e7f6ec;
+  --orange:          #d97706;
   --orange-light:    rgba(217,119,6,.10);
-  --red:             #EF4444;   /* red-500 */
-  --red-light:       rgba(239,68,68,.10);
-  --purple:          #7C3AED;
+  --orange-soft:     #fdf0dc;
+  --red:             #dc2626;
+  --red-light:       rgba(220,38,38,.10);
+  --red-soft:        #fdeaea;
+  --purple:          #7c3aed;
   --purple-light:    rgba(124,58,237,.10);
-  --blue:            #3B82F6;   /* blue-500 */
-  --blue-light:      rgba(59,130,246,.10);
+  --blue:            #2563eb;
+  --blue-light:      rgba(37,99,235,.10);
+  --teal:            #0ea5a3;
 
-  /* === Surfaces — Slate / Emerald Clean UI === */
-  --body-bg:         #F8FAFC;   /* slate-50 */
-  --surface:         #FFFFFF;
-  --surface-2:       #F1F5F9;   /* slate-100 */
-  --surface-solid:   #FFFFFF;
-  --surface-hover:   #ECFDF5;   /* emerald-50 */
-  --surface-active:  rgba(5,150,105,.08);
+  /* === Surfaces === */
+  --body-bg:         #f5f6fb;
+  --surface:         #ffffff;
+  --surface-2:       #f1f2f8;
+  --surface-solid:   #ffffff;
+  --surface-hover:   #f5f5fa;
+  --surface-active:  rgba(79,70,229,.08);
 
-  /* === Sidebar (legacy, hidden) === */
-  --sidebar-bg:      rgba(4,6,10,.95);
-  --sidebar-w:       270px;
-  --sidebar-collapsed-w: 60px;
+  /* === Text === */
+  --text-primary:    #1f2340;
+  --text-secondary:  #4b4f6b;
+  --text-muted:      #7a7f9e;
+  --text-dim:        #a3a7bf;
 
-  /* === Text — Slate === */
-  --text-primary:    #1E293B;   /* slate-800 */
-  --text-secondary:  #475569;   /* slate-600 */
-  --text-muted:      #64748B;   /* slate-500 */
-  --text-dim:        #94A3B8;   /* slate-400 */
+  /* Gray aliases */
+  --gray-50:  #f7f8fc; --gray-100: #f1f2f8; --gray-200: #e7e8f0;
+  --gray-300: #d3d5e0; --gray-400: #a3a7bf; --gray-500: #7a7f9e;
+  --gray-600: #4b4f6b; --gray-700: #363a55; --gray-800: #1f2340; --gray-900: #14172b;
 
-  /* Gray aliases — Slate */
-  --gray-50:         #F8FAFC;
-  --gray-100:        #F1F5F9;
-  --gray-200:        #E2E8F0;
-  --gray-300:        #CBD5E1;
-  --gray-400:        #94A3B8;
-  --gray-500:        #64748B;
-  --gray-600:        #475569;
-  --gray-700:        #334155;
-  --gray-800:        #1E293B;
-  --gray-900:        #0F172A;
-
-  /* === Borders — Slate-200 === */
-  --border:          #E2E8F0;
-  --border-subtle:   rgba(226,232,240,.6);
-  --border-gold:     rgba(200,150,42,.22);
+  /* === Borders === */
+  --border:          #e7e8f0;
+  --border-subtle:   rgba(231,232,240,.6);
+  --border-gold:     rgba(217,119,6,.22);
 
   /* === Layout === */
-  --topbar-h:        60px;
-  --radius:          10px;
-  --radius-sm:       7px;
+  --topbar-h:        64px;
+  --sidebar-w:       238px;
+  --radius:          11px;
+  --radius-sm:       8px;
   --radius-lg:       14px;
   --radius-xl:       18px;
 
-  /* === Shadows — Neutral === */
-  --shadow:          0 2px 8px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04);
-  --shadow-md:       0 8px 28px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.05);
-  --shadow-lg:       0 20px 56px rgba(0,0,0,.10), 0 8px 24px rgba(0,0,0,.07);
-  --glow-green:      0 0 20px rgba(5,150,105,.12);
-  --glow-gold:       0 0 20px rgba(200,150,42,.15);
+  /* === Shadows === */
+  --shadow:          0 2px 8px rgba(31,35,64,.05), 0 1px 3px rgba(31,35,64,.04);
+  --shadow-md:       0 8px 28px rgba(31,35,64,.07), 0 4px 12px rgba(31,35,64,.05);
+  --shadow-lg:       0 20px 56px rgba(31,35,64,.10), 0 8px 24px rgba(31,35,64,.06);
+  --glow-green:      0 0 20px rgba(22,163,74,.10);
+  --glow-gold:       0 0 20px rgba(217,119,6,.12);
 
   --transition:      .18s cubic-bezier(.4,0,.2,1);
 }
