@@ -2407,112 +2407,46 @@ const Pages = {
     const todayStr = new Date().toISOString().slice(0,10);
     const allAtt   = DB.get('attendance').filter(a => a.date === todayStr);
 
-    const rows = classes.map(c => {
-      const cnt      = students.filter(s => s.classId === c.id).length;
-      const att      = allAtt.find(a => a.classId === c.id);
-      const pres     = att ? att.records.filter(r => r.status === 'present').length : 0;
-      const attDone  = !!att;
-      const filename = `سجل_${c.name.replace(/\s+/g,'_')}.xlsx`;
-      const formula  = attDone ? '=TRUE()' : '=FALSE()';
-      const cfClass  = attDone ? 'xl-cf-green' : 'xl-cf-red';
-      const cfB      = attDone
-        ? `<span class="xl-formula-text" style="color:#375623">=TRUE()</span>`
-        : `<span class="xl-formula-text" style="color:#9C0006">=FALSE()</span>`;
-      const cfC      = attDone
-        ? `<span style="font-size:.7rem">✓ ${pres} / ${cnt}</span>`
-        : `<span style="font-size:.7rem">⚠ لم يُسجل</span>`;
-
+    const cards = classes.map(c => {
+      const cnt  = students.filter(s => s.classId === c.id).length;
+      const att  = allAtt.find(a => a.classId === c.id);
+      const pres = att ? att.records.filter(r => r.status === 'present').length : 0;
+      const rate = att && att.records.length ? Math.round(pres/att.records.length*100) : null;
+      const clr  = c.color || '#4f46e5';
+      const initials = (c.name||'').replace(/[^0-9ء-ي]/g,'').slice(0,2);
       return `
-      <div class="xl-widget">
-        <div class="xl-titlebar">
-          <div class="xl-title-icon">X</div>
-          <div class="xl-title-filename">${filename}</div>
-          <div class="xl-winctrl">
-            <span class="xl-wc-min" title="مصغّر">—</span>
-            <span class="xl-wc-max" title="تكبير">□</span>
-            <span class="xl-wc-cls" title="تعديل الفصل" onclick="Pages.addClassModal('${c.id}')">✕</span>
+      <div class="cls-card">
+        <div class="cls-card-top" style="background:${clr}"></div>
+        <div class="cls-card-body">
+          <div class="cls-card-head">
+            <div class="cls-card-dot" style="background:${clr}">${initials}</div>
+            <div style="min-width:0"><div class="cls-card-name">${c.name}</div><div class="cls-card-sub">${c.subject || '—'}</div></div>
           </div>
-        </div>
-        <div class="xl-formulabar">
-          <div class="xl-fb-cellref">B4</div>
-          <div class="xl-fb-sep"></div>
-          <span class="xl-fb-fx">fx</span>
-          <div class="xl-fb-formula">${formula}</div>
-        </div>
-        <div class="xl-sheet">
-          <table class="xl-table">
-            <colgroup>
-              <col style="width:26px">
-              <col style="width:32%">
-              <col style="width:36%">
-              <col>
-            </colgroup>
-            <thead>
-              <tr>
-                <td class="xl-col-hdr-cell corner"></td>
-                <td class="xl-col-hdr-cell">A</td>
-                <td class="xl-col-hdr-cell">B</td>
-                <td class="xl-col-hdr-cell">C</td>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="xl-rownum">1</td>
-                <td class="xl-cell label">الفصل</td>
-                <td class="xl-cell" style="font-weight:800;color:#1D6F42">${c.name}</td>
-                <td class="xl-cell"></td>
-              </tr>
-              <tr>
-                <td class="xl-rownum">2</td>
-                <td class="xl-cell label">المادة</td>
-                <td class="xl-cell">${c.subject || '—'}</td>
-                <td class="xl-cell"></td>
-              </tr>
-              <tr>
-                <td class="xl-rownum">3</td>
-                <td class="xl-cell label">الطلاب</td>
-                <td class="xl-cell" style="font-weight:700;color:#1F497D;font-family:monospace">${cnt}</td>
-                <td class="xl-cell" style="color:#888;font-size:.72rem">طالب</td>
-              </tr>
-              <tr>
-                <td class="xl-rownum">4</td>
-                <td class="xl-cell label selected">الحضور</td>
-                <td class="xl-cell selected ${cfClass}">${cfB}</td>
-                <td class="xl-cell ${cfClass}">${cfC}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="xl-actions">
-          <button class="xl-action-btn xl-action-lm" onclick="Router.go('classDetail',{classId:'${c.id}'})">
-            <i class="fas fa-door-open"></i> دخول الفصل
-          </button>
-          <button class="xl-action-btn xl-action-green" onclick="Router.go('classDetail',{classId:'${c.id}',tab:'att'})">
-            <i class="fas fa-clipboard-check"></i> حضور
-          </button>
-          <button class="xl-action-btn xl-action-blue" onclick="Router.go('grades',{classId:'${c.id}'})">
-            <i class="fas fa-star"></i> درجات
-          </button>
-          <button class="xl-action-btn xl-action-gray" onclick="Pages.shareClassModal('${c.id}')">
-            <i class="fas fa-share-alt"></i>
-          </button>
-          <button class="xl-action-btn" style="background:#FEE2E2;color:#991B1B;border-color:#FECACA;margin-right:auto" onclick="Pages.deleteClass('${c.id}')">
-            <i class="fas fa-trash"></i>
-          </button>
+          <div class="cls-card-stats">
+            <div class="cls-card-stat"><div class="cls-card-stat-v">${cnt}</div><div class="cls-card-stat-l">${_T.stu}</div></div>
+            <div class="cls-card-stat"><div class="cls-card-stat-v">${rate!==null?rate+'%':'—'}</div><div class="cls-card-stat-l">حضور اليوم</div></div>
+          </div>
+          <div class="cls-card-att ${att?'done':'pending'}">${att?`<i class="fas fa-circle-check"></i> سُجّل الحضور · ${pres}/${cnt}`:`<i class="fas fa-circle-exclamation"></i> لم يُسجّل الحضور اليوم`}</div>
+          <div class="cls-card-actions">
+            <button class="cls-btn primary" onclick="Router.go('classDetail',{classId:'${c.id}',tab:'att'})"><i class="fas fa-door-open"></i> دخول الفصل</button>
+            <button class="cls-btn icon" onclick="Router.go('grades',{classId:'${c.id}'})" title="الدرجات"><i class="fas fa-star"></i></button>
+            <button class="cls-btn icon" onclick="Pages.shareClassModal('${c.id}')" title="مشاركة"><i class="fas fa-share-alt"></i></button>
+            <button class="cls-btn icon danger" onclick="Pages.deleteClass('${c.id}')" title="حذف"><i class="fas fa-trash"></i></button>
+          </div>
         </div>
       </div>`;
     }).join('');
 
     document.getElementById('content').innerHTML = `
       <div class="page-header">
-        <h2>الفصول الدراسية</h2>
-        <div style="display:flex;gap:.5rem">
+        <h2>فصولي</h2>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
           <button class="btn btn-outline" onclick="Pages.importClassModal()"><i class="fas fa-file-import"></i> استيراد بكود</button>
           <button class="btn btn-outline" onclick="Pages.shareAllClassesModal()"><i class="fas fa-share-alt"></i> مشاركة الكل</button>
           <button class="btn btn-primary" onclick="Pages.addClassModal()"><i class="fas fa-plus"></i> إضافة فصل</button>
         </div>
       </div>
-      ${classes.length ? `<div class="xl-grid-section">${rows}</div>` : `
+      ${classes.length ? `<div class="cls-grid">${cards}</div>` : `
       <div class="empty-state">
         <div class="empty-icon"><i class="fas fa-door-open"></i></div>
         <h3>لا توجد فصول دراسية بعد</h3>
