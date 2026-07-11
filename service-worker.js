@@ -1,4 +1,4 @@
-const CACHE = 'teacher-static-v3';
+const CACHE = 'teacher-static-v4';
 
 // Only cache third-party CDN assets that never change
 const CDN_ASSETS = [
