@@ -2345,29 +2345,43 @@ const Pages = {
       const cnt  = students.filter(s => s.classId === c.id).length;
       const att  = allAtt.find(a => a.classId === c.id);
       const pres = att ? att.records.filter(r => r.status === 'present').length : 0;
-      const rate = att && att.records.length ? Math.round(pres/att.records.length*100) : null;
+      const rate = att && att.records.length ? Math.round(pres/att.records.length*100) : 0;
       const clr  = c.color || '#4f46e5';
       const initials = (((c.gradeLevel||c.name||'').replace(/الصف|صف/g,'').trim().replace(/^ال/,'').match(/[ء-ي]/)||[''])[0]) + (c.section||'');
+      const menuId = `cls-${c.id}`;
+      const ringLen = 2 * Math.PI * 21;
+      const ringDash = att ? (rate/100*ringLen) : 0;
       return `
-      <div class="cls-card">
-        <div class="cls-card-top" style="background:${clr}"></div>
-        <div class="cls-card-body">
-          <div class="cls-card-head">
-            <div class="cls-card-dot" style="background:${clr}">${initials}</div>
+      <div class="cls-card" style="--cls-c:${clr}">
+        <div class="cls-card-head">
+          <div class="cls-card-id">
+            <div class="cls-card-dot" style="background:${clr}22;color:${clr}">${initials}</div>
             <div style="min-width:0"><div class="cls-card-name">${c.name}</div><div class="cls-card-sub">${c.subject || '—'}</div></div>
           </div>
-          <div class="cls-card-stats">
-            <div class="cls-card-stat"><div class="cls-card-stat-v">${cnt}</div><div class="cls-card-stat-l">${_T.stu}</div></div>
-            <div class="cls-card-stat"><div class="cls-card-stat-v">${rate!==null?rate+'%':'—'}</div><div class="cls-card-stat-l">حضور اليوم</div></div>
-          </div>
-          <div class="cls-card-att ${att?'done':'pending'}">${att?`<i class="fas fa-circle-check"></i> سُجّل الحضور · ${pres}/${cnt}`:`<i class="fas fa-circle-exclamation"></i> لم يُسجّل الحضور اليوم`}</div>
-          <div class="cls-card-actions">
-            <button class="cls-btn primary" onclick="Router.go('classDetail',{classId:'${c.id}',tab:'att'})"><i class="fas fa-door-open"></i> دخول الفصل</button>
-            <button class="cls-btn icon" onclick="Router.go('grades',{classId:'${c.id}'})" title="الدرجات"><i class="fas fa-star"></i></button>
-            <button class="cls-btn icon" onclick="Pages.shareClassModal('${c.id}')" title="مشاركة"><i class="fas fa-share-alt"></i></button>
-            <button class="cls-btn icon danger" onclick="Pages.deleteClass('${c.id}')" title="حذف"><i class="fas fa-trash"></i></button>
+          <div class="dot-menu-wrap" id="dm-${menuId}">
+            <button class="dot-btn" onclick="Pages._dotToggle('${menuId}',event)" aria-label="مزيد"><i class="fas fa-ellipsis"></i></button>
+            <div class="dot-drop hidden">
+              <button onclick="Pages.addClassModal('${c.id}')"><i class="fas fa-pen"></i> تعديل الفصل</button>
+              <button onclick="Router.go('grades',{classId:'${c.id}'})"><i class="fas fa-star"></i> الدرجات</button>
+              <button onclick="Pages.shareClassModal('${c.id}')"><i class="fas fa-share-alt"></i> مشاركة</button>
+              <button class="danger" onclick="Pages.deleteClass('${c.id}')"><i class="fas fa-trash"></i> حذف</button>
+            </div>
           </div>
         </div>
+        <div class="cls-card-mid">
+          <div class="cls-ring">
+            <svg width="52" height="52" viewBox="0 0 52 52" style="transform:rotate(-90deg)">
+              <circle cx="26" cy="26" r="21" fill="none" stroke="var(--surface-2)" stroke-width="5"></circle>
+              <circle cx="26" cy="26" r="21" fill="none" stroke="${att?clr:'var(--border)'}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${ringDash} ${ringLen}"></circle>
+            </svg>
+            <div class="cls-ring-val${att?'':' pending'}">${att?rate+'%':'—'}</div>
+          </div>
+          <div class="cls-card-info">
+            <div class="cls-card-att-lbl${att?'':' pending'}">${att?`حضور اليوم <b>${pres}/${cnt}</b>`:'لم يُسجَّل الحضور بعد'}</div>
+            <div class="cls-card-stu"><i class="fas fa-users"></i> <b>${cnt}</b> ${_T.stu}</div>
+          </div>
+        </div>
+        <button class="cls-btn primary full" onclick="Router.go('classDetail',{classId:'${c.id}',tab:'att'})"><i class="fas fa-door-open"></i> دخول الفصل</button>
       </div>`;
     }).join('');
 
@@ -5568,7 +5582,7 @@ const App = {
     document.addEventListener('click', e => {
       if (!e.target.closest('.st-avatar-wrap')) document.getElementById('st-avatar-wrap')?.classList.remove('open');
       if (!e.target.closest('.cw-switch')) document.getElementById('cw-switch')?.classList.remove('open');
-      if (!e.target.closest('.dot-menu')) document.querySelectorAll('.dot-drop:not(.hidden)').forEach(d => d.classList.add('hidden'));
+      if (!e.target.closest('.dot-menu-wrap')) document.querySelectorAll('.dot-drop:not(.hidden)').forEach(d => d.classList.add('hidden'));
     });
 
     const { data: { session } } = await _sb.auth.getSession();

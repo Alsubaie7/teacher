@@ -270,29 +270,31 @@ textarea { resize: vertical; min-height: 80px; }
 /* ============================================================
    CLASSES (فصولي) + CLASS WORKSPACE
    ============================================================ */
-.cls-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); gap: 1rem; }
-.cls-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; transition: var(--transition); }
-.cls-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
-.cls-card-top { height: 6px; }
-.cls-card-body { padding: 1.1rem 1.2rem; }
-.cls-card-head { display: flex; align-items: flex-start; gap: .7rem; margin-bottom: 1rem; }
-.cls-card-dot { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-weight: 900; font-size: 1rem; flex-shrink: 0; }
-.cls-card-name { font-weight: 900; font-size: 1.05rem; }
-.cls-card-sub { color: var(--text-muted); font-size: .82rem; margin-top: .15rem; }
-.cls-card-stats { display: flex; gap: .6rem; margin-bottom: 1rem; }
-.cls-card-stat { flex: 1; background: var(--surface-2); border-radius: 10px; padding: .6rem; text-align: center; }
-.cls-card-stat-v { font-weight: 900; font-size: 1.1rem; }
-.cls-card-stat-l { color: var(--text-muted); font-size: .72rem; font-weight: 700; margin-top: .15rem; }
-.cls-card-att { border-radius: 10px; padding: .55rem; text-align: center; font-weight: 800; font-size: .8rem; margin-bottom: 1rem; }
-.cls-card-att.done { background: var(--green-soft); color: var(--green); }
-.cls-card-att.pending { background: var(--red-soft); color: var(--red); }
-.cls-card-actions { display: flex; gap: .5rem; }
+.cls-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 1rem; }
+.cls-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.1rem 1.2rem 1.2rem; transition: var(--transition); }
+.cls-card:hover { border-color: var(--cls-c, var(--primary)); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.cls-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .6rem; margin-bottom: .9rem; }
+.cls-card-id { display: flex; align-items: flex-start; gap: .7rem; min-width: 0; }
+.cls-card-dot { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; font-weight: 900; font-size: .92rem; flex-shrink: 0; }
+.cls-card-name { font-weight: 900; font-size: 1rem; }
+.cls-card-sub { color: var(--text-muted); font-size: .8rem; margin-top: .15rem; }
+
+.cls-card-mid { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.cls-ring { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+.cls-ring-val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 900; }
+.cls-ring-val.pending { color: var(--text-muted); font-size: .62rem; }
+.cls-card-info { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.cls-card-att-lbl { font-size: .78rem; font-weight: 700; color: var(--green); }
+.cls-card-att-lbl b { font-weight: 900; }
+.cls-card-att-lbl.pending { color: var(--gold); }
+.cls-card-stu { font-size: .78rem; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: .35rem; }
+.cls-card-stu b { font-weight: 900; color: var(--text-primary); }
+
 .cls-btn { flex: 1; font-family: inherit; font-weight: 800; font-size: .82rem; padding: .6rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: .4rem; }
 .cls-btn:hover { border-color: var(--primary); color: var(--primary); }
 .cls-btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .cls-btn.primary:hover { background: var(--primary-dark); color: #fff; }
-.cls-btn.icon { flex: 0 0 auto; width: 40px; padding: .6rem 0; }
-.cls-btn.danger:hover { border-color: var(--red); color: var(--red); }
+.cls-btn.full { width: 100%; }
 
 .cw-crumb { color: var(--text-muted); font-size: .82rem; font-weight: 700; margin-bottom: .7rem; }
 .cw-crumb b { color: var(--primary); cursor: pointer; }
@@ -1346,18 +1348,16 @@ select option { background: #fff; color: var(--text-primary); }
   color: var(--text-muted); font-size: 1rem; line-height: 1;
   transition: all var(--transition); cursor: pointer;
 }
-.dot-btn:hover { background: rgba(5,150,105,.07); color: var(--text-secondary); }
+.dot-btn:hover { background: var(--primary-dim); color: var(--text-secondary); }
 .dot-drop {
-  position: absolute; top: calc(100% + 4px); left: 0;
-  background: #fff; border: 1px solid var(--border);
+  position: absolute; top: calc(100% + 4px); inset-inline-end: 0;
+  background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-md);
   min-width: 160px; z-index: 50;
-  opacity: 0; pointer-events: none; transform: translateY(-4px);
-  transition: all var(--transition);
-  font-size: .84rem; font-family: inherit; font-weight: 600; font-size: .84rem;
-  padding:.4rem 0; font-size:.85rem;
+  font-family: inherit; font-weight: 600;
+  padding: .4rem 0; font-size: .85rem;
 }
-.dot-menu-wrap.open .dot-drop { opacity: 1; pointer-events: all; transform: translateY(0); }
+.dot-drop.hidden { display: none; }
 .dot-drop button {
   display: flex; width: 100%; align-items: center; gap: .5rem;
   padding: .48rem .85rem; color: var(--text-secondary); cursor: pointer;
