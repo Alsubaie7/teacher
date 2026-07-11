@@ -1201,6 +1201,72 @@ const Books = {
                   ['تنفيذ','Execution'],['مُلحق','Extention'],['التعليمات','Instruction']]
         }
       ]
+    },
+    {
+      key: 'g5',
+      matchGrade: 'خامس ابتدائي',
+      matchSubject: 'المهارات الرقمية',
+      title: 'المهارات الرقمية',
+      grade: 'الصف الخامس الابتدائي',
+      edition: 'طبعة ١٤٤٧ﻫ',
+      totalPages: 418,
+      units: [
+        { n: 1, title: 'تعلم الأساسيات', part: 1, goals: [], terms: [], lessons: [
+          { n: 1, title: 'أجهزة الحاسب',    from: 15, to: 24, presentation: null, topics: [] },
+          { n: 2, title: 'أجزاء الحاسب',    from: 25, to: 38, presentation: null, topics: [] },
+          { n: 3, title: 'الملفات والمجلدات', from: 39, to: 54, presentation: null, topics: [] }
+        ]},
+        { n: 2, title: 'التعامل مع المستندات', part: 1, goals: [], terms: [], lessons: [
+          { n: 1, title: 'الصور والرسومات',            from: 62, to: 68, presentation: null, topics: [] },
+          { n: 2, title: 'التنسيق المتقدم',            from: 69, to: 80, presentation: null, topics: [] },
+          { n: 3, title: 'إدراج الرسومات التوضيحية',    from: 81, to: 89, presentation: null, topics: [] },
+          { n: 4, title: 'التدقيق والطباعة',           from: 90, to: 96, presentation: null, topics: [] }
+        ]},
+        { n: 3, title: 'الوسائط المتعددة', part: 1, goals: [], terms: [], lessons: [
+          { n: 1, title: 'استخدام أجهزة الالتقاط وتحرير مقاطع الصوت',              from: 103, to: 131, presentation: null, topics: [] },
+          { n: 2, title: 'البحث عن الوسائط المتعددة وإنشاء وتحرير مقاطع الفيديو', from: 132, to: 154, presentation: null, topics: [] }
+        ]},
+        { n: 4, title: 'البرمجة والتفاعل في سكراتش', part: 1, goals: [], terms: [], lessons: [
+          { n: 1, title: 'كيفية تصميم برنامج',   from: 162, to: 169, presentation: null, topics: [] },
+          { n: 2, title: 'الكائنات في سكراتش',   from: 170, to: 181, presentation: null, topics: [] },
+          { n: 3, title: 'المعاملات المنطقية',   from: 182, to: 192, presentation: null, topics: [] },
+          { n: 4, title: 'الحركة في سكراتش',     from: 193, to: 206, presentation: null, topics: [] },
+          { n: 5, title: 'رسائل البث',           from: 207, to: 216, presentation: null, topics: [] },
+          { n: 6, title: 'الاستشعار',            from: 217, to: 224, presentation: null, topics: [] }
+        ]}
+      ]
+    },
+    {
+      key: 'g6',
+      matchGrade: 'سادس ابتدائي',
+      matchSubject: 'المهارات الرقمية',
+      title: 'المهارات الرقمية',
+      grade: 'الصف السادس الابتدائي',
+      edition: 'طبعة ١٤٤٧ﻫ',
+      totalPages: 387,
+      units: [
+        { n: 1, title: 'التصميم ثلاثي الأبعاد', part: 1, goals: [], terms: [], lessons: [
+          { n: 1, title: 'مقدمة إلى النمذجة ثلاثية الأبعاد', from: 12, to: 31, presentation: null, topics: [] },
+          { n: 2, title: 'معالجة الأشكال ثلاثية الأبعاد',    from: 36, to: 52, presentation: null, topics: [] }
+        ]},
+        { n: 2, title: 'جداول البيانات', part: 1, goals: [], terms: [], lessons: [
+          { n: 1, title: 'تنفيذ العمليات الحسابية', from: 61, to: 73, presentation: null, topics: [] },
+          { n: 2, title: 'المخططات البيانية',      from: 79, to: 89, presentation: null, topics: [] }
+        ]},
+        { n: 3, title: 'قواعد البيانات', part: 1, goals: [], terms: [], lessons: [
+          { n: 1, title: 'مقدمة عن قواعد البيانات', from: 97,  to: 101, presentation: null, topics: [] },
+          { n: 2, title: 'إنشاء قاعدة بيانات',      from: 108, to: 113, presentation: null, topics: [] },
+          { n: 3, title: 'الفرز والتصفية',         from: 118, to: 122, presentation: null, topics: [] }
+        ]},
+        { n: 4, title: 'البرمجة باستخدام سكراتش', part: 1, goals: [], terms: [], lessons: [
+          { n: 1, title: 'التكرار في سكراتش',          from: 134, to: 139, presentation: null, topics: [] },
+          { n: 2, title: 'برمجة العمليات الحسابية',     from: 142, to: 150, presentation: null, topics: [] },
+          { n: 3, title: 'اتخاذ القرارات',             from: 153, to: 156, presentation: null, topics: [] },
+          { n: 4, title: 'الإحداثيات في سكراتش',        from: 160, to: 167, presentation: null, topics: [] },
+          { n: 5, title: 'القرارات المركبة في سكراتش',  from: 172, to: 176, presentation: null, topics: [] },
+          { n: 6, title: 'الألعاب في سكراتش',          from: 180, to: 187, presentation: null, topics: [] }
+        ]}
+      ]
     }
   ],
 
@@ -1216,7 +1282,7 @@ const Books = {
 
   // يفتح السبورة الذكية على صفحة محددة في تبويب جديد
   open(bookKey, page) {
-    window.open(`whiteboard.html?p=${page}`, '_blank');
+    window.open(`whiteboard.html?book=${bookKey}&p=${page}`, '_blank');
   },
 
   init() {}

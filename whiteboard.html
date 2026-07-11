@@ -154,7 +154,7 @@ body[data-tool="text"] #draw-canvas{cursor:text}
     <div class="top-bar-right">
       <button class="top-btn back-btn" onclick="goBack()" title="رجوع"><i class="fas fa-arrow-right"></i></button>
       <div class="breadcrumb">
-        <span class="bc-item" onclick="Sidebar.toggle()"><i class="fas fa-book"></i> رابع ابتدائي</span>
+        <span class="bc-item" onclick="Sidebar.toggle()"><i class="fas fa-book"></i> <span id="bc-grade">رابع ابتدائي</span></span>
         <i class="fas fa-chevron-left bc-sep"></i>
         <span class="bc-item active" id="bc-unit">الوحدة الأولى</span>
         <i class="fas fa-chevron-left bc-sep"></i>
@@ -267,36 +267,99 @@ body[data-tool="text"] #draw-canvas{cursor:text}
 <script>
 'use strict';
 
-/* ==================== بيانات المنهج ==================== */
-const BOOK = {
-  dir: 'books/g4/pages',
-  totalPages: 311,
-  units: [
-    { n:'الأولى', title:'تعلم الأساسيات', lessons:[
-      { name:'الدرس الأول: الحاسب',        from:14, to:19, presentation:'presentations/g4/u1-l1.html' },
-      { name:'الدرس الثاني: سطح المكتب',    from:20, to:32, presentation:null },
-      { name:'الدرس الثالث: إعدادات الحاسب', from:33, to:38, presentation:null },
-    ]},
-    { n:'الثانية', title:'العمل على النص', lessons:[
-      { name:'الدرس الأول: لوحة المفاتيح', from:44, to:52, presentation:null },
-      { name:'الدرس الثاني: تحرير النص',   from:53, to:65, presentation:null },
-      { name:'الدرس الثالث: تنسيق النص',   from:66, to:73, presentation:null },
-      { name:'الدرس الرابع: تنسيق الفقرة',  from:74, to:85, presentation:null },
-    ]},
-    { n:'الثالثة', title:'عالمي المتصل', lessons:[
-      { name:'الدرس الأول: الموقع الإلكتروني', from:88,  to:93,  presentation:null },
-      { name:'الدرس الثاني: البحث في الإنترنت', from:94,  to:99,  presentation:null },
-      { name:'الدرس الثالث: مصادر المعلومات',  from:100, to:106, presentation:null },
-      { name:'الدرس الرابع: السلامة على الإنترنت', from:107, to:117, presentation:null },
-    ]},
-    { n:'الرابعة', title:'البرمجة باستخدام سكراتش', lessons:[
-      { name:'الدرس الأول: أساسيات سكراتش',   from:120, to:129, presentation:null },
-      { name:'الدرس الثاني: استخدام اللبنات', from:130, to:140, presentation:null },
-      { name:'الدرس الثالث: التكرارات',       from:141, to:146, presentation:null },
-      { name:'الدرس الرابع: الرسم بسكراتش',    from:147, to:159, presentation:null },
-    ]},
-  ]
+/* ==================== بيانات المناهج ==================== */
+const BOOKS = {
+  g4: {
+    gradeLabel: 'رابع ابتدائي',
+    dir: 'books/g4/pages',
+    totalPages: 311,
+    units: [
+      { n:'الأولى', title:'تعلم الأساسيات', lessons:[
+        { name:'الدرس الأول: الحاسب',        from:14, to:19, presentation:'presentations/g4/u1-l1.html' },
+        { name:'الدرس الثاني: سطح المكتب',    from:20, to:32, presentation:null },
+        { name:'الدرس الثالث: إعدادات الحاسب', from:33, to:38, presentation:null },
+      ]},
+      { n:'الثانية', title:'العمل على النص', lessons:[
+        { name:'الدرس الأول: لوحة المفاتيح', from:44, to:52, presentation:null },
+        { name:'الدرس الثاني: تحرير النص',   from:53, to:65, presentation:null },
+        { name:'الدرس الثالث: تنسيق النص',   from:66, to:73, presentation:null },
+        { name:'الدرس الرابع: تنسيق الفقرة',  from:74, to:85, presentation:null },
+      ]},
+      { n:'الثالثة', title:'عالمي المتصل', lessons:[
+        { name:'الدرس الأول: الموقع الإلكتروني', from:88,  to:93,  presentation:null },
+        { name:'الدرس الثاني: البحث في الإنترنت', from:94,  to:99,  presentation:null },
+        { name:'الدرس الثالث: مصادر المعلومات',  from:100, to:106, presentation:null },
+        { name:'الدرس الرابع: السلامة على الإنترنت', from:107, to:117, presentation:null },
+      ]},
+      { n:'الرابعة', title:'البرمجة باستخدام سكراتش', lessons:[
+        { name:'الدرس الأول: أساسيات سكراتش',   from:120, to:129, presentation:null },
+        { name:'الدرس الثاني: استخدام اللبنات', from:130, to:140, presentation:null },
+        { name:'الدرس الثالث: التكرارات',       from:141, to:146, presentation:null },
+        { name:'الدرس الرابع: الرسم بسكراتش',    from:147, to:159, presentation:null },
+      ]},
+    ]
+  },
+  g5: {
+    gradeLabel: 'خامس ابتدائي',
+    dir: 'books/g5/pages',
+    totalPages: 418,
+    units: [
+      { n:'الأولى', title:'تعلم الأساسيات', lessons:[
+        { name:'الدرس الأول: أجهزة الحاسب',    from:15, to:24, presentation:null },
+        { name:'الدرس الثاني: أجزاء الحاسب',    from:25, to:38, presentation:null },
+        { name:'الدرس الثالث: الملفات والمجلدات', from:39, to:54, presentation:null },
+      ]},
+      { n:'الثانية', title:'التعامل مع المستندات', lessons:[
+        { name:'الدرس الأول: الصور والرسومات',      from:62, to:68, presentation:null },
+        { name:'الدرس الثاني: التنسيق المتقدم',      from:69, to:80, presentation:null },
+        { name:'الدرس الثالث: إدراج الرسومات التوضيحية', from:81, to:89, presentation:null },
+        { name:'الدرس الرابع: التدقيق والطباعة',      from:90, to:96, presentation:null },
+      ]},
+      { n:'الثالثة', title:'الوسائط المتعددة', lessons:[
+        { name:'الدرس الأول: استخدام أجهزة الالتقاط وتحرير مقاطع الصوت', from:103, to:131, presentation:null },
+        { name:'الدرس الثاني: البحث عن الوسائط المتعددة وإنشاء وتحرير مقاطع الفيديو', from:132, to:154, presentation:null },
+      ]},
+      { n:'الرابعة', title:'البرمجة والتفاعل في سكراتش', lessons:[
+        { name:'الدرس الأول: كيفية تصميم برنامج', from:162, to:169, presentation:null },
+        { name:'الدرس الثاني: الكائنات في سكراتش', from:170, to:181, presentation:null },
+        { name:'الدرس الثالث: المعاملات المنطقية', from:182, to:192, presentation:null },
+        { name:'الدرس الرابع: الحركة في سكراتش',   from:193, to:206, presentation:null },
+        { name:'الدرس الخامس: رسائل البث',        from:207, to:216, presentation:null },
+        { name:'الدرس السادس: الاستشعار',         from:217, to:224, presentation:null },
+      ]},
+    ]
+  },
+  g6: {
+    gradeLabel: 'سادس ابتدائي',
+    dir: 'books/g6/pages',
+    totalPages: 387,
+    units: [
+      { n:'الأولى', title:'التصميم ثلاثي الأبعاد', lessons:[
+        { name:'الدرس الأول: مقدمة إلى النمذجة ثلاثية الأبعاد', from:12, to:31, presentation:null },
+        { name:'الدرس الثاني: معالجة الأشكال ثلاثية الأبعاد',    from:36, to:52, presentation:null },
+      ]},
+      { n:'الثانية', title:'جداول البيانات', lessons:[
+        { name:'الدرس الأول: تنفيذ العمليات الحسابية', from:61, to:73, presentation:null },
+        { name:'الدرس الثاني: المخططات البيانية',      from:79, to:89, presentation:null },
+      ]},
+      { n:'الثالثة', title:'قواعد البيانات', lessons:[
+        { name:'الدرس الأول: مقدمة عن قواعد البيانات', from:97,  to:101, presentation:null },
+        { name:'الدرس الثاني: إنشاء قاعدة بيانات',     from:108, to:113, presentation:null },
+        { name:'الدرس الثالث: الفرز والتصفية',        from:118, to:122, presentation:null },
+      ]},
+      { n:'الرابعة', title:'البرمجة باستخدام سكراتش', lessons:[
+        { name:'الدرس الأول: التكرار في سكراتش',         from:134, to:139, presentation:null },
+        { name:'الدرس الثاني: برمجة العمليات الحسابية',   from:142, to:150, presentation:null },
+        { name:'الدرس الثالث: اتخاذ القرارات',           from:153, to:156, presentation:null },
+        { name:'الدرس الرابع: الإحداثيات في سكراتش',      from:160, to:167, presentation:null },
+        { name:'الدرس الخامس: القرارات المركبة في سكراتش', from:172, to:176, presentation:null },
+        { name:'الدرس السادس: الألعاب في سكراتش',         from:180, to:187, presentation:null },
+      ]},
+    ]
+  }
 };
+const BOOK_KEY = new URLSearchParams(location.search).get('book') || 'g4';
+const BOOK = BOOKS[BOOK_KEY] || BOOKS.g4;
 
 const pagePath = p => `${BOOK.dir}/p${String(p).padStart(3,'0')}.webp`;
 
@@ -642,7 +705,9 @@ function openPresentation(){ if (Board._curPres) window.open(Board._curPres, '_b
 
 /* ==================== التشغيل ==================== */
 document.addEventListener('DOMContentLoaded', () => {
-  // صفحة البداية من الرابط: whiteboard.html?p=17
+  // صفحة البداية والكتاب من الرابط: whiteboard.html?book=g5&p=17
+  document.getElementById('bc-grade').textContent = BOOK.gradeLabel;
+  document.title = `السبورة الذكية | المهارات الرقمية — ${BOOK.gradeLabel}`;
   const p = parseInt(new URLSearchParams(location.search).get('p'));
   if (p >= 1 && p <= BOOK.totalPages) currentPage = p;
   Sidebar.build();
