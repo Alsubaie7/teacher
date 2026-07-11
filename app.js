@@ -101,6 +101,12 @@ const GRADE_LEVELS = [
 ];
 const SECTIONS_LETTERS = ['أ','ب','ج','د','هـ','و','ز','ح'];
 const SECTIONS_NUMS    = ['1','2','3','4','5','6','7','8'];
+const _ORDINALS = { 'أول':1, 'ثاني':2, 'ثالث':3, 'رابع':4, 'خامس':5, 'سادس':6 };
+const _classBadge = (gradeLevel, name, section) => {
+  const src  = gradeLevel || name || '';
+  const word = Object.keys(_ORDINALS).find(w => src.includes(w));
+  return `${word ? _ORDINALS[word] : ''}${section || ''}`;
+};
 const _normAr = s => (s || '').split(' ').map(w => w.replace(/^ال/, '')).join(' ').trim().replace(/[اإ]/g, 'أ');
 const _esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const _ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
@@ -2056,7 +2062,7 @@ const Pages = {
 
     const clr = cls.color || '#4f46e5';
     const cnt = list.length;
-    const initials = (((cls.gradeLevel||cls.name||'').replace(/الصف|صف/g,'').trim().replace(/^ال/,'').match(/[ء-ي]/)||[''])[0]) + (cls.section||'');
+    const initials = _classBadge(cls.gradeLevel, cls.name, cls.section);
     const bookTab = Books.forClass(cls)
       ? `<button class="cw-tab ${tab==='book'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'book'})"><i class="fas fa-book-open"></i> الكتاب والعروض</button>`
       : '';
@@ -2347,7 +2353,7 @@ const Pages = {
       const pres = att ? att.records.filter(r => r.status === 'present').length : 0;
       const rate = att && att.records.length ? Math.round(pres/att.records.length*100) : 0;
       const clr  = c.color || '#4f46e5';
-      const initials = (((c.gradeLevel||c.name||'').replace(/الصف|صف/g,'').trim().replace(/^ال/,'').match(/[ء-ي]/)||[''])[0]) + (c.section||'');
+      const initials = _classBadge(c.gradeLevel, c.name, c.section);
       const menuId = `cls-${c.id}`;
       const ringLen = 2 * Math.PI * 21;
       const ringDash = att ? (rate/100*ringLen) : 0;
@@ -3763,7 +3769,7 @@ const Pages = {
     document.getElementById('content').innerHTML = `
       <div class="cw-crumb"><b onclick="Router.go('classes')">فصولي</b> ‹ ${cls.name}</div>
       <div class="cw-head">
-        <div class="cw-avatar" style="background:${cls.color||'#4f46e5'}">${(((cls.gradeLevel||cls.name||'').replace(/الصف|صف/g,'').trim().replace(/^ال/,'').match(/[ء-ي]/)||[''])[0]) + (cls.section||'')}</div>
+        <div class="cw-avatar" style="background:${cls.color||'#4f46e5'}">${_classBadge(cls.gradeLevel, cls.name, cls.section)}</div>
         <div class="cw-title">
           <div class="cw-name">${cls.name}</div>
           <div class="cw-sub">${cls.subject ? cls.subject + ' · ' : ''}${clsStu.length} ${_T.stu}</div>
