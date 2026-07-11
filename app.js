@@ -4993,7 +4993,7 @@ const Pages = {
     const subHtml = `<div class="settings-card">
       <div class="settings-card-hdr"><i class="fas fa-crown"></i> الاشتراك</div>
       <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0">
-        <span style="background:#10b981;color:#fff;padding:.25rem .75rem;border-radius:999px;font-size:.85rem;font-weight:700"><i class="fas fa-infinity"></i> مجاني — بدون قيود</span>
+        <span style="background:var(--green);color:#fff;padding:.25rem .75rem;border-radius:999px;font-size:.85rem;font-weight:700"><i class="fas fa-infinity"></i> مجاني — بدون قيود</span>
       </div>
     </div>`;
 
