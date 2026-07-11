@@ -2096,10 +2096,9 @@ const Pages = {
 
     const content = document.getElementById('content');
     content.innerHTML = header + body;
-    // att tab needs flex layout to fill height
-    content.style.display = tab === 'att' ? 'flex' : '';
-    content.style.flexDirection = tab === 'att' ? 'column' : '';
-    content.style.overflow = tab === 'att' ? 'hidden' : '';
+    content.style.display = '';
+    content.style.flexDirection = '';
+    content.style.overflow = '';
   },
 
   _cdBookBody(cls) {
@@ -2203,16 +2202,6 @@ const Pages = {
   },
 
   _cdAttBody(selId, list, map, selDate) {
-    const cls = DB.get('classes').find(c => c.id === selId) || {};
-    const n = list.length;
-    const cfColors = {
-      present: { bg: '#E2EFDA', color: '#375623', border: '#A9D18E' },
-      late:    { bg: '#FCEACC', color: '#7A4F1C', border: '#F4B942' },
-      absent:  { bg: '#FCE4D6', color: '#9C0006', border: '#FF7676' },
-    };
-    const counts = { present: 0, late: 0, absent: 0 };
-    list.forEach(s => counts[map[s.id] || 'present']++);
-
     if (!list.length) return `
       <div class="cd-att-bar">
         <button class="btn btn-sm btn-outline" onclick="Pages.bulkStudentsModal('${selId}')"><i class="fas fa-list"></i> إضافة جماعية</button>
@@ -2223,104 +2212,50 @@ const Pages = {
         <button class="btn btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة ${_T.stu}</button>
       </div>`;
 
+    const counts = { present: 0, late: 0, absent: 0 };
+    list.forEach(s => counts[map[s.id] || 'present']++);
+
     const rows = list.map((s, i) => {
       const st = map[s.id] || 'present';
-      const cf = cfColors[st];
-      const warns = _behWarn(s);
-      const attBtns = ['present','late','absent'].map(key => {
-        const active = st === key;
-        const kc = cfColors[key];
-        const icon = key==='present'?'✓':key==='late'?'⏰':'✗';
-        return `<button id="ar-att-${s.id}-${key}"
-          onclick="Pages.setAtt('${s.id}','${key}','${selId}','${selDate}')"
-          style="width:26px;height:26px;border-radius:3px;font-size:.65rem;font-weight:900;
-            border:1.5px solid ${active?kc.border:'#C0C0C0'};
-            background:${active?kc.bg:'#fff'};color:${active?kc.color:'#aaa'};
-            cursor:pointer;transition:all .1s;font-family:inherit;padding:0">
-          ${icon}</button>`;
+      const seg = ['present','late','absent'].map(key => {
+        const lbl = { present:'حاضر', late:'متأخر', absent:'غائب' }[key];
+        return `<button id="ar-att-${s.id}-${key}" class="att2-seg att2-seg-${key} ${st===key?'active':''}" onclick="Pages.setAtt('${s.id}','${key}')">${lbl}</button>`;
       }).join('');
-      const behCells = BEH_TYPES.map(b => {
+      const behs = BEH_TYPES.map(b => {
         const val = s.behaviors?.[b.key] || 0;
-        return `<td class="xl-cell" style="text-align:center;padding:2px 4px;cursor:pointer;
-            background:${val>0?(b.pos?'#E2EFDA':'#FCE4D6'):'transparent'}"
-          onclick="Pages.incBehavior('${s.id}','${b.key}','${selId}')" title="${b.label}">
-          <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-            <span style="font-size:.9rem;line-height:1">${b.emoji}</span>
-            <span id="beh-${s.id}-${b.key}" style="font-size:.6rem;font-weight:800;
-              color:${b.pos?'#375623':'#9C0006'}">${val||''}</span>
-          </div></td>`;
+        return `<span class="att2-beh" onclick="Pages.incBehavior('${s.id}','${b.key}','${selId}')" title="${b.label}">${b.emoji}<span class="att2-beh-count" id="beh-${s.id}-${b.key}" style="color:${b.color}">${val||''}</span></span>`;
       }).join('');
-      const warnCell = warns.length
-        ? `<td class="xl-cell" style="text-align:center;cursor:default" title="${warns.map(b=>b.label).join('، ')}"><span style="font-size:.75rem">⚠️</span></td>`
-        : `<td class="xl-cell"></td>`;
-      return `<tr id="ar-${s.id}" style="background:${cf.bg}">
-        <td class="xl-rownum">${i+2}</td>
-        <td class="xl-cell" style="font-weight:700;color:${cf.color};white-space:nowrap;cursor:pointer"
-          onclick="Pages.studentProfile('${s.id}')">${s.name}</td>
-        <td class="xl-cell" style="padding:3px 5px">
-          <div style="display:flex;gap:2px;align-items:center;justify-content:center">${attBtns}</div>
-        </td>
-        ${behCells}
-        ${warnCell}
+      const warn = _behWarn(s).length ? `<i class="fas fa-triangle-exclamation att2-warn" title="${_behWarn(s).map(b=>b.label).join('، ')}"></i>` : '';
+      return `<tr id="ar-${s.id}" class="att2-row att2-${st}">
+        <td style="color:var(--text-muted);font-size:.8rem;width:36px">${i+1}</td>
+        <td><div class="att2-stu" onclick="Pages.studentProfile('${s.id}')"><span class="att2-ini">${s.name.charAt(0)}</span><span class="att2-name">${s.name}${warn}</span></div></td>
+        <td><div class="att2-seg-wrap">${seg}</div></td>
+        <td><div class="att2-behs">${behs}</div></td>
       </tr>`;
     }).join('');
-      const mkBadge = b => `
-        <button onclick="Pages.incBehavior('${s.id}','${b.key}','${selId}')" title="${b.label}"
-          style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;
-                 padding:5px 7px;border-radius:10px;border:1.5px solid ${b.color}30;
-                 background:${b.color}12;cursor:pointer;transition:all .15s;min-width:38px"
-          onmouseover="this.style.background='${b.color}28';this.style.transform='translateY(-1px)'"
-          onmouseout="this.style.background='${b.color}12';this.style.transform='none'">
-          ${_bIcon(b)}
-          <span id="beh-${s.id}-${b.key}" style="font-size:.7rem;font-weight:800;color:${b.color};line-height:1">${behs[b.key]||0}</span>
-        </button>`;
-    return `<div style="display:flex;flex-direction:column;height:100%;font-size:.8rem">
-      <div class="xl-titlebar" style="display:flex;align-items:center;gap:.5rem;padding:.45rem .8rem;flex-wrap:wrap;flex-shrink:0">
-        <div class="xl-title-icon">X</div>
-        <div class="xl-title-filename">حضور_${cls.name||'فصل'}.xlsx</div>
-        <input type="date" class="date-input" value="${selDate}" style="margin-right:.3rem;font-size:.75rem;padding:2px 6px"
-          onchange="Pages.classDetail({classId:'${selId}',tab:'att',date:this.value})">
-        <div style="margin-right:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
-          <span id="ar-cnt-present" style="background:#E2EFDA;color:#375623;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #A9D18E">✓ ${counts.present} حاضر</span>
-          <span id="ar-cnt-late"    style="background:#FCEACC;color:#7A4F1C;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #F4B942">⏰ ${counts.late} متأخر</span>
-          <span id="ar-cnt-absent"  style="background:#FCE4D6;color:#9C0006;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;border:1px solid #FF7676">✗ ${counts.absent} غائب</span>
-          <button onclick="Pages.markAll('present')" style="background:#fff;border:1px solid #C0C0C0;padding:3px 10px;border-radius:4px;font-size:.72rem;cursor:pointer;font-family:inherit"><i class="fas fa-check-double"></i> حضور الكل</button>
-          <button onclick="Pages.markAll('absent')" style="background:#fff;border:1px solid #C0C0C0;padding:3px 10px;border-radius:4px;font-size:.72rem;cursor:pointer;font-family:inherit"><i class="fas fa-times"></i> غياب الكل</button>
-          <button onclick="Pages.diceRoll('${selId}')" style="background:#fff;border:1px solid #C0C0C0;padding:3px 8px;border-radius:4px;font-size:.72rem;cursor:pointer;font-family:inherit"><i class="fas fa-dice"></i></button>
-          <button onclick="Print.attendance('${selId}','${selDate}')" style="background:#fff;border:1px solid #C0C0C0;padding:3px 8px;border-radius:4px;font-size:.72rem;cursor:pointer;font-family:inherit"><i class="fas fa-print"></i></button>
+
+    return `
+      <div class="att2-toolbar">
+        <div class="att2-date"><i class="fas fa-calendar-alt"></i><input type="date" value="${selDate}" onchange="Pages.classDetail({classId:'${selId}',tab:'att',date:this.value})"></div>
+        <button class="att2-tool-btn" onclick="Pages.markAll('present')"><i class="fas fa-check-double"></i> تحضير الكل</button>
+        <button class="att2-tool-btn" onclick="Pages.markAll('absent')"><i class="fas fa-user-xmark"></i> تغييب الكل</button>
+        <button class="att2-tool-btn" onclick="Pages.diceRoll('${selId}')" title="اختيار عشوائي"><i class="fas fa-dice"></i></button>
+        <button class="att2-tool-btn" onclick="Print.attendance('${selId}','${selDate}')" title="طباعة"><i class="fas fa-print"></i></button>
+        <div class="att2-chips">
+          <span class="att2-chip p" id="ar-cnt-present">حاضر ${counts.present}</span>
+          <span class="att2-chip l" id="ar-cnt-late">متأخر ${counts.late}</span>
+          <span class="att2-chip a" id="ar-cnt-absent">غائب ${counts.absent}</span>
         </div>
       </div>
-      <div class="xl-formulabar" style="flex-shrink:0">
-        <div class="xl-fb-cellref">B${n+1}</div>
-        <div class="xl-fb-sep"></div>
-        <span class="xl-fb-fx">fx</span>
-        <div class="xl-fb-formula">=COUNTIF(B2:B${n+1},"حاضر")</div>
-      </div>
-      <div style="overflow:auto;flex:1">
-        <table class="xl-table" style="width:100%">
-          <thead>
-            <tr>
-              <td class="xl-col-hdr-cell corner"></td>
-              <td class="xl-col-hdr-cell">A</td>
-              <td class="xl-col-hdr-cell">B</td>
-              ${BEH_TYPES.map((_,i)=>`<td class="xl-col-hdr-cell">${String.fromCharCode(67+i)}</td>`).join('')}
-              <td class="xl-col-hdr-cell">K</td>
-            </tr>
-            <tr style="background:#F2F2F2">
-              <td class="xl-rownum">1</td>
-              <td class="xl-cell label">الاسم</td>
-              <td class="xl-cell label" style="text-align:center;font-size:.72rem">الحضور</td>
-              ${BEH_TYPES.map(b=>`<td class="xl-cell label" style="text-align:center;padding:2px 4px" title="${b.label}">${b.emoji}</td>`).join('')}
-              <td class="xl-cell label" style="text-align:center;font-size:.72rem">تنبيه</td>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      <div style="padding:.3rem .8rem;font-size:.72rem;color:#888;border-top:1px solid #E0E0E0;background:#FAFAFA;flex-shrink:0">
-        <i class="fas fa-cloud" style="color:#1D6F42"></i> يُحفظ تلقائياً عند كل تغيير
-      </div>
-    </div>`;
+      <div class="att2-card">
+        <div class="att2-scroll">
+          <table class="att2-table">
+            <thead><tr><th style="width:36px">#</th><th>الطالب</th><th>الحضور</th><th>السلوك اليوم</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div class="att2-foot"><i class="fas fa-cloud"></i> يُحفظ تلقائياً عند كل تغيير</div>
+      </div>`;
   },
 
   _cdGroupsBody(selId, saved) {
