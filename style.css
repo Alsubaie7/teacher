@@ -640,7 +640,7 @@ textarea { resize: vertical; min-height: 80px; }
 .table-container { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
 .data-table th {
-  background: rgba(5,150,105,.04); padding: .65rem 1rem; font-weight: 700;
+  background: rgba(79,70,229,.04); padding: .65rem 1rem; font-weight: 700;
   color: var(--text-muted); text-align: right;
   border-bottom: 1px solid var(--border);
   white-space: nowrap; text-transform: uppercase; letter-spacing: .04em; font-size: .73rem;
@@ -650,7 +650,7 @@ textarea { resize: vertical; min-height: 80px; }
   vertical-align: middle; color: var(--text-secondary);
 }
 .data-table td:first-child { color: var(--text-primary); }
-.data-table tbody tr:hover td { background: rgba(5,150,105,.04); }
+.data-table tbody tr:hover td { background: rgba(79,70,229,.04); }
 .data-table tbody tr:last-child td { border-bottom: none; }
 .student-name-cell { display: flex; align-items: center; gap: .6rem; font-weight: 600; color: var(--text-primary); min-width: 120px; white-space: nowrap; }
 .student-avatar-sm {
@@ -1006,7 +1006,7 @@ textarea { resize: vertical; min-height: 80px; }
 
 /* Header banner */
 .profile-banner {
-  background: linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%);
+  background: linear-gradient(135deg, #3730a3 0%, #4338ca 50%, #4f46e5 100%);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding: 1.5rem 1.5rem 3.2rem;
   position: relative; margin: -1.1rem -1.1rem 0;
