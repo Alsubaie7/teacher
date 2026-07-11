@@ -321,6 +321,44 @@ textarea { resize: vertical; min-height: 80px; }
 }
 
 /* ============================================================
+   ATTENDANCE + BEHAVIOR (clean, replaces excel)
+   ============================================================ */
+.att2-toolbar { display: flex; align-items: center; gap: .7rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.att2-date { display: flex; align-items: center; gap: .5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: .45rem .8rem; font-weight: 800; font-size: .85rem; color: var(--text-secondary); }
+.att2-date input { border: none; background: none; font-family: inherit; font-weight: 800; color: var(--text-primary); font-size: .85rem; }
+.att2-tool-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .8rem; font-weight: 800; font-size: .8rem; cursor: pointer; font-family: inherit; color: var(--text-secondary); display: flex; align-items: center; gap: .4rem; }
+.att2-tool-btn:hover { border-color: var(--primary); color: var(--primary); }
+.att2-chips { display: flex; gap: .5rem; margin-inline-start: auto; flex-wrap: wrap; }
+.att2-chip { border-radius: 10px; padding: .45rem .8rem; font-weight: 800; font-size: .8rem; }
+.att2-chip.p { background: var(--green-soft); color: var(--green); }
+.att2-chip.l { background: var(--orange-soft); color: var(--orange); }
+.att2-chip.a { background: var(--red-soft); color: var(--red); }
+.att2-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.att2-scroll { overflow-x: auto; }
+.att2-table { width: 100%; border-collapse: collapse; }
+.att2-table thead th { text-align: right; font-size: .76rem; color: var(--text-muted); font-weight: 800; padding: .8rem 1rem; background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.att2-table td { padding: .6rem 1rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+.att2-table tbody tr:last-child td { border-bottom: 0; }
+.att2-row.att2-absent { background: rgba(220,38,38,.05); }
+.att2-row.att2-late { background: rgba(217,119,6,.05); }
+.att2-stu { display: flex; align-items: center; gap: .6rem; cursor: pointer; }
+.att2-ini { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; font-weight: 800; font-size: .8rem; flex-shrink: 0; }
+.att2-name { font-weight: 800; font-size: .9rem; white-space: nowrap; }
+.att2-seg-wrap { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.att2-seg { padding: .42rem .85rem; font-weight: 800; font-size: .78rem; color: var(--text-muted); cursor: pointer; background: var(--surface); border: none; border-inline-start: 1px solid var(--border); font-family: inherit; white-space: nowrap; }
+.att2-seg:first-child { border-inline-start: none; }
+.att2-seg.att2-seg-present.active { background: var(--green); color: #fff; }
+.att2-seg.att2-seg-late.active { background: var(--orange); color: #fff; }
+.att2-seg.att2-seg-absent.active { background: var(--red); color: #fff; }
+.att2-behs { display: flex; gap: .35rem; flex-wrap: wrap; }
+.att2-beh { display: inline-flex; align-items: center; gap: .25rem; border: 1px solid var(--border); border-radius: 999px; padding: .25rem .5rem; cursor: pointer; background: var(--surface); transition: var(--transition); font-size: .85rem; line-height: 1; }
+.att2-beh:hover { border-color: var(--primary); background: var(--surface-hover); }
+.att2-beh-count { font-weight: 900; font-size: .72rem; min-width: .5rem; }
+.att2-warn { color: var(--red); margin-inline-start: .35rem; font-size: .78rem; }
+.att2-foot { padding: .6rem 1rem; color: var(--text-muted); font-size: .78rem; font-weight: 700; background: var(--surface-2); border-top: 1px solid var(--border); display: flex; align-items: center; gap: .4rem; }
+.att2-foot i { color: var(--green); }
+
+/* ============================================================
    SETUP / AUTH SCREEN
    ============================================================ */
 .setup-overlay {
