@@ -1097,6 +1097,7 @@ const Books = {
             ]}
           ],
           project: 39,
+          review: 'presentations/g4/u1-review.html',
           terms: [['لوحة المفاتيح','Keyboard'],['شاشة','Monitor'],['صندوق الحاسب','Computer case'],
                   ['دقة الشاشة','Screen resolution'],['مكبر الصوت','Speaker'],['كاميرا الويب','Webcam'],
                   ['ملف','File'],['مجلد','Folder'],['سلة المحذوفات','Recycle bin']]
@@ -2198,6 +2199,14 @@ const Pages = {
         </div>` : `
         <div class="empty-state" style="padding:2rem"><div class="empty-icon"><i class="fas fa-hourglass-half"></i></div>
         <h3>محتوى هذه الوحدة قيد الإعداد</h3></div>`}
+
+        ${unit.review ? `
+        <div class="bk-card">
+          <div class="bk-card-hd"><i class="fas fa-rotate" style="color:var(--primary)"></i> مراجعة الوحدة</div>
+          <div class="bk-lactions">
+            <a class="btn btn-sm btn-primary" href="${unit.review}" target="_blank"><i class="fas fa-play"></i> عرض مراجعة الوحدة ${_ar(unit.n)}</a>
+          </div>
+        </div>` : ''}
 
         ${terms ? `
         <div class="bk-card">
