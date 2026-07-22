@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="style.css?v=27">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="theme-color" content="#4f46e5">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="منصة المعلم">
@@ -17,7 +21,7 @@
   <!-- Setup Screen -->
   <div id="setup-screen" class="setup-overlay">
     <div class="setup-card">
-      <div class="setup-logo"><i class="fas fa-chalkboard-teacher"></i></div>
+      <div class="setup-logo"><svg viewBox="0 0 512 512" width="34" height="34" role="img" aria-label="منصة المعلم"><g transform="translate(137.481,287.264) scale(0.40868,-0.40868)" fill="#ffffff"><path d="M182 139Q168 183 168 234Q168 346 229 410Q284 468 373 468Q464 468 515 410Q560 359 560 279V154Q559 80 508.5 40.0Q458 0 366 0H223Q191 0 178.0 -13.0Q165 -26 165 -58V-238L20 -315V-51Q20 34 70 86Q113 131 182 139ZM415 179V283Q415 332 373 332Q311 332 311 239Q311 140 372 140Q415 140 415 179Z"/></g></svg></div>
       <h1>منصة المعلم</h1>
       <p class="setup-sub">Teacher Platform — نظام إدارة الفصل الدراسي</p>
       <form id="setup-form" data-mode="login">
@@ -81,7 +85,7 @@
     <!-- Sidebar (right in RTL) -->
     <aside class="side-nav" id="side-nav">
       <div class="sn-brand" onclick="Router.go('dashboard')" title="الرئيسية">
-        <div class="sn-logo"><i class="fas fa-chalkboard-teacher"></i></div>
+        <div class="sn-logo"><svg viewBox="0 0 512 512" width="20" height="20" role="img" aria-label="منصة المعلم"><g transform="translate(137.481,287.264) scale(0.40868,-0.40868)" fill="#ffffff"><path d="M182 139Q168 183 168 234Q168 346 229 410Q284 468 373 468Q464 468 515 410Q560 359 560 279V154Q559 80 508.5 40.0Q458 0 366 0H223Q191 0 178.0 -13.0Q165 -26 165 -58V-238L20 -315V-51Q20 34 70 86Q113 131 182 139ZM415 179V283Q415 332 373 332Q311 332 311 239Q311 140 372 140Q415 140 415 179Z"/></g></svg></div>
         <span class="sn-brand-name">منصة المعلم</span>
       </div>
       <nav class="sn-links">
