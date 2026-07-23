@@ -1147,23 +1147,24 @@ const Books = {
             'كيفية الحماية من مخاطر الإنترنت.'
           ],
           lessons: [
-            { n: 1, title: 'الموقع الإلكتروني', from: 88, to: 93, presentation: null, topics: [
+            { n: 1, title: 'الموقع الإلكتروني', from: 88, to: 93, presentation: 'presentations/g4/u3-l1.html', topics: [
               ['الإنترنت',88],['متصفح المواقع الإلكترونية',88],['زيارة موقع إلكتروني',89],
               ['عرض المعلومات داخل الصفحة',90],['الانتقال إلى صفحات أخرى مرتبطة',90],['لنطبق معاً',91,1]
             ]},
-            { n: 2, title: 'البحث في الإنترنت', from: 94, to: 99, presentation: null, topics: [
+            { n: 2, title: 'البحث في الإنترنت', from: 94, to: 99, presentation: 'presentations/g4/u3-l2.html', topics: [
               ['أدوات المتصفح',94],['البحث في الإنترنت',95],['لنطبق معاً',96,1]
             ]},
-            { n: 3, title: 'مصادر المعلومات', from: 100, to: 106, presentation: null, topics: [
+            { n: 3, title: 'مصادر المعلومات', from: 100, to: 106, presentation: 'presentations/g4/u3-l3.html', topics: [
               ['المعلومات الموثوقة',100],['أمثلة لبعض المواقع الإلكترونية الموثوقة',100],
               ['تحقق من حداثة المعلومات',101],['نسخ المعلومات',102],['احترم عمل الآخرين',102],
               ['لنطبق معاً',103,1]
             ]},
-            { n: 4, title: 'السلامة على الإنترنت', from: 107, to: 117, presentation: null, topics: [
+            { n: 4, title: 'السلامة على الإنترنت', from: 107, to: 117, presentation: 'presentations/g4/u3-l4.html', topics: [
               ['أخلاقيات التواصل عبر الإنترنت',107],['كن حذراً',107],['الفيروسات',109],['لنطبق معاً',110,1]
             ]}
           ],
           project: 114,
+          review: 'presentations/g4/u3-review.html',
           terms: [['حقوق النشر','Copyright'],['الأمان','Safety'],['محرك بحث','Search Engine'],
                   ['متصفح الموقع الإلكتروني','Web Browser'],['شريط العنوان','Address Bar'],
                   ['مكافحة الفيروسات','Antivirus'],['مدونة','Blog'],['غرف الدردشة','Chat Room']]
@@ -1183,26 +1184,27 @@ const Books = {
             'إنشاء نسخة باستخدام لبنة اطبع.'
           ],
           lessons: [
-            { n: 1, title: 'أساسيات سكراتش', from: 120, to: 129, presentation: null, topics: [
+            { n: 1, title: 'أساسيات سكراتش', from: 120, to: 129, presentation: 'presentations/g4/u4-l1.html', topics: [
               ['الخوارزمية',120],['مثال من حياتنا اليومية',121],['سكراتش',122],
               ['العمل عبر الإصدار المتوفر على الإنترنت',123],['شريط الأدوات',124],['منطقة البرمجة',124],
               ['الكائن',124],['المنصة',125],['تغيير موقع الكائن',125],['الخلفية',126],['حفظ عملك',128],
               ['لنطبق معاً',128,1]
             ]},
-            { n: 2, title: 'استخدام اللبنات الأساسية', from: 130, to: 140, presentation: null, topics: [
+            { n: 2, title: 'استخدام اللبنات الأساسية', from: 130, to: 140, presentation: 'presentations/g4/u4-l2.html', topics: [
               ['لوحة اللبنات',130],['إنشاء مقطعك البرمجي الأول',131],['لبنة التحدث (قل)',131],
               ['تحرير المقطع البرمجي',134],['لبنة بدء الحركة',135],['دوران الكائن',136],
               ['المؤثرات الصوتية',137],['لنطبق معاً',139,1]
             ]},
-            { n: 3, title: 'التكرارات في سكراتش', from: 141, to: 146, presentation: null, topics: [
+            { n: 3, title: 'التكرارات في سكراتش', from: 141, to: 146, presentation: 'presentations/g4/u4-l3.html', topics: [
               ['لبنة كرّر',141],['لبنة انتظر ( ) ثانية',143],['جمع اللبنات',144],['لنطبق معاً',145,1]
             ]},
-            { n: 4, title: 'الرسم بواسطة سكراتش', from: 147, to: 159, presentation: null, topics: [
+            { n: 4, title: 'الرسم بواسطة سكراتش', from: 147, to: 159, presentation: 'presentations/g4/u4-l4.html', topics: [
               ['إضافة القلم في سكراتش',147],['أداة القلم',148],['إضافة الألوان إلى رسوماتك',150],
               ['لبنة حجم القلم',151],['رسم الأشكال',152],['لبنة اطبع',154],['لنطبق معاً',155,1]
             ]}
           ],
           project: 157,
+          review: 'presentations/g4/u4-review.html',
           terms: [['حلقة','Loop'],['القلم','Pen'],['المشكلة','Problem'],['البرنامج','Program'],
                   ['التكرار','Repeatition'],['الكائن','Sprite'],['المنصة','Stage'],['الخوارزمية','Algorithm'],
                   ['الخلفية','Backdrop'],['اللبنة','Block'],['المقطع البرمجي','Code'],['الحدث','Event'],
@@ -1216,25 +1218,26 @@ const Books = {
             'استخدام مقاطع الفيديو والأصوات في العروض التقديمية.'
           ],
           lessons: [
-            { n: 1, title: 'الشرائح التقديمية', from: 176, to: 188, presentation: null, topics: [
+            { n: 1, title: 'الشرائح التقديمية', from: 176, to: 188, presentation: 'presentations/g4/part2/u1-l1.html', topics: [
               ['إنشاء عرض تقديمي باستخدام شرائح جديدة',176],['تصميم شرائح العرض التقديمي',178],
               ['حفظ عرض تقديمي',179],['فتح عرض تقديمي',180],['شريحة العنوان',181],
               ['إضافة المحتوى',182],['إضافة المزيد على النص',183],['إدراج نص WordArt',184],
               ['لنطبق معاً',186,1]
             ]},
-            { n: 2, title: 'إدراج الصور', from: 189, to: 197, presentation: null, topics: [
+            { n: 2, title: 'إدراج الصور', from: 189, to: 197, presentation: 'presentations/g4/part2/u1-l2.html', topics: [
               ['إدراج الصور في العرض التقديمي',189],['تغيير حجم، ونقل وتدوير العناصر في العرض التقديمي',191],
               ['تطبيق نمط الصورة',194],['لنطبق معاً',196,1]
             ]},
-            { n: 3, title: 'الانتقالات وتأثيرات الحركة', from: 198, to: 202, presentation: null, topics: [
+            { n: 3, title: 'الانتقالات وتأثيرات الحركة', from: 198, to: 202, presentation: 'presentations/g4/part2/u1-l3.html', topics: [
               ['الانتقالات',198],['ضبط التوقيت',199],['تأثيرات الحركة',200],['لنطبق معاً',202,1]
             ]},
-            { n: 4, title: 'إدراج مقاطع فيديو', from: 203, to: 212, presentation: null, topics: [
+            { n: 4, title: 'إدراج مقاطع فيديو', from: 203, to: 212, presentation: 'presentations/g4/part2/u1-l4.html', topics: [
               ['إدراج مقاطع الفيديو',203],['كيفية تشغيل العرض التقديمي',204],['ترتيب الشرائح بالشكل الصحيح',206],
               ['ملاحظات',207],['نصائح لتقديم عرض رائع',208],['لنطبق معاً',209,1]
             ]}
           ],
           project: 213,
+          review: 'presentations/g4/part2/u1-review.html',
           terms: [['إدراج','Insert'],['نقل','Move'],['صور عبر الإنترنت','Online pictures'],['فتح','Open'],
                   ['صور','Pictures'],['تقديم','Present'],['عرض تقديمي','Presentation'],['تغيير الحجم','Resize'],
                   ['تدوير','Rotate'],['شريحة','Slide']]
@@ -1246,15 +1249,16 @@ const Books = {
             'إجراء العمليات الحسابية في جداول البيانات.'
           ],
           lessons: [
-            { n: 1, title: 'جدول البيانات', from: 218, to: 225, presentation: null, topics: [
+            { n: 1, title: 'جدول البيانات', from: 218, to: 225, presentation: 'presentations/g4/part2/u2-l1.html', topics: [
               ['فتح مايكروسوفت إكسل',218],['جدول البيانات',218],['لنطبق معاً',221,1]
             ]},
-            { n: 2, title: 'إدخال البيانات وإجراء العمليات الحسابية البسيطة', from: 226, to: 238, presentation: null, topics: [
+            { n: 2, title: 'إدخال البيانات وإجراء العمليات الحسابية البسيطة', from: 226, to: 238, presentation: 'presentations/g4/part2/u2-l2.html', topics: [
               ['تغيير اتجاه ورقة العمل في الإكسل',226],['إدخال البيانات في الإكسل',227],
               ['إجراء العمليات الحسابية في الإكسل',228],['لنطبق معاً',230,1]
             ]}
           ],
           project: 239,
+          review: 'presentations/g4/part2/u2-review.html',
           terms: [['الخلية النشطة','Active Cell'],['الحساب','Calculation'],['الخلية','Cell'],
                   ['العمود','Column'],['الصيغة','Formula'],['شريط الصيغة','Formula Bar'],['الشبكة','Grid'],
                   ['الصف','Row'],['جدول البيانات','Spreadsheet']]
@@ -1266,20 +1270,21 @@ const Books = {
             'استخدام بعض المؤثرات الخاصة التي تجعل الصور تبدو أفضل.'
           ],
           lessons: [
-            { n: 1, title: 'إنشاء مقطع صوتي', from: 244, to: 249, presentation: null, topics: [
+            { n: 1, title: 'إنشاء مقطع صوتي', from: 244, to: 249, presentation: 'presentations/g4/part2/u3-l1.html', topics: [
               ['تسجيل مقطع صوتي',244],['تشغيل مقطع صوتي',245],['لنطبق معاً',246,1]
             ]},
-            { n: 2, title: 'عرض الصور ومقاطع الفيديو', from: 250, to: 256, presentation: null, topics: [
+            { n: 2, title: 'عرض الصور ومقاطع الفيديو', from: 250, to: 256, presentation: 'presentations/g4/part2/u3-l2.html', topics: [
               ['عرض الصور',250],['عرض مقطع فيديو',251],['لنطبق معاً',252,1]
             ]},
-            { n: 3, title: 'إدخال التحسينات على الصورة', from: 257, to: 264, presentation: null, topics: [
+            { n: 3, title: 'إدخال التحسينات على الصورة', from: 257, to: 264, presentation: 'presentations/g4/part2/u3-l3.html', topics: [
               ['إزالة العين الحمراء',257],['تحسين الصور',258],['التدوير',259],['القص',260],['لنطبق معاً',261,1]
             ]},
-            { n: 4, title: 'تطبيق التأثيرات على الصور', from: 265, to: 269, presentation: null, topics: [
+            { n: 4, title: 'تطبيق التأثيرات على الصور', from: 265, to: 269, presentation: 'presentations/g4/part2/u3-l4.html', topics: [
               ['تعديلات اللون والإضاءة',266],['لنطبق معاً',267,1]
             ]}
           ],
           project: 270,
+          review: 'presentations/g4/part2/u3-review.html',
           terms: [['تعديل','Adjustment'],['قص','Crop'],['تأثير','Effect'],['تعرض','Exposure'],
                   ['إصلاح','Fix'],['رسمة توضيحية','Illustration'],['تحسين','Improvement'],
                   ['إيقاف مؤقت','Pause'],['تشغيل','Play'],['تسجيل','Record'],
@@ -1296,15 +1301,16 @@ const Books = {
             'برمجة الروبوت للانعطاف.'
           ],
           lessons: [
-            { n: 1, title: 'مقدمة في علم الروبوت', from: 276, to: 291, presentation: null, topics: [
+            { n: 1, title: 'مقدمة في علم الروبوت', from: 276, to: 291, presentation: 'presentations/g4/part2/u4-l1.html', topics: [
               ['الروبوت',276],['روبوت ليجو مايند ستورم',276],['بيئة أوبن روبيرتا لاب',278],
               ['البرمجة في أوبن روبيرتا لاب',285],['لنطبق معاً',290,1]
             ]},
-            { n: 2, title: 'انعطاف الروبوت', from: 292, to: 299, presentation: null, topics: [
+            { n: 2, title: 'انعطاف الروبوت', from: 292, to: 299, presentation: 'presentations/g4/part2/u4-l2.html', topics: [
               ['إنشاء مشروع جديد',292],['التحكم باتجاه الروبوت',293],['لنطبق معاً',296,1]
             ]}
           ],
           project: 300,
+          review: 'presentations/g4/part2/u4-review.html',
           terms: [['المقطع البرمجي','Code'],['مستشعر الألوان','Color sensor'],
                   ['مستشعر الجيروسكوب','Gyroscope sensor'],['المحرك','Motor'],['محركات','Motors'],
                   ['قاعدة الروبوت','Robot base'],['روبوت','Robot'],['عرض المحاكاة','Simulation view'],
