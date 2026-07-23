@@ -41,6 +41,8 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);ove
 .sidebar-content{flex:1;overflow-y:auto;padding:12px}
 .sidebar-content::-webkit-scrollbar{width:4px}
 .sidebar-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.part-group{margin-bottom:16px}
+.part-header{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
 .unit-group{margin-bottom:8px}
 .unit-title{display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(255,255,255,.04);border-radius:10px;cursor:pointer;font-weight:700;font-size:13.5px;transition:all .2s;border:1px solid transparent}
 .unit-title:hover{background:rgba(255,255,255,.07);border-color:var(--border)}
@@ -274,30 +276,50 @@ const BOOKS = {
     dir: 'books/g4/pages',
     totalPages: 311,
     units: [
-      { n:'الأولى', title:'تعلم الأساسيات', lessons:[
+      { n:'الأولى', title:'تعلم الأساسيات', part:1, lessons:[
         { name:'الدرس الأول: الحاسب',        from:14, to:19, presentation:'presentations/g4/u1-l1.html' },
         { name:'الدرس الثاني: سطح المكتب',    from:20, to:32, presentation:'presentations/g4/u1-l2.html' },
         { name:'الدرس الثالث: إعدادات الحاسب', from:33, to:38, presentation:'presentations/g4/u1-l3.html' },
         { name:'مراجعة الوحدة الأولى',        from:38, to:38, presentation:'presentations/g4/u1-review.html' },
       ]},
-      { n:'الثانية', title:'العمل على النص', lessons:[
+      { n:'الثانية', title:'العمل على النص', part:1, lessons:[
         { name:'الدرس الأول: لوحة المفاتيح', from:44, to:52, presentation:'presentations/g4/u2-l1.html' },
         { name:'الدرس الثاني: تحرير النص',   from:53, to:65, presentation:'presentations/g4/u2-l2.html' },
         { name:'الدرس الثالث: تنسيق النص',   from:66, to:73, presentation:'presentations/g4/u2-l3.html' },
         { name:'الدرس الرابع: تنسيق الفقرة',  from:74, to:85, presentation:'presentations/g4/u2-l4.html' },
         { name:'مراجعة الوحدة الثانية',      from:85, to:85, presentation:'presentations/g4/u2-review.html' },
       ]},
-      { n:'الثالثة', title:'عالمي المتصل', lessons:[
+      { n:'الثالثة', title:'عالمي المتصل', part:1, lessons:[
         { name:'الدرس الأول: الموقع الإلكتروني', from:88,  to:93,  presentation:null },
         { name:'الدرس الثاني: البحث في الإنترنت', from:94,  to:99,  presentation:null },
         { name:'الدرس الثالث: مصادر المعلومات',  from:100, to:106, presentation:null },
         { name:'الدرس الرابع: السلامة على الإنترنت', from:107, to:117, presentation:null },
       ]},
-      { n:'الرابعة', title:'البرمجة باستخدام سكراتش', lessons:[
+      { n:'الرابعة', title:'البرمجة باستخدام سكراتش', part:1, lessons:[
         { name:'الدرس الأول: أساسيات سكراتش',   from:120, to:129, presentation:null },
         { name:'الدرس الثاني: استخدام اللبنات', from:130, to:140, presentation:null },
         { name:'الدرس الثالث: التكرارات',       from:141, to:146, presentation:null },
         { name:'الدرس الرابع: الرسم بسكراتش',    from:147, to:159, presentation:null },
+      ]},
+      { n:'الأولى', title:'عرضي التقديمي', part:2, lessons:[
+        { name:'الدرس الأول: الشرائح التقديمية', from:176, to:188, presentation:null },
+        { name:'الدرس الثاني: إدراج الصور',      from:189, to:197, presentation:null },
+        { name:'الدرس الثالث: الانتقالات وتأثيرات الحركة', from:198, to:202, presentation:null },
+        { name:'الدرس الرابع: إدراج مقاطع فيديو', from:203, to:212, presentation:null },
+      ]},
+      { n:'الثانية', title:'العمل على الأرقام', part:2, lessons:[
+        { name:'الدرس الأول: جدول البيانات', from:218, to:225, presentation:null },
+        { name:'الدرس الثاني: إدخال البيانات وإجراء العمليات الحسابية البسيطة', from:226, to:238, presentation:null },
+      ]},
+      { n:'الثالثة', title:'استخدام الوسائط المتعددة', part:2, lessons:[
+        { name:'الدرس الأول: إنشاء مقطع صوتي',        from:244, to:249, presentation:null },
+        { name:'الدرس الثاني: عرض الصور ومقاطع الفيديو', from:250, to:256, presentation:null },
+        { name:'الدرس الثالث: إدخال التحسينات على الصورة', from:257, to:264, presentation:null },
+        { name:'الدرس الرابع: تطبيق التأثيرات على الصور', from:265, to:269, presentation:null },
+      ]},
+      { n:'الرابعة', title:'مقدمة في علم الروبوت', part:2, lessons:[
+        { name:'الدرس الأول: مقدمة في علم الروبوت', from:276, to:291, presentation:null },
+        { name:'الدرس الثاني: انعطاف الروبوت',      from:292, to:299, presentation:null },
       ]},
     ]
   },
@@ -306,28 +328,47 @@ const BOOKS = {
     dir: 'books/g5/pages',
     totalPages: 418,
     units: [
-      { n:'الأولى', title:'تعلم الأساسيات', lessons:[
+      { n:'الأولى', title:'تعلم الأساسيات', part:1, lessons:[
         { name:'الدرس الأول: أجهزة الحاسب',    from:15, to:24, presentation:null },
         { name:'الدرس الثاني: أجزاء الحاسب',    from:25, to:38, presentation:null },
         { name:'الدرس الثالث: الملفات والمجلدات', from:39, to:54, presentation:null },
       ]},
-      { n:'الثانية', title:'التعامل مع المستندات', lessons:[
+      { n:'الثانية', title:'التعامل مع المستندات', part:1, lessons:[
         { name:'الدرس الأول: الصور والرسومات',      from:62, to:68, presentation:null },
         { name:'الدرس الثاني: التنسيق المتقدم',      from:69, to:80, presentation:null },
         { name:'الدرس الثالث: إدراج الرسومات التوضيحية', from:81, to:89, presentation:null },
         { name:'الدرس الرابع: التدقيق والطباعة',      from:90, to:96, presentation:null },
       ]},
-      { n:'الثالثة', title:'الوسائط المتعددة', lessons:[
+      { n:'الثالثة', title:'الوسائط المتعددة', part:1, lessons:[
         { name:'الدرس الأول: استخدام أجهزة الالتقاط وتحرير مقاطع الصوت', from:103, to:131, presentation:null },
         { name:'الدرس الثاني: البحث عن الوسائط المتعددة وإنشاء وتحرير مقاطع الفيديو', from:132, to:154, presentation:null },
       ]},
-      { n:'الرابعة', title:'البرمجة والتفاعل في سكراتش', lessons:[
+      { n:'الرابعة', title:'البرمجة والتفاعل في سكراتش', part:1, lessons:[
         { name:'الدرس الأول: كيفية تصميم برنامج', from:162, to:169, presentation:null },
         { name:'الدرس الثاني: الكائنات في سكراتش', from:170, to:181, presentation:null },
         { name:'الدرس الثالث: المعاملات المنطقية', from:182, to:192, presentation:null },
         { name:'الدرس الرابع: الحركة في سكراتش',   from:193, to:206, presentation:null },
         { name:'الدرس الخامس: رسائل البث',        from:207, to:216, presentation:null },
         { name:'الدرس السادس: الاستشعار',         from:217, to:224, presentation:null },
+      ]},
+      { n:'الأولى', title:'أدوات البحث والاتصال ومشاركة الملفات', part:2, lessons:[
+        { name:'الدرس الأول: الإنترنت و الشبكة العنكبوتية', from:245, to:254, presentation:null },
+        { name:'الدرس الثاني: الإنترنت وأدوات التواصل', from:255, to:268, presentation:null },
+        { name:'الدرس الثالث: مشاركة الملفات', from:269, to:280, presentation:null },
+      ]},
+      { n:'الثانية', title:'جداول البيانات', part:2, lessons:[
+        { name:'الدرس الأول: الصفوف والأعمدة', from:287, to:302, presentation:null },
+        { name:'الدرس الثاني: العمليات الحسابية', from:303, to:314, presentation:null },
+      ]},
+      { n:'الثالثة', title:'وسائل التواصل الاجتماعي', part:2, lessons:[
+        { name:'الدرس الأول: وسائل التواصل الاجتماعي', from:320, to:325, presentation:null },
+        { name:'الدرس الثاني: التدوين', from:326, to:346, presentation:null },
+        { name:'الدرس الثالث: الملكية الفكرية', from:347, to:351, presentation:null },
+      ]},
+      { n:'الرابعة', title:'برمجة الروبوت', part:2, lessons:[
+        { name:'الدرس الأول: الروبوتات في حياتنا اليومية', from:359, to:367, presentation:null },
+        { name:'الدرس الثاني: استخدام التكرارات', from:368, to:382, presentation:null },
+        { name:'الدرس الثالث: رسم مكعب', from:383, to:408, presentation:null },
       ]},
     ]
   },
@@ -336,26 +377,45 @@ const BOOKS = {
     dir: 'books/g6/pages',
     totalPages: 387,
     units: [
-      { n:'الأولى', title:'التصميم ثلاثي الأبعاد', lessons:[
+      { n:'الأولى', title:'التصميم ثلاثي الأبعاد', part:1, lessons:[
         { name:'الدرس الأول: مقدمة إلى النمذجة ثلاثية الأبعاد', from:12, to:31, presentation:null },
         { name:'الدرس الثاني: معالجة الأشكال ثلاثية الأبعاد',    from:36, to:52, presentation:null },
       ]},
-      { n:'الثانية', title:'جداول البيانات', lessons:[
+      { n:'الثانية', title:'جداول البيانات', part:1, lessons:[
         { name:'الدرس الأول: تنفيذ العمليات الحسابية', from:61, to:73, presentation:null },
         { name:'الدرس الثاني: المخططات البيانية',      from:79, to:89, presentation:null },
       ]},
-      { n:'الثالثة', title:'قواعد البيانات', lessons:[
+      { n:'الثالثة', title:'قواعد البيانات', part:1, lessons:[
         { name:'الدرس الأول: مقدمة عن قواعد البيانات', from:97,  to:101, presentation:null },
         { name:'الدرس الثاني: إنشاء قاعدة بيانات',     from:108, to:113, presentation:null },
         { name:'الدرس الثالث: الفرز والتصفية',        from:118, to:122, presentation:null },
       ]},
-      { n:'الرابعة', title:'البرمجة باستخدام سكراتش', lessons:[
+      { n:'الرابعة', title:'البرمجة باستخدام سكراتش', part:1, lessons:[
         { name:'الدرس الأول: التكرار في سكراتش',         from:134, to:139, presentation:null },
         { name:'الدرس الثاني: برمجة العمليات الحسابية',   from:142, to:150, presentation:null },
         { name:'الدرس الثالث: اتخاذ القرارات',           from:153, to:156, presentation:null },
         { name:'الدرس الرابع: الإحداثيات في سكراتش',      from:160, to:167, presentation:null },
         { name:'الدرس الخامس: القرارات المركبة في سكراتش', from:172, to:176, presentation:null },
         { name:'الدرس السادس: الألعاب في سكراتش',         from:180, to:187, presentation:null },
+      ]},
+      { n:'الأولى', title:'التصميم المتقدم للمستندات', part:2, lessons:[
+        { name:'الدرس الأول: إنشاء الجداول وتنسيقها', from:211, to:218, presentation:null },
+        { name:'الدرس الثاني: تحرير الجداول', from:219, to:227, presentation:null },
+        { name:'الدرس الثالث: التنسيق المتقدم', from:228, to:245, presentation:null },
+      ]},
+      { n:'الثانية', title:'تصميم المواقع الإلكترونية', part:2, lessons:[
+        { name:'الدرس الأول: تصميم صفحة إلكترونية', from:252, to:271, presentation:null },
+        { name:'الدرس الثاني: إضافة الصفحات', from:272, to:282, presentation:null },
+        { name:'الدرس الثالث: نشر الموقع الإلكتروني', from:283, to:291, presentation:null },
+      ]},
+      { n:'الثالثة', title:'تصميم ألعاب جهاز الحاسب', part:2, lessons:[
+        { name:'الدرس الأول: تخطيط وتصميم ألعاب جهاز الحاسب', from:296, to:313, presentation:null },
+        { name:'الدرس الثاني: برمجة ألعاب جهاز الحاسب', from:314, to:326, presentation:null },
+      ]},
+      { n:'الرابعة', title:'المستشعرات في علم الروبوت', part:2, lessons:[
+        { name:'الدرس الأول: مستشعرات الروبوت', from:334, to:347, presentation:null },
+        { name:'الدرس الثاني: اتخاذ القرارات', from:348, to:362, presentation:null },
+        { name:'الدرس الثالث: إنشاء الخرائط', from:363, to:377, presentation:null },
       ]},
     ]
   }
@@ -627,25 +687,32 @@ const Tools = {
 /* ==================== الفهرس ==================== */
 const Sidebar = {
   _open:false,
+  _partLabel: { 1:'الفصل الدراسي الأول', 2:'الفصل الدراسي الثاني' },
   build() {
-    const html = BOOK.units.map((u,ui) => `
-      <div class="unit-group">
-        <div class="unit-title ${ui===0?'active':''}" onclick="Sidebar.toggleUnit(this)">
-          <i class="fas fa-chevron-${ui===0?'down':'left'}"></i>
-          <span>الوحدة ${u.n}: ${u.title}</span>
-          <span class="unit-badge">${toAr(u.lessons.length)} دروس</span>
-        </div>
-        <div class="unit-lessons ${ui===0?'':'collapsed'}">
-          ${u.lessons.map(l => `
-            <div class="lesson-item" data-from="${l.from}" onclick="Sidebar.goto(${l.from})">
-              <div class="lesson-dot"></div>
-              <div class="lesson-info">
-                <span class="lesson-name">${l.name}</span>
-                <span class="lesson-pages">ص ${toAr(l.from)}-${toAr(l.to)}</span>
-              </div>
-              ${l.presentation ? '<i class="fas fa-play lesson-pres" title="عرض تفاعلي متاح"></i>' : ''}
-            </div>`).join('')}
-        </div>
+    const parts = {};
+    BOOK.units.forEach(u => { const p = u.part || 1; (parts[p] = parts[p] || []).push(u); });
+    const html = Object.keys(parts).sort().map(p => `
+      <div class="part-group">
+        <div class="part-header"><i class="fas fa-calendar-day"></i> ${this._partLabel[p] || 'الفصل الدراسي ' + p}</div>
+        ${parts[p].map((u,ui) => `
+          <div class="unit-group">
+            <div class="unit-title ${p==='1'&&ui===0?'active':''}" onclick="Sidebar.toggleUnit(this)">
+              <i class="fas fa-chevron-${p==='1'&&ui===0?'down':'left'}"></i>
+              <span>الوحدة ${u.n}: ${u.title}</span>
+              <span class="unit-badge">${toAr(u.lessons.length)} دروس</span>
+            </div>
+            <div class="unit-lessons ${p==='1'&&ui===0?'':'collapsed'}">
+              ${u.lessons.map(l => `
+                <div class="lesson-item" data-from="${l.from}" onclick="Sidebar.goto(${l.from})">
+                  <div class="lesson-dot"></div>
+                  <div class="lesson-info">
+                    <span class="lesson-name">${l.name}</span>
+                    <span class="lesson-pages">ص ${toAr(l.from)}-${toAr(l.to)}</span>
+                  </div>
+                  ${l.presentation ? '<i class="fas fa-play lesson-pres" title="عرض تفاعلي متاح"></i>' : ''}
+                </div>`).join('')}
+            </div>
+          </div>`).join('')}
       </div>`).join('');
     document.getElementById('sidebar-content').innerHTML = html;
   },
