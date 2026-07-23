@@ -41,8 +41,10 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);ove
 .sidebar-content{flex:1;overflow-y:auto;padding:12px}
 .sidebar-content::-webkit-scrollbar{width:4px}
 .sidebar-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-.part-group{margin-bottom:16px}
-.part-header{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+.term-switch{display:flex;gap:8px;padding:12px 20px;border-bottom:1px solid var(--border)}
+.term-btn{flex:1;padding:9px 8px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text-muted);border-radius:8px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;transition:all .2s}
+.term-btn:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.term-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}
 .unit-group{margin-bottom:8px}
 .unit-title{display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(255,255,255,.04);border-radius:10px;cursor:pointer;font-weight:700;font-size:13.5px;transition:all .2s;border:1px solid transparent}
 .unit-title:hover{background:rgba(255,255,255,.07);border-color:var(--border)}
@@ -178,6 +180,10 @@ body[data-tool="text"] #draw-canvas{cursor:text}
     <div class="sidebar-header">
       <h3><i class="fas fa-book-open"></i> فهرس المنهج</h3>
       <button class="sidebar-close" onclick="Sidebar.toggle()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="term-switch">
+      <button class="term-btn" data-part="1" onclick="Sidebar.setTerm(1)">الفصل الدراسي الأول</button>
+      <button class="term-btn" data-part="2" onclick="Sidebar.setTerm(2)">الفصل الدراسي الثاني</button>
     </div>
     <div class="sidebar-content" id="sidebar-content"></div>
   </aside>
@@ -688,31 +694,35 @@ const Tools = {
 const Sidebar = {
   _open:false,
   _partLabel: { 1:'الفصل الدراسي الأول', 2:'الفصل الدراسي الثاني' },
+  _termKey() { return 'wbTerm_' + BOOK_KEY; },
+  _term: null,
+  setTerm(p) {
+    this._term = p;
+    localStorage.setItem(this._termKey(), p);
+    this.build();
+  },
   build() {
-    const parts = {};
-    BOOK.units.forEach(u => { const p = u.part || 1; (parts[p] = parts[p] || []).push(u); });
-    const html = Object.keys(parts).sort().map(p => `
-      <div class="part-group">
-        <div class="part-header"><i class="fas fa-calendar-day"></i> ${this._partLabel[p] || 'الفصل الدراسي ' + p}</div>
-        ${parts[p].map((u,ui) => `
-          <div class="unit-group">
-            <div class="unit-title ${p==='1'&&ui===0?'active':''}" onclick="Sidebar.toggleUnit(this)">
-              <i class="fas fa-chevron-${p==='1'&&ui===0?'down':'left'}"></i>
-              <span>الوحدة ${u.n}: ${u.title}</span>
-              <span class="unit-badge">${toAr(u.lessons.length)} دروس</span>
-            </div>
-            <div class="unit-lessons ${p==='1'&&ui===0?'':'collapsed'}">
-              ${u.lessons.map(l => `
-                <div class="lesson-item" data-from="${l.from}" onclick="Sidebar.goto(${l.from})">
-                  <div class="lesson-dot"></div>
-                  <div class="lesson-info">
-                    <span class="lesson-name">${l.name}</span>
-                    <span class="lesson-pages">ص ${toAr(l.from)}-${toAr(l.to)}</span>
-                  </div>
-                  ${l.presentation ? '<i class="fas fa-play lesson-pres" title="عرض تفاعلي متاح"></i>' : ''}
-                </div>`).join('')}
-            </div>
-          </div>`).join('')}
+    if (!this._term) this._term = parseInt(localStorage.getItem(this._termKey())) || 1;
+    document.querySelectorAll('.term-btn').forEach(b => b.classList.toggle('active', +b.dataset.part === this._term));
+    const units = BOOK.units.filter(u => (u.part || 1) === this._term);
+    const html = units.map((u,ui) => `
+      <div class="unit-group">
+        <div class="unit-title ${ui===0?'active':''}" onclick="Sidebar.toggleUnit(this)">
+          <i class="fas fa-chevron-${ui===0?'down':'left'}"></i>
+          <span>الوحدة ${u.n}: ${u.title}</span>
+          <span class="unit-badge">${toAr(u.lessons.length)} دروس</span>
+        </div>
+        <div class="unit-lessons ${ui===0?'':'collapsed'}">
+          ${u.lessons.map(l => `
+            <div class="lesson-item" data-from="${l.from}" onclick="Sidebar.goto(${l.from})">
+              <div class="lesson-dot"></div>
+              <div class="lesson-info">
+                <span class="lesson-name">${l.name}</span>
+                <span class="lesson-pages">ص ${toAr(l.from)}-${toAr(l.to)}</span>
+              </div>
+              ${l.presentation ? '<i class="fas fa-play lesson-pres" title="عرض تفاعلي متاح"></i>' : ''}
+            </div>`).join('')}
+        </div>
       </div>`).join('');
     document.getElementById('sidebar-content').innerHTML = html;
   },

@@ -2485,28 +2485,31 @@ const Pages = {
       <h3>لا يوجد كتاب مرتبط بهذا الفصل</h3>
       <p style="color:var(--text-muted)">تأكد من ضبط المرحلة والمادة في إعدادات الفصل.</p></div>`;
 
-    const unitIdx = this._bookUnit || 0;
+    const bk = book.key;
+    const termKey = 'book_term_' + bk;
+    if (this._bookTerm == null) this._bookTerm = parseInt(localStorage.getItem(termKey)) || 1;
+    const termUnits = book.units.map((u,i) => ({u,i})).filter(({u}) => (u.part||1) === this._bookTerm);
+    if (this._bookUnit == null || !termUnits.some(t => t.i === this._bookUnit)) {
+      this._bookUnit = termUnits.length ? termUnits[0].i : 0;
+    }
+    const unitIdx = this._bookUnit;
     const unit    = book.units[unitIdx];
-    const bk       = book.key;
     const lessonCount = book.units.reduce((s,u)=>s+(u.lessons?.length||0),0);
 
     const partLabel = { 1:'الفصل الدراسي الأول', 2:'الفصل الدراسي الثاني' };
-    const partsMap = {};
-    book.units.forEach((u,i) => { const p = u.part||1; (partsMap[p]=partsMap[p]||[]).push({u,i}); });
-    const unitPills = Object.keys(partsMap).sort().map(p => `
-      <div class="bk-part">
-        <div class="bk-part-lbl">${partLabel[p]||'الفصل الدراسي '+p}</div>
-        <div class="bk-part-units">
-          ${partsMap[p].map(({u,i}) => {
-            const ready = (u.lessons && u.lessons.length);
-            return `<button class="bk-unit ${i===unitIdx?'active':''} ${ready?'':'locked'}"
-              ${ready?`onclick="Pages._bookUnit=${i};Pages.classDetail({classId:'${cls.id}',tab:'book'})"`:'disabled'}>
-              <span class="bk-unit-n">${_ar(u.n)}</span> ${u.title}
-              ${ready?'':'<i class="fas fa-lock" style="font-size:.62rem;opacity:.6"></i>'}
-            </button>`;
-          }).join('')}
-        </div>
-      </div>`).join('');
+    const termSwitch = `
+      <div class="bk-term-switch">
+        ${[1,2].map(p => `<button class="bk-term-btn ${this._bookTerm===p?'active':''}"
+          onclick="localStorage.setItem('${termKey}','${p}');Pages._bookTerm=${p};Pages._bookUnit=null;Pages.classDetail({classId:'${cls.id}',tab:'book'})">${partLabel[p]}</button>`).join('')}
+      </div>`;
+    const unitPills = termUnits.map(({u,i}) => {
+      const ready = (u.lessons && u.lessons.length);
+      return `<button class="bk-unit ${i===unitIdx?'active':''} ${ready?'':'locked'}"
+        ${ready?`onclick="Pages._bookUnit=${i};Pages.classDetail({classId:'${cls.id}',tab:'book'})"`:'disabled'}>
+        <span class="bk-unit-n">${_ar(u.n)}</span> ${u.title}
+        ${ready?'':'<i class="fas fa-lock" style="font-size:.62rem;opacity:.6"></i>'}
+      </button>`;
+    }).join('');
 
     const goals = (unit.goals||[]).map(g =>
       `<li><i class="fas fa-circle"></i> ${g}</li>`).join('');
@@ -2563,6 +2566,7 @@ const Pages = {
           </button>
         </div>
 
+        ${termSwitch}
         <div class="bk-units">${unitPills}</div>
 
         ${goals ? `
