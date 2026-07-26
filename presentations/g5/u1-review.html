@@ -959,10 +959,10 @@ body.text-lg .ppt-title{font-size:29px;} body.text-lg .ppt-content{font-size:19p
 .deck section.slide .decor{ z-index:1; }
 .decor-icon{ animation:skinSpin 26s linear infinite; transform-origin:center; }
 @keyframes skinSpin{ to{ transform:rotate(360deg);} }
-.slide-title{ background:linear-gradient(92deg,var(--sa),var(--sa2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; position:relative; display:inline-block; padding-bottom:9px; }
+.slide-title{ color:var(--sa,#4f46e5); position:relative; display:inline-block; padding-bottom:9px; }
 .slide-title::after{ content:''; position:absolute; right:0; bottom:0; height:4px; width:100%; border-radius:6px; background:linear-gradient(90deg,var(--sa),var(--sa2),var(--sa)); background-size:200% 100%; animation:skinShine 3.2s linear infinite; }
 @keyframes skinShine{ from{ background-position:0 0;} to{ background-position:200% 0;} }
-.title-main{ background:linear-gradient(92deg,var(--sa),var(--sa2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
+.title-main{ color:var(--sa,#4f46e5); }
 .slide-lead b{ color:var(--sa); }
 .title-badge{ border:2px solid transparent!important; background:linear-gradient(var(--card),var(--card)) padding-box, linear-gradient(90deg,var(--sa),var(--sa2)) border-box!important; }
 .title-icon{ color:var(--sa)!important; filter:drop-shadow(0 6px 14px var(--sa)); }

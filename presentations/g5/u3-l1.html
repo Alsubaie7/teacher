@@ -338,6 +338,29 @@
   </div>
 </section>
 
+<!-- ===== SLIDE : MATCH (وصِل) ===== -->
+<section class="slide theme-play" data-tip="تدريب «وصِل»: اضغط مفهومًا من اليمين ثم وصفه من اليسار؛ يُرسم خط عند الإجابة الصحيح.">
+  <div class="decor"><svg class="decor-icon" style="top:10%;right:8%;width:30px;opacity:.14;color:#7c3aed" viewBox="0 0 24 24"><use href="#icon-copy"/></svg></div>
+  <h2 class="slide-title">تدريب 4 — صِل المفهوم بوصفه 🔗</h2>
+  <p class="slide-lead">اضغط مفهومًا من اليمين ثم وصفه من اليسار. <b><span id="naMScore">0</span>/<span id="naMTotal">0</span></b></p>
+  <div class="na-match-wrap" id="naMatchWrap">
+    <svg class="na-match-svg" id="naMatchSvg"></svg>
+    <div class="na-match-cols">
+      <div class="na-match-col" id="naLeft"><h4>المفهوم</h4></div>
+      <div class="na-match-col" id="naRight"><h4>الوصف</h4></div>
+    </div>
+  </div>
+  <div class="order-footer"><button class="btn-ghost" id="naMReset">إعادة 🔁</button><span class="order-msg" id="naMMsg"></span></div>
+</section>
+
+<!-- ===== SLIDE : QUIZ (مسابقة صفّية) ===== -->
+<section class="slide theme-play" data-tip="مسابقة صفّية: قسّم الصف فِرَقًا! لكل عبارة قرّروا صحيحة أم خطأ، وبعد الكشف امنح النقطة للفريق الفائز.">
+  <div class="decor"><svg class="decor-icon" style="bottom:14%;right:8%;width:30px;opacity:.14;color:#d97706" viewBox="0 0 24 24"><use href="#icon-star"/></svg></div>
+  <h2 class="slide-title">🏆 مسابقة صفّية — صحيح أم خطأ؟</h2>
+  <p class="slide-lead">قسّم الصف إلى فِرَق، وتنافسوا: هل العبارة صحيحة أم خطأ؟</p>
+  <div class="na-quiz" id="naQuizCard"></div>
+</section>
+
 <!-- ===== SLIDE : EXIT ===== -->
 <section class="slide theme-play" data-tip="بطاقة الخروج: أجب في ذهنك ثم أظهر الإجابة.">
   <div class="decor"><svg class="decor-icon" style="top:11%;right:8%;width:28px;opacity:.14;color:#0ea5a3" viewBox="0 0 24 24"><use href="#icon-check"/></svg></div>
@@ -948,10 +971,10 @@ body.text-lg .ppt-title{font-size:29px;} body.text-lg .ppt-content{font-size:19p
 .deck section.slide .decor{ z-index:1; }
 .decor-icon{ animation:skinSpin 26s linear infinite; transform-origin:center; }
 @keyframes skinSpin{ to{ transform:rotate(360deg);} }
-.slide-title{ background:linear-gradient(92deg,var(--sa),var(--sa2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; position:relative; display:inline-block; padding-bottom:9px; }
+.slide-title{ color:var(--sa,#4f46e5); position:relative; display:inline-block; padding-bottom:9px; }
 .slide-title::after{ content:''; position:absolute; right:0; bottom:0; height:4px; width:100%; border-radius:6px; background:linear-gradient(90deg,var(--sa),var(--sa2),var(--sa)); background-size:200% 100%; animation:skinShine 3.2s linear infinite; }
 @keyframes skinShine{ from{ background-position:0 0;} to{ background-position:200% 0;} }
-.title-main{ background:linear-gradient(92deg,var(--sa),var(--sa2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
+.title-main{ color:var(--sa,#4f46e5); }
 .slide-lead b{ color:var(--sa); }
 .title-badge{ border:2px solid transparent!important; background:linear-gradient(var(--card),var(--card)) padding-box, linear-gradient(90deg,var(--sa),var(--sa2)) border-box!important; }
 .title-icon{ color:var(--sa)!important; filter:drop-shadow(0 6px 14px var(--sa)); }
@@ -1038,6 +1061,57 @@ body.dark-mode .disc-reveal{background:rgba(99,102,241,.18);color:#c7d2fe;}
 .disc-a{max-height:0;opacity:0;overflow:hidden;font-family:'Tajawal',sans-serif;font-weight:600;font-size:14.5px;color:var(--text-2);line-height:1.7;background:var(--surface-2);border-radius:11px;padding:0 13px;transition:max-height .35s ease,opacity .25s,padding .3s;border-inline-start:4px solid var(--sa);}
 .disc-card.open .disc-a{max-height:280px;opacity:1;padding:12px 13px;margin-top:2px;}
 .disc-card.open .disc-reveal{display:none;}
+
+/* ===== NEW ACTIVITIES (وصِل · مسابقة) ===== */
+.na-match-wrap{position:relative;width:100%;max-width:900px;margin:0 auto;z-index:1;}
+.na-match-cols{display:flex;gap:64px;justify-content:space-between;position:relative;z-index:2;}
+.na-match-col{flex:1;display:flex;flex-direction:column;gap:11px;}
+.na-match-col h4{margin:0 0 2px;font-size:13.5px;color:var(--text-2);font-weight:800;text-align:center;}
+.na-mitem{background:var(--card);border:2px solid var(--border);border-radius:14px;padding:12px 14px;font-weight:700;cursor:pointer;
+  transition:.15s;box-shadow:var(--shadow-md);font-size:14px;line-height:1.5;position:relative;color:var(--text);}
+.na-mitem:hover{border-color:var(--primary);}
+.na-mitem.sel{border-color:var(--primary);background:var(--primary-a10);box-shadow:0 0 0 4px var(--primary-a15);}
+.na-mitem.done{background:var(--success-light);border-color:var(--success);color:#14532d;cursor:default;}
+.na-mitem.shake{animation:naShake .4s;}
+@keyframes naShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+.na-match-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible;}
+.na-dot{width:11px;height:11px;border-radius:50%;background:var(--border);position:absolute;top:50%;transform:translateY(-50%);}
+.na-dot.l{inset-inline-end:-6px;}.na-dot.r{inset-inline-start:-6px;}
+.na-quiz{width:100%;max-width:820px;margin:0 auto;z-index:1;position:relative;}
+.na-setup{text-align:center;padding:6px;}
+.na-setup h3{font-size:19px;font-weight:900;margin:0 0 4px;}
+.na-teamsel{display:flex;gap:10px;justify-content:center;margin:14px 0;}
+.na-teamsel button{width:60px;height:60px;border-radius:16px;border:2px solid var(--border);background:var(--card);font-family:inherit;
+  font-size:22px;font-weight:900;cursor:pointer;transition:.15s;color:var(--primary);}
+.na-teamsel button.on{border-color:var(--primary);background:var(--primary-a10);box-shadow:0 6px 16px var(--primary-a15);}
+.na-scoreboard{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;}
+.na-team{flex:1 1 130px;max-width:200px;border-radius:16px;padding:11px;text-align:center;color:#fff;box-shadow:var(--shadow-md);}
+.na-team b{display:block;font-size:14.5px;font-weight:800;}
+.na-team .pts{font-size:32px;font-weight:900;line-height:1.1;}
+.na-team .add{margin-top:5px;background:rgba(255,255,255,.28);border:0;color:#fff;font-family:inherit;font-weight:900;
+  border-radius:10px;padding:6px 0;width:100%;cursor:pointer;font-size:13.5px;transition:.12s;}
+.na-team .add:hover{background:rgba(255,255,255,.45);}
+.na-team .add:disabled{opacity:.4;cursor:not-allowed;}
+.na-qc{background:linear-gradient(160deg,var(--card),var(--surface-2));border:2px solid var(--border);border-radius:18px;padding:18px;text-align:center;}
+.na-qnum{font-weight:800;color:var(--text-2);font-size:13px;}
+.na-qtext{font-size:20px;font-weight:900;margin:6px 0 14px;color:var(--text);line-height:1.6;}
+.na-opts{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.na-opt{background:var(--card);border:2px solid var(--border);border-radius:14px;padding:13px;font-family:inherit;font-weight:800;font-size:16px;
+  cursor:pointer;transition:.15s;color:var(--text);}
+.na-opt:hover{border-color:var(--primary);transform:translateY(-1px);}
+.na-opt.correct{background:var(--success-light);border-color:var(--success);color:#14532d;}
+.na-opt.wrong{background:var(--danger-light);border-color:var(--danger);color:var(--danger);opacity:.7;}
+.na-tbar{height:11px;border-radius:8px;background:var(--border);overflow:hidden;margin:13px 0 4px;}
+.na-tfill{height:100%;background:linear-gradient(90deg,var(--success),var(--warning));width:100%;transition:width 1s linear;}
+.na-tfill.low{background:linear-gradient(90deg,var(--danger),var(--warning));}
+.na-winner{text-align:center;padding:8px;}
+.na-winner .cup{font-size:60px;}
+.na-winner h3{font-size:24px;font-weight:900;margin:6px 0;color:var(--text);}
+.na-confetti{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;}
+.na-confetti span{position:absolute;top:-14px;width:11px;height:16px;border-radius:2px;animation:naFall 2.7s linear forwards;}
+@keyframes naFall{to{transform:translateY(108vh) rotate(560deg);}}
+@media(max-width:640px){.na-match-cols{gap:30px;}.na-fb-text{font-size:17px;}}
+
 </style>
 
 <script>
@@ -1278,7 +1352,7 @@ document.querySelectorAll('.slide').forEach(function(s){
 
 /* ===== NAVIGATION ===== */
 var slides=Array.prototype.slice.call(document.querySelectorAll('.slide'));
-var slideNames=["الترحيب", "هل تذكر؟", "أهداف الدرس", "أجهزة الالتقاط", "حجم الملفات", "أوداسيتي", "تحرير الصوت", "الحفظ والتصدير", "نصائح وإرشادات", "فكّر وشارك", "تدريب 1", "تدريب 2", "تدريب 3", "بطاقة الخروج", "الختام"];
+var slideNames=["الترحيب", "هل تذكر؟", "أهداف الدرس", "أجهزة الالتقاط", "حجم الملفات", "أوداسيتي", "تحرير الصوت", "الحفظ والتصدير", "نصائح وإرشادات", "فكّر وشارك", "تدريب 1", "تدريب 2", "تدريب 3", "وصِل", "مسابقة صفّية", "بطاقة الخروج", "الختام"];
 var current=-1, animating=false;
 var progressFill=document.getElementById('progressFill'), slideNumEl=document.getElementById('slideNum'), slideNameEl=document.getElementById('slideName');
 var prevBtn=document.getElementById('prevBtn'), nextBtn=document.getElementById('nextBtn'), mascotBubble=document.getElementById('mascotBubble');
@@ -1370,6 +1444,8 @@ var notesData=[
   {say:['⏱ ٣ د · نشاط تصنيف: امتدادات الصوت مقابل الفيديو.'], ask:'«.mp4»: صوت أم فيديو؟', ans:'فيديو.', tip:'استخدم زر «إظهار الإجابة».'},
   {say:['⏱ ٣ د · عبارات صح/خطأ عن الأجهزة والملفات والصوت.'], ask:'«ملف الفيديو أصغر من الصورة» — صح أم خطأ؟', ans:'خطأ؛ الفيديو أكبر عادةً.'},
   {say:['⏱ ٣ د · نشاط ترتيب خطوات فتح ملف في أوداسيتي.'], ask:'ما أول خطوة؟', ans:'فتح برنامج أوداسيتي.'},
+  {say:['⏱ ٤ د · تدريب «وصِل»: اضغط المفهوم ثم وصفه الصحيح فيُرسم خط بينهما.'], ask:'راجعوا المفاهيم ووصفاتها.'},
+  {say:['⏱ ٥ د · مسابقة صفّية (صح/خطأ): قسّم الصف فِرَقًا، لكل عبارة مؤقّت، امنح النقاط بعد الكشف، واحتفل بالفائز.'], ask:'استعدّوا للتنافس بروح رياضية!'},
   {say:['⏱ ٣ د · بطاقة الخروج: اطرح الأسئلة ودع الطلاب يجيبون قبل الكشف.'], ask:'رتّب من الأصغر: MB، KB، GB.', ans:'KB ← MB ← GB.'},
   {say:['⏱ ٢ د · لخّص الدرس وامنح النجوم.','اطبع الشهادة للمتميزين.'], ask:'اذكر امتدادًا لملف صوتي.'}
 ];
@@ -1439,5 +1515,95 @@ goTo(0);
 });
 </script>
 <script>document.addEventListener('click',function(e){var b=e.target&&e.target.closest?e.target.closest('.disc-reveal'):null;if(!b)return;var c=b.closest('.disc-card');if(c&&!c.classList.contains('open')){c.classList.add('open');try{if(typeof playSound==='function')playSound('tap');}catch(_){}}});</script>
+<script>
+(function(){
+  var AX=null;function ac(){if(!AX){var A=window.AudioContext||window.webkitAudioContext;if(A)AX=new A();}return AX;}
+  function tn(f,s,d,t,v){var c=ac();if(!c)return;var o=c.createOscillator(),g=c.createGain();o.type=t||'sine';o.frequency.value=f;
+    g.gain.setValueAtTime(v||.12,c.currentTime+s);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+s+d);o.connect(g);g.connect(c.destination);o.start(c.currentTime+s);o.stop(c.currentTime+s+d+.02);}
+  function fx(k){try{if(k==='ok'){tn(523,0,.12);tn(784,.1,.18);}else if(k==='no'){tn(220,0,.22,'sawtooth',.08);}
+    else if(k==='tap'){tn(660,0,.06,'sine',.06);}else if(k==='win'){tn(523,0,.12);tn(659,.11,.12);tn(784,.22,.14);tn(1047,.34,.26);}}catch(e){}}
+  function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  function ar(n){var M=['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];return String(n).split('').map(function(c){return M[+c]||c;}).join('');}
+  function confetti(){var w=document.createElement('div');w.className='na-confetti';document.body.appendChild(w);
+    var cols=['#fbbf24','#22c55e','#6366f1','#ec4899','#38bdf8','#f97316','#a855f7'],h='';
+    for(var i=0;i<70;i++){h+='<span style="left:'+(Math.random()*100)+'%;background:'+cols[i%7]+';animation-delay:'+(Math.random()*.9).toFixed(2)+'s;transform:rotate('+(Math.random()*360)+'deg)"></span>';}
+    w.innerHTML=h;setTimeout(function(){w.remove();},3200);}
+
+  var MATCH=[{"t": "أجهزة الالتقاط والمنافذ", "d": "نستخدم أجهزة الالتقاط (الكاميرا، الماسح، الميكروفون) ونوصّلها بالحاسب عبر منافذ USB، أو لاسلكيًّا (بلوتوث، NFC، Wi-Fi)."}, {"t": "حجم الملفات وامتداداتها", "d": "وحدات القياس: بايت، KB، MB، GB، TB. ولكل ملف امتداد يوضّح نوعه: .mp3 صوت، .jpg صورة، .mp4 فيديو، .docx نص."}, {"t": "برنامج أوداسيتي", "d": "أوداسيتي (Audacity) برنامج مجاني لتحرير الصوت؛ نثبّته من موقعه، ونفتح فيه الملفات الصوتية."}, {"t": "تحرير الصوت وتصديره", "d": "نرى الشكل الموجي، ونستخدم الأدوات (تشغيل، إيقاف، تحديد، حذف)، ونحفظ المشروع (.aup) أو نصدّره كملف MP3."}];
+  var mL=document.getElementById('naLeft'),mR=document.getElementById('naRight'),mSvg=document.getElementById('naMatchSvg'),
+      mWrap=document.getElementById('naMatchWrap'),mMsg=document.getElementById('naMMsg'),mScore=document.getElementById('naMScore');
+  var mSel=null,mDone=0,mLines=[],COLS=['#6366f1','#0ea5a3','#d97706','#16a34a','#ec4899','#2563eb'];
+  if(document.getElementById('naMTotal'))document.getElementById('naMTotal').textContent=MATCH.length;
+  function buildMatch(){if(!mL)return;mL.innerHTML='<h4>المفهوم</h4>';mR.innerHTML='<h4>الوصف</h4>';mSvg.innerHTML='';mSel=null;mDone=0;mLines=[];
+    mScore.textContent='0';mMsg.textContent='';
+    MATCH.forEach(function(p,i){var a=document.createElement('div');a.className='na-mitem';a.dataset.id=i;a.dataset.side='t';
+      a.innerHTML='<span class="na-dot l"></span>'+p.t;mL.appendChild(a);wireM(a);});
+    shuffle(MATCH.map(function(p,i){return i;})).forEach(function(i){var b=document.createElement('div');b.className='na-mitem';b.dataset.id=i;b.dataset.side='d';
+      b.innerHTML='<span class="na-dot r"></span>'+MATCH[i].d;mR.appendChild(b);wireM(b);});}
+  function wireM(el){el.addEventListener('click',function(){
+    if(el.classList.contains('done'))return;
+    if(!mSel){mSel=el;el.classList.add('sel');fx('tap');return;}
+    if(mSel===el){el.classList.remove('sel');mSel=null;return;}
+    if(mSel.dataset.side===el.dataset.side){mSel.classList.remove('sel');mSel=el;el.classList.add('sel');return;}
+    var a=mSel,b=el;a.classList.remove('sel');
+    if(a.dataset.id===b.dataset.id){a.classList.add('done');b.classList.add('done');var col=COLS[mDone%COLS.length];mDone++;mScore.textContent=mDone;
+      mLines.push({a:a,b:b,c:col});drawLines();fx('ok');mMsg.textContent='أحسنت! ربط صحيح 🎉';mMsg.style.color='var(--success)';
+      if(mDone===MATCH.length){mMsg.textContent='ممتاز! وصلت الكل 🌟';confetti();fx('win');}
+    }else{a.classList.add('shake');b.classList.add('shake');setTimeout(function(){a.classList.remove('shake');b.classList.remove('shake');},420);
+      fx('no');mMsg.textContent='حاول مرة أخرى.';mMsg.style.color='var(--danger)';}
+    mSel=null;});}
+  function drawLines(){if(!mWrap)return;var wr=mWrap.getBoundingClientRect();mSvg.innerHTML='';
+    mLines.forEach(function(ln){var da=ln.a.querySelector('.na-dot').getBoundingClientRect(),db=ln.b.querySelector('.na-dot').getBoundingClientRect();
+      var x1=da.left+da.width/2-wr.left,y1=da.top+da.height/2-wr.top,x2=db.left+db.width/2-wr.left,y2=db.top+db.height/2-wr.top,mx=(x1+x2)/2;
+      mSvg.innerHTML+='<path d="M'+x1+' '+y1+' C '+mx+' '+y1+' '+mx+' '+y2+' '+x2+' '+y2+'" fill="none" stroke="'+ln.c+'" stroke-width="3.5" stroke-linecap="round"/>'
+        +'<circle cx="'+x1+'" cy="'+y1+'" r="6" fill="'+ln.c+'"/><circle cx="'+x2+'" cy="'+y2+'" r="6" fill="'+ln.c+'"/>';});}
+  window.addEventListener('resize',function(){if(mLines.length)drawLines();});
+  var mrb=document.getElementById('naMReset');if(mrb)mrb.addEventListener('click',function(){buildMatch();fx('tap');});
+  buildMatch();
+
+  var QUIZ=[{"q": "نستخدم وصلة USB لتوصيل الأجهزة بالحاسب", "o": ["صحيحة", "خطأ"], "c": 0}, {"q": "الكيلوبايت أصغر من التيرابايت", "o": ["صحيحة", "خطأ"], "c": 0}, {"q": "ملف الفيديو يشغل مساحة أقل من الصورة", "o": ["صحيحة", "خطأ"], "c": 1}, {"q": "نعرف نوع الملف من امتداده", "o": ["صحيحة", "خطأ"], "c": 0}, {"q": "أوداسيتي برنامج لتحرير الصوت", "o": ["صحيحة", "خطأ"], "c": 0}, {"q": "مشروع أوداسيتي (.aup) يُشغَّل في أي مشغّل", "o": ["صحيحة", "خطأ"], "c": 1}, {"q": "نصدّر (Export) لحفظ ملف MP3 يُشغَّل", "o": ["صحيحة", "خطأ"], "c": 0}, {"q": "البلوتوث تقنية توصيل لاسلكية", "o": ["صحيحة", "خطأ"], "c": 0}];
+  var TC=[['#4f46e5','#7c3aed'],['#0ea5a3','#16a34a'],['#d97706','#f59e0b'],['#e2465f','#ec4899']];
+  var TN=['الفريق الأزرق','الفريق الأخضر','الفريق الذهبي','الفريق الوردي'];
+  var qc=document.getElementById('naQuizCard');
+  var nT=2,sc=[],qi=0,tI=null,tL=0,rev=false,QORDER=[];
+  function setup(){if(!qc)return;qc.innerHTML='<div class="na-setup"><h3>🏆 وضع المسابقة الصفّية</h3>'+
+    '<p style="color:var(--text-2);font-weight:600;margin:0 0 4px">قسّم الصف إلى فِرَق وابدأ! لكل عبارة مؤقّت، وبعد الكشف امنح النقطة للفريق الذي أجاب.</p>'+
+    '<div style="font-weight:800;margin-top:14px">كم عدد الفِرَق؟</div><div class="na-teamsel" id="naTeamSel"></div>'+
+    '<button class="btn-primary" id="naStart">ابدأ المسابقة 🚀</button></div>';
+    var ts=document.getElementById('naTeamSel');[2,3,4].forEach(function(n){var b=document.createElement('button');b.textContent=ar(n);if(n===nT)b.classList.add('on');
+      b.addEventListener('click',function(){nT=n;ts.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');fx('tap');});ts.appendChild(b);});
+    document.getElementById('naStart').addEventListener('click',function(){sc=[];for(var i=0;i<nT;i++)sc.push(0);qi=0;QORDER=shuffle(QUIZ);fx('tap');question();});}
+  function board(add){var h='<div class="na-scoreboard">';for(var i=0;i<nT;i++){var c=TC[i];
+    h+='<div class="na-team" style="background:linear-gradient(150deg,'+c[0]+','+c[1]+')"><b>'+TN[i]+'</b><div class="pts" id="naPts'+i+'">'+ar(sc[i])+'</div>'+
+      (add?'<button class="add" data-team="'+i+'">+ نقطة</button>':'')+'</div>';}return h+'</div>';}
+  function question(){rev=false;var Q=QORDER[qi];
+    qc.innerHTML=board(false)+'<div class="na-qc"><div class="na-qnum">العبارة '+ar(qi+1)+' من '+ar(QORDER.length)+'</div>'+
+      '<div class="na-qtext">'+Q.q+'</div><div class="na-opts" id="naOpts"></div>'+
+      '<div class="na-tbar"><div class="na-tfill" id="naTfill"></div></div>'+
+      '<div style="font-weight:800;color:var(--text-2);margin-top:4px">الوقت المتبقّي: <span id="naTnum">'+ar(20)+'</span> ثانية</div>'+
+      '<div class="order-footer" style="justify-content:center"><button class="btn-ghost" id="naReveal">كشف الإجابة 👁️</button>'+
+      '<button class="btn-primary" id="naNext" style="display:none">'+(qi<QORDER.length-1?'التالي ⬅️':'النتيجة 🏁')+'</button></div></div>';
+    var op=document.getElementById('naOpts');Q.o.forEach(function(x,idx){var b=document.createElement('button');b.className='na-opt';b.textContent=x;
+      b.addEventListener('click',function(){if(!rev)reveal(idx);});op.appendChild(b);});
+    document.getElementById('naReveal').addEventListener('click',function(){if(!rev)reveal(-1);});timer();}
+  function timer(){tL=20;var f=document.getElementById('naTfill'),n=document.getElementById('naTnum');f.style.width='100%';if(tI)clearInterval(tI);
+    tI=setInterval(function(){tL--;if(n)n.textContent=ar(Math.max(tL,0));if(f){f.style.width=(tL/20*100)+'%';f.classList.toggle('low',tL<=7);}
+      if(tL<=0){clearInterval(tI);if(!rev)reveal(-1);}},1000);}
+  function reveal(pick){rev=true;if(tI)clearInterval(tI);var Q=QORDER[qi],op=document.getElementById('naOpts').children;
+    for(var i=0;i<op.length;i++){if(i===Q.c)op[i].classList.add('correct');else if(i===pick)op[i].classList.add('wrong');}
+    fx(pick===Q.c?'ok':'tap');document.getElementById('naReveal').style.display='none';document.getElementById('naNext').style.display='';
+    var sb=document.querySelector('.na-scoreboard');sb.outerHTML=board(true);
+    document.querySelectorAll('.na-team .add').forEach(function(btn){btn.addEventListener('click',function(){var ti=+btn.dataset.team;sc[ti]++;
+      document.getElementById('naPts'+ti).textContent=ar(sc[ti]);btn.disabled=true;fx('ok');});});
+    document.getElementById('naNext').addEventListener('click',function(){if(qi<QORDER.length-1){qi++;fx('tap');question();}else winner();});}
+  function winner(){var mx=Math.max.apply(null,sc),ws=[];sc.forEach(function(s,i){if(s===mx)ws.push(TN[i]);});
+    var ti=ws.length>1?('تعادل! 🤝 '+ws.join(' و ')):('الفائز: '+ws[0]+' 🎉');
+    qc.innerHTML=board(false)+'<div class="na-winner"><div class="cup">🏆</div><h3>'+ti+'</h3>'+
+      '<p style="font-weight:700;color:var(--text-2)">بأعلى نتيجة: '+ar(mx)+' نقطة. أحسنتم جميعًا!</p>'+
+      '<div class="order-footer" style="justify-content:center"><button class="btn-primary" id="naAgain">إعادة 🔁</button></div></div>';
+    confetti();fx('win');document.getElementById('naAgain').addEventListener('click',function(){fx('tap');setup();});}
+  setup();
+})();
+</script>
 </body>
 </html>
