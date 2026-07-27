@@ -6185,7 +6185,7 @@ const SBAuth = {
     }
   },
 
-  async signUp(email, password, name, school, subject, gender, region) {
+  async signUp(email, password, name, school, subject, gender, region, stage) {
     const { data: platRow } = await _sb.from('user_data').select('value').eq('key','platform_open').maybeSingle();
     if (platRow?.value === '0') throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
     const { data, error } = await _sb.auth.signUp({ email, password });
@@ -6196,8 +6196,8 @@ const SBAuth = {
         Object.values(DB._k).forEach(k => localStorage.removeItem(k));
       }
       localStorage.setItem('tm_current_user', data.user.id);
-      await _sb.from('profiles').upsert({ id: data.user.id, name, school, subject, gender, email: email.toLowerCase(), approved: false });
-      localStorage.setItem(DB._k.teacher, JSON.stringify({ name, school, subject, gender, region }));
+      await _sb.from('profiles').upsert({ id: data.user.id, name, school, subject, stage, gender, email: email.toLowerCase(), approved: false });
+      localStorage.setItem(DB._k.teacher, JSON.stringify({ name, school, subject, stage, gender, region }));
       localStorage.setItem('tm_user_email', email.toLowerCase());
     }
     return data;
@@ -6309,11 +6309,12 @@ const App = {
         if (mode === 'signup') {
           const name       = document.getElementById('setup-teacher').value.trim();
           const school     = document.getElementById('setup-school').value.trim();
-          const subject    = document.getElementById('setup-subject').value.trim();
+          const stage      = document.getElementById('setup-stage').value;
+          const subject    = document.getElementById('setup-subject').value;
           const gender     = document.querySelector('input[name="setup-gender"]:checked')?.value || 'male';
           const region     = document.getElementById('setup-region')?.value.trim() || '';
-          if (!name || !school || !subject) throw new Error('يرجى تعبئة جميع الحقول');
-          await SBAuth.signUp(email, pwd, name, school, subject, gender, region);
+          if (!name || !school || !Subjects.isValid(stage, subject)) throw new Error('يرجى تعبئة جميع الحقول واختيار المرحلة والمادة');
+          await SBAuth.signUp(email, pwd, name, school, subject, gender, region, stage);
           await _sb.auth.signOut();
           Object.values(DB._k).forEach(k => localStorage.removeItem(k));
           localStorage.removeItem('tm_current_user');
