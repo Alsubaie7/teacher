@@ -6159,7 +6159,7 @@ const SBAuth = {
   async loadUserData(userId) {
     const [{ data: rows }, { data: profile }] = await Promise.all([
       _sb.from('user_data').select('key,value').eq('user_id', userId),
-      _sb.from('profiles').select('name,school,subject,gender').eq('id', userId).maybeSingle()
+      _sb.from('profiles').select('name,school,subject,stage,gender').eq('id', userId).maybeSingle()
     ]);
     if (rows && rows.length) {
       rows.forEach(r => { if (DB._k[r.key]) localStorage.setItem(DB._k[r.key], r.value); });
