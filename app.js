@@ -6347,7 +6347,43 @@ const App = {
   },
 
   start(teacher) {
+    if (!Subjects.isValid(teacher.stage, teacher.subject)) {
+      this._showProfileGate(teacher);
+      return;
+    }
+    this._reveal(teacher);
+  },
+
+  _showProfileGate(teacher) {
     document.getElementById('setup-screen').classList.add('hidden');
+    document.getElementById('app').classList.add('hidden');
+    const gateScreen = document.getElementById('profile-gate-screen');
+    gateScreen.classList.remove('hidden');
+    const stageSel   = document.getElementById('gate-stage');
+    const subjectSel = document.getElementById('gate-subject');
+    stageSel.value = teacher.stage || '';
+    Subjects.fillSubjectSelect(stageSel.value, 'gate-subject', teacher.subject);
+    const form  = document.getElementById('profile-gate-form');
+    const errEl = document.getElementById('gate-error');
+    form.onsubmit = e => {
+      e.preventDefault();
+      const stage   = stageSel.value;
+      const subject = subjectSel.value;
+      if (!Subjects.isValid(stage, subject)) {
+        errEl.textContent = 'يرجى اختيار المرحلة والمادة';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      const updated = { ...DB.teacher(), stage, subject };
+      DB.setTeacher(updated);
+      gateScreen.classList.add('hidden');
+      this._reveal(updated);
+    };
+  },
+
+  _reveal(teacher) {
+    document.getElementById('setup-screen').classList.add('hidden');
+    document.getElementById('profile-gate-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('sb-name').textContent   = teacher.name   || '—';
     document.getElementById('sb-school').textContent = teacher.school || '—';
