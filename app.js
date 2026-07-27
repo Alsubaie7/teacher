@@ -6419,30 +6419,47 @@ const App = {
       if (!e.target.closest('.dot-menu-wrap')) document.querySelectorAll('.dot-drop:not(.hidden)').forEach(d => d.classList.add('hidden'));
     });
 
-    const { data: { session } } = await _sb.auth.getSession();
-    if (session) {
-      localStorage.setItem('tm_user_email', session.user.email.toLowerCase());
-      /* لو حُدِّثت الصفحة أثناء وضع المعاينة، تُعاد بيانات الأدمن قبل أي شيء */
-      if (Pages._restorePreviewData()) setTimeout(() => Toast.show('تم الخروج من وضع المعاينة واستعادة بياناتك', 'info'), 400);
-      try {
-        await SBAuth.checkSubscription(session.user.id, session.user.email);
-        const { data: prof } = await _sb.from('profiles').select('approved, role').eq('id', session.user.id).maybeSingle();
-        _adminFlag = prof?.role === 'admin';
-        localStorage.setItem('tm_is_admin', _adminFlag ? '1' : '0');
-        if (!_adminFlag && (!prof || prof.approved !== true)) {
-          throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
+    try {
+      const { data: { session } } = await _sb.auth.getSession();
+      if (session) {
+        localStorage.setItem('tm_user_email', session.user.email.toLowerCase());
+        /* لو حُدِّثت الصفحة أثناء وضع المعاينة، تُعاد بيانات الأدمن قبل أي شيء */
+        if (Pages._restorePreviewData()) setTimeout(() => Toast.show('تم الخروج من وضع المعاينة واستعادة بياناتك', 'info'), 400);
+        try {
+          await SBAuth.checkSubscription(session.user.id, session.user.email);
+          const { data: prof } = await _sb.from('profiles').select('approved, role').eq('id', session.user.id).maybeSingle();
+          _adminFlag = prof?.role === 'admin';
+          localStorage.setItem('tm_is_admin', _adminFlag ? '1' : '0');
+          if (!_adminFlag && (!prof || prof.approved !== true)) {
+            throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
+          }
+        } catch (err) {
+          await SBAuth.signOut();
+          this._showLogin();
+          setTimeout(() => Toast.show(err.message, 'error'), 300);
+          return;
         }
-      } catch (err) {
-        await SBAuth.signOut();
-        document.getElementById('setup-screen').classList.remove('hidden');
-        this._bindAuthForm();
-        setTimeout(() => Toast.show(err.message, 'error'), 300);
-        return;
+        await SBAuth.loadUserData(session.user.id);
+        const teacher = DB.teacher();
+        if (teacher) { this.start(teacher); return; }
       }
-      await SBAuth.loadUserData(session.user.id);
-      const teacher = DB.teacher();
-      if (teacher) { this.start(teacher); return; }
+      this._showLogin();
+    } catch (err) {
+      /* أي تعثّر غير متوقع (شبكة، تخزين معطّل) يُنهي شاشة الإقلاع
+         بدل ترك المستخدم أمام مؤشر تحميل لا ينتهي */
+      console.error('App init failed:', err);
+      this._showLogin();
+      setTimeout(() => Toast.show('تعذّر الاتصال — تحقق من الإنترنت وأعد المحاولة', 'error'), 300);
     }
+  },
+
+  /* شاشة الإقلاع تُخفى في كل مسار ينتهي بعرض شيء للمستخدم */
+  _hideSplash() {
+    document.getElementById('boot-splash')?.classList.add('hidden');
+  },
+
+  _showLogin() {
+    this._hideSplash();
     document.getElementById('setup-screen').classList.remove('hidden');
     this._bindAuthForm();
   },
@@ -6512,6 +6529,7 @@ const App = {
   },
 
   _showProfileGate(teacher) {
+    this._hideSplash();
     document.getElementById('setup-screen').classList.add('hidden');
     document.getElementById('app').classList.add('hidden');
     const gateScreen = document.getElementById('profile-gate-screen');
@@ -6539,6 +6557,7 @@ const App = {
   },
 
   _reveal(teacher) {
+    this._hideSplash();
     document.getElementById('setup-screen').classList.add('hidden');
     document.getElementById('profile-gate-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
@@ -6569,8 +6588,7 @@ const App = {
         clearInterval(this._subTimer);
         await SBAuth.signOut();
         document.getElementById('app').classList.add('hidden');
-        document.getElementById('setup-screen').classList.remove('hidden');
-        this._bindAuthForm();
+        this._showLogin();
         setTimeout(() => Toast.show('انتهت صلاحية اشتراكك. تواصل مع الإدارة للتجديد.', 'error'), 300);
       }
     };
@@ -6583,7 +6601,7 @@ const App = {
     localStorage.removeItem('tm_user_email');
     await SBAuth.signOut();
     document.getElementById('app').classList.add('hidden');
-    document.getElementById('setup-screen').classList.remove('hidden');
+    this._showLogin();
   }
 };
 
