@@ -90,6 +90,35 @@
     </div>
   </div>
 
+  <!-- Profile Gate (حسابات قديمة تحتاج اختيار المرحلة/المادة) -->
+  <div id="profile-gate-screen" class="setup-overlay hidden">
+    <div class="setup-card">
+      <h1>أكمل بياناتك</h1>
+      <p class="setup-sub">يرجى اختيار مرحلتك ومادتك الدراسية للمتابعة</p>
+      <form id="profile-gate-form">
+        <div class="form-group">
+          <label><i class="fas fa-layer-group"></i> المرحلة الدراسية</label>
+          <select id="gate-stage" onchange="Subjects.fillSubjectSelect(this.value,'gate-subject')">
+            <option value="">اختر المرحلة</option>
+            <option value="lower">الصفوف الأولية (١-٣ ابتدائي)</option>
+            <option value="upper">الصفوف العليا (٤-٦ ابتدائي)</option>
+            <option value="middle">المرحلة المتوسطة</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label><i class="fas fa-book"></i> المادة</label>
+          <select id="gate-subject" disabled>
+            <option value="">اختر المرحلة أولاً</option>
+          </select>
+        </div>
+        <div id="gate-error" class="auth-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-full btn-lg">
+          <i class="fas fa-check"></i> متابعة
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Main App -->
   <div id="app" class="app hidden">
 
