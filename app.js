@@ -202,7 +202,10 @@ const DB = {
   setTeacher(v) {
     localStorage.setItem(this._k.teacher, JSON.stringify(v));
     if (v) _sb.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) _sb.from('profiles').upsert({ id: session.user.id, ...v });
+      if (!session?.user) return;
+      const { name, school, subject, stage, gender } = v;
+      _sb.from('profiles').upsert({ id: session.user.id, name, school, subject, stage, gender })
+        .then(({ error }) => { if (error) console.error('Profile sync error:', error.message); });
     });
   },
   id() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); },
