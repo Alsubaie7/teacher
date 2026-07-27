@@ -1110,14 +1110,12 @@ const Modal = {
 const ActiveClass = {
   // Returns the class currently in session, or null
   get() {
-    const settings = DB.settings();
-    const now      = new Date();
-    const dayKey   = ['sun','mon','tue','wed','thu','fri','sat'][now.getDay()];
+    const now    = new Date();
+    const dayKey = ['sun','mon','tue','wed','thu','fri','sat'][now.getDay()];
     if (dayKey === 'fri' || dayKey === 'sat') return null;
-    const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    const count = settings.periodCount || 8;
-    const ps    = settings.periods.filter(p => p.p <= count);
-    const cur   = ps.find(p => p.s && p.e && hhmm >= p.s && hhmm < p.e);
+    /* يعتمد TimeAware._periods بدل تكرار منطق تصفية الحصص —
+       التكرار السابق هو ما جعل الهيرو والجدول يختلفان في عدد الحصص */
+    const cur = TimeAware.currentPeriod();
     if (!cur) return null;
     const entry = DB.get('schedule').find(s => s.day === dayKey && s.period === cur.p);
     if (!entry) return null;
@@ -2225,7 +2223,14 @@ const TimeAware = {
     return (bh*60+bm) - (ah*60+am);
   },
 
-  _periods() { return DB.settings().periods || []; },
+  /* المصدر الوحيد لحصص اليوم الفعلية: تُستبعد الحصص التي ألغاها المعلم
+     بتقليل "عدد الحصص" في الإعدادات، والحصص بلا وقت بداية أو نهاية.
+     بدونه كان الهيرو يعلن عن حصة ثامنة لمن ضبط عدد الحصص على 7. */
+  _periods() {
+    const s = DB.settings();
+    const count = s.periodCount || 8;
+    return (s.periods || []).filter(p => p.p <= count && p.s && p.e);
+  },
 
   currentPeriod() {
     const hm = this._hhmm();
