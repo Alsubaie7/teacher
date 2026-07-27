@@ -1078,7 +1078,31 @@ const Modal = {
     box.className = 'modal-box' + (large ? ' modal-lg' : '');
     document.getElementById('modal-backdrop').classList.remove('hidden');
   },
-  close() { document.getElementById('modal-backdrop').classList.add('hidden'); }
+  close() {
+    this._pending = null;
+    document.getElementById('modal-backdrop').classList.add('hidden');
+  },
+
+  /* بديل confirm() الأصلي بهوية المنصة. الرسالة تُعرض كنص خام — هرّب أي محتوى ديناميكي */
+  _pending: null,
+  confirm(title, message, onConfirm, opts = {}) {
+    const { okText = 'تأكيد', danger = false, icon = danger ? 'fa-triangle-exclamation' : 'fa-circle-question' } = opts;
+    this._pending = onConfirm;
+    this.open(title, `
+      <div class="confirm-body">
+        <div class="confirm-icon ${danger ? 'danger' : ''}"><i class="fas ${icon}"></i></div>
+        <p class="confirm-msg">${message}</p>
+      </div>
+      <div class="confirm-actions">
+        <button class="btn btn-outline" onclick="Modal.close()">إلغاء</button>
+        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" onclick="Modal._accept()">${_esc(okText)}</button>
+      </div>`);
+  },
+  _accept() {
+    const fn = this._pending;
+    this.close();
+    if (typeof fn === 'function') fn();
+  }
 };
 
 /* ==================== ROUTER ==================== */
@@ -5891,14 +5915,21 @@ const Pages = {
     if (_inp && refToSel) { _inp.value = (DB.teacher()?.refToNames||{})[refToSel.value] || ''; }
   },
 
-  /* ---- PREVIEW MODE ---- */
-  _previewOriginal: null,
+  /* ---- PREVIEW MODE ----
+     تُحفظ بيانات الأدمن الأصلية في sessionStorage لا في الذاكرة، وإلا ضاعت
+     نهائياً لو حُدِّثت الصفحة أثناء المعاينة وبقيت بيانات المعلم الآخر مكانها. */
+  _PREVIEW_KEY: 'tm_preview_original',
 
-  _previewAs(profile) {
-    if (this._previewOriginal === null)
-      this._previewOriginal = localStorage.getItem(DB._k.teacher);
+  _previewAs(userId) {
+    const p = (this._adminCache || []).find(u => u.id === userId);
+    if (!p) { Toast.show('تعذّر العثور على بيانات المعلم', 'error'); return; }
+    if (sessionStorage.getItem(this._PREVIEW_KEY) === null)
+      sessionStorage.setItem(this._PREVIEW_KEY, localStorage.getItem(DB._k.teacher) ?? '');
+
+    const profile = { name: p.name || '', school: p.school || '', subject: p.subject || '',
+                      stage: p.stage || '', gender: p.gender || 'male', email: p.email || '' };
     localStorage.setItem(DB._k.teacher, JSON.stringify(profile));
-    const role = profile.gender === 'female' ? 'معلمة' : 'معلم';
+    const role  = profile.gender === 'female' ? 'معلمة' : 'معلم';
     const label = profile.name ? `${role}: ${profile.name}` : role;
     document.getElementById('preview-banner-text').textContent = `وضع المعاينة — ${label}`;
     document.getElementById('preview-banner').classList.remove('hidden');
@@ -5908,10 +5939,7 @@ const Pages = {
   },
 
   _exitPreview() {
-    if (this._previewOriginal !== null) {
-      localStorage.setItem(DB._k.teacher, this._previewOriginal);
-      this._previewOriginal = null;
-    }
+    this._restorePreviewData();
     document.getElementById('preview-banner').classList.add('hidden');
     const t = DB.teacher() || {};
     document.getElementById('sb-name').textContent   = t.name   || '—';
@@ -5919,76 +5947,165 @@ const Pages = {
     Router.go('admin');
   },
 
+  /* تعيد بيانات الأدمن الأصلية. ترجع true إن كانت هناك معاينة قائمة */
+  _restorePreviewData() {
+    const saved = sessionStorage.getItem(this._PREVIEW_KEY);
+    if (saved === null) return false;
+    if (saved === '') localStorage.removeItem(DB._k.teacher);
+    else              localStorage.setItem(DB._k.teacher, saved);
+    sessionStorage.removeItem(this._PREVIEW_KEY);
+    return true;
+  },
+
   /* ---- ADMIN PANEL ---- */
+  _adminCache: null,
+
+  _AUDIT_META: {
+    user_approved:        { i:'fa-user-check',   c:'#059669', b:'#d1fae5', t:'فعّل حساب' },
+    user_suspended:       { i:'fa-user-slash',   c:'#dc2626', b:'#fee2e2', t:'علّق حساب' },
+    bulk_approved:        { i:'fa-check-double', c:'#059669', b:'#d1fae5', t:'تفعيل جماعي' },
+    user_deleted:         { i:'fa-user-xmark',   c:'#dc2626', b:'#fee2e2', t:'حذف حساب' },
+    subscription_set:     { i:'fa-credit-card',  c:'#2563eb', b:'#dbeafe', t:'حدّث اشتراك' },
+    subscription_cleared: { i:'fa-ban',          c:'#d97706', b:'#fef3c7', t:'ألغى اشتراك' },
+    role_changed:         { i:'fa-user-shield',  c:'#7c3aed', b:'#ede9fe', t:'غيّر دور' },
+    setting_changed:      { i:'fa-sliders',      c:'#475569', b:'#e2e8f0', t:'غيّر إعداد' }
+  },
+
+  _fmtDT(v, withTime = false) {
+    if (!v) return '—';
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return '—';
+    const date = d.toLocaleDateString('ar-SA');
+    return withTime ? `${date} · ${d.toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' })}` : date;
+  },
+
+  _relTime(v) {
+    if (!v) return 'لم يدخل بعد';
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return '—';
+    const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (mins < 1)     return 'الآن';
+    if (mins < 60)    return `قبل ${mins} د`;
+    if (mins < 1440)  return `قبل ${Math.floor(mins/60)} س`;
+    const days = Math.floor(mins/1440);
+    if (days < 30)    return `قبل ${days} يوم`;
+    return this._fmtDT(v);
+  },
+
+  _subCell(u) {
+    if (!u.expires_at) return '<span class="badge badge-gray">بدون اشتراك</span>';
+    const days = Math.ceil((new Date(u.expires_at).getTime() - Date.now()) / 86400000);
+    const date = `<div class="admin-sub-date">${this._fmtDT(u.expires_at)}</div>`;
+    if (days < 0)   return `<span class="badge badge-red">منتهي</span>${date}`;
+    if (days <= 14) return `<span class="badge badge-gold">باقي ${days} يوم</span>${date}`;
+    return `<span class="badge badge-green">ساري</span>${date}`;
+  },
+
   async admin() {
     const el = document.getElementById('content');
     el.innerHTML = `<div class="admin-banner"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2><p>جارِ تحميل البيانات...</p></div>
-      <div style="text-align:center;padding:3rem"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:#7c3aed"></i></div>`;
-    const [{ data: profiles, error: profErr }, { data: platRow }] = await Promise.all([
+      <div style="text-align:center;padding:3rem"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--purple)"></i></div>`;
+
+    const [usersRes, platRes, logRes] = await Promise.all([
       _sb.rpc('get_all_users'),
-      _sb.from('user_data').select('value').eq('key','platform_open').maybeSingle()
+      _sb.from('app_settings').select('value').eq('key', 'platform_open').maybeSingle(),
+      _sb.rpc('get_audit_log', { p_limit: 12 })
     ]);
-    if (profErr) {
+
+    if (usersRes.error) {
       el.innerHTML = `<div class="admin-banner"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2></div>
         <div class="empty-state"><i class="fas fa-exclamation-triangle fa-3x" style="color:#ef4444"></i>
-        <p>تعذّر تحميل البيانات</p><small style="direction:ltr;opacity:.6">${profErr.message}</small></div>`;
+          <p>تعذّر تحميل البيانات</p>
+          <small style="direction:ltr;opacity:.6">${_esc(usersRes.error.message)}</small>
+          <div style="margin-top:1rem"><button class="btn btn-primary" onclick="Pages.admin()"><i class="fas fa-rotate"></i> إعادة المحاولة</button></div>
+        </div>`;
       return;
     }
-    const isPO = !platRow || platRow.value !== '0';
-    const T = profiles || [];
-    const M = T.filter(p => p.gender !== 'female').length;
-    const F = T.filter(p => p.gender === 'female').length;
-    const pend = T.filter(p => !p.approved && p.email !== _ADMIN_EMAIL);
-    const appr = T.filter(p => p.approved || p.email === _ADMIN_EMAIL);
-    const tot = M + F || 1;
+
+    const T = usersRes.data || [];
+    this._adminCache = T;
+    const isPO  = (platRes.data?.value ?? '1') !== '0';
+    const logs  = logRes.data || [];
+    const now   = Date.now();
+
+    const M    = T.filter(p => p.gender !== 'female').length;
+    const F    = T.filter(p => p.gender === 'female').length;
+    const pend = T.filter(p => !p.approved && p.role !== 'admin');
+    const appr = T.filter(p => p.approved || p.role === 'admin');
+    const subOk  = T.filter(p => p.expires_at && new Date(p.expires_at).getTime() >  now).length;
+    const subBad = T.filter(p => p.expires_at && new Date(p.expires_at).getTime() <= now).length;
+    const tot  = M + F || 1;
     const mD = (M/tot)*251.2, fD = (F/tot)*251.2;
+
     const donut = `<svg width="110" height="110" viewBox="0 0 100 100">
-      <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" stroke-width="14"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" stroke-width="14"/>
       <circle cx="50" cy="50" r="40" fill="none" stroke="#3b82f6" stroke-width="14" stroke-dasharray="${mD} ${251.2-mD}" stroke-dashoffset="62.8" stroke-linecap="round"/>
       <circle cx="50" cy="50" r="40" fill="none" stroke="#ec4899" stroke-width="14" stroke-dasharray="${fD} ${251.2-fD}" stroke-dashoffset="${62.8-mD}" stroke-linecap="round"/>
-      <text x="50" y="50" text-anchor="middle" dy=".35em" font-size="16" font-weight="900" fill="#1e293b">${T.length}</text>
+      <text x="50" y="50" text-anchor="middle" dy=".35em" font-size="16" font-weight="900" fill="var(--text-primary)">${T.length}</text>
     </svg>`;
+
     const pendHtml = pend.length ? `<div class="admin-pending-alert">
       <div class="admin-pending-icon"><i class="fas fa-user-clock"></i></div>
       <div class="admin-pending-info"><strong>🔔 ${pend.length} طلب بانتظار الموافقة</strong>
-        <p>${pend.map(p=>p.name||p.email).slice(0,3).join('، ')}${pend.length>3?` و ${pend.length-3} آخرين`:''}</p></div>
+        <p>${_esc(pend.map(p => p.name || p.email).slice(0,3).join('، '))}${pend.length > 3 ? ` و ${pend.length-3} آخرين` : ''}</p></div>
       <div class="admin-pending-actions"><button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="Pages._approveAll()"><i class="fas fa-check-double"></i> قبول الكل</button></div>
     </div>` : '';
-    const logHtml = [...T].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,8).map(p=>{
-      const d=p.created_at?new Date(p.created_at):null;
-      const ts=d?d.toLocaleDateString('ar-SA')+' '+d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'—';
-      const ic=p.approved?'fa-user-check':'fa-user-plus';
-      const bg=p.approved?'background:#d1fae5;color:#059669':'background:#fef3c7;color:#d97706';
-      return `<div class="admin-log-item"><div class="admin-log-icon" style="${bg}"><i class="fas ${ic}"></i></div>
-        <div class="admin-log-text"><strong>${p.name||'مستخدم'}</strong> ${p.approved?'حساب مفعّل':'سجّل حساباً جديداً'}</div>
-        <div class="admin-log-time">${ts}</div></div>`;
+
+    const logHtml = logs.map(l => {
+      const m   = this._AUDIT_META[l.action] || { i:'fa-circle-info', c:'#475569', b:'#e2e8f0', t:l.action };
+      const d   = l.details || {};
+      const who = l.target_email || (d.count ? `${d.count} حساب` : (d.key ? `${d.key} = ${d.value}` : ''));
+      return `<div class="admin-log-item">
+        <div class="admin-log-icon" style="background:${m.b};color:${m.c}"><i class="fas ${m.i}"></i></div>
+        <div class="admin-log-text"><strong>${_esc(m.t)}</strong>${who ? ` — ${_esc(String(who))}` : ''}
+          <div class="admin-log-actor">${_esc(l.actor_email || '')}</div></div>
+        <div class="admin-log-time">${this._fmtDT(l.created_at, true)}</div>
+      </div>`;
     }).join('');
-    const rows = T.map((p,i)=>{
-      const pJ=JSON.stringify({name:p.name||'',school:p.school||'',subject:p.subject||'',gender:p.gender||'male',email:p.email||''}).replace(/"/g,'&quot;');
-      const isMe=p.email===_ADMIN_EMAIL;
-      const stB=isMe?'<span class="badge" style="background:#7c3aed;color:#fff">أدمن</span>':p.approved?'<span class="badge badge-green">مفعّل</span>':'<span class="badge badge-gold">قيد المراجعة</span>';
-      const act=isMe?'':p.approved
-        ?`<button class="btn btn-sm btn-danger" onclick="Pages._setApproval('${p.id}',false)"><i class="fas fa-ban"></i> تعليق</button>`
-        :`<button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="Pages._setApproval('${p.id}',true)"><i class="fas fa-check"></i> تفعيل</button>`;
-      const ac=p.gender==='female'?'female':'male';
-      return `<tr data-name="${(p.name||'').toLowerCase()}" data-status="${isMe?'admin':p.approved?'approved':'pending'}">
+
+    const rows = T.map((p, i) => {
+      const isAdminRow = p.role === 'admin';
+      const isMe       = p.email && p.email.toLowerCase() === (localStorage.getItem('tm_user_email') || '').toLowerCase();
+      const stB = isAdminRow
+        ? '<span class="badge" style="background:var(--purple);color:#fff">أدمن</span>'
+        : p.approved ? '<span class="badge badge-green">مفعّل</span>'
+                     : '<span class="badge badge-gold">قيد المراجعة</span>';
+
+      const acts = [];
+      if (!isAdminRow) acts.push(p.approved
+        ? `<button class="admin-act danger" title="تعليق الحساب" onclick="Pages._setApproval('${p.id}',false)"><i class="fas fa-ban"></i></button>`
+        : `<button class="admin-act ok" title="تفعيل الحساب" onclick="Pages._setApproval('${p.id}',true)"><i class="fas fa-check"></i></button>`);
+      acts.push(`<button class="admin-act" title="إدارة الاشتراك" onclick="Pages._subModal('${p.id}')"><i class="fas fa-credit-card"></i></button>`);
+      acts.push(`<button class="admin-act" title="معاينة كمعلم" onclick="Pages._previewAs('${p.id}')"><i class="fas fa-eye"></i></button>`);
+      if (!isMe) acts.push(`<button class="admin-act" title="${isAdminRow ? 'إرجاعه معلماً' : 'ترقيته لأدمن'}" onclick="Pages._setRole('${p.id}','${isAdminRow ? 'teacher' : 'admin'}')"><i class="fas fa-user-shield"></i></button>`);
+      if (!isAdminRow) acts.push(`<button class="admin-act danger" title="حذف الحساب نهائياً" onclick="Pages._deleteUser('${p.id}')"><i class="fas fa-trash"></i></button>`);
+
+      const ac = p.gender === 'female' ? 'female' : 'male';
+      const search = `${p.name || ''} ${p.email || ''} ${p.school || ''}`.toLowerCase();
+      return `<tr data-name="${_esc(search)}" data-status="${isAdminRow ? 'admin' : p.approved ? 'approved' : 'pending'}">
         <td>${i+1}</td>
-        <td><div class="admin-teacher-cell"><div class="admin-teacher-avatar ${ac}">${(p.name||'؟').charAt(0)}</div>
-          <div><div>${p.name||'—'}</div><div style="font-size:.72rem;color:var(--text-muted);font-weight:400">${p.email||''}</div></div></div></td>
-        <td><span class="badge ${p.gender==='female'?'badge-purple':'badge-blue'}">${p.gender==='female'?'معلمة':'معلم'}</span></td>
-        <td>${p.school||'—'}</td><td>${p.subject||'—'}</td><td>${stB}</td>
-        <td style="font-size:.76rem;color:var(--text-muted)">${p.created_at?new Date(p.created_at).toLocaleDateString('ar-SA'):'—'}</td>
-        <td><div style="display:flex;gap:.3rem">${act}<button class="btn btn-sm btn-outline" onclick='Pages._previewAs(${pJ})'><i class="fas fa-eye"></i></button></div></td>
+        <td><div class="admin-teacher-cell"><div class="admin-teacher-avatar ${ac}">${_esc((p.name || '؟').charAt(0))}</div>
+          <div><div>${_esc(p.name) || '—'}</div><div style="font-size:.72rem;color:var(--text-muted);font-weight:400">${_esc(p.email)}</div></div></div></td>
+        <td><span class="badge ${p.gender === 'female' ? 'badge-purple' : 'badge-blue'}">${p.gender === 'female' ? 'معلمة' : 'معلم'}</span></td>
+        <td>${_esc(p.school) || '—'}<div style="font-size:.72rem;color:var(--text-muted)">${_esc(p.subject) || '—'}</div></td>
+        <td><div class="admin-usage"><span title="عدد الفصول"><i class="fas fa-chalkboard"></i> ${p.classes_count ?? 0}</span>
+          <span title="عدد الطلاب"><i class="fas fa-user-graduate"></i> ${p.students_count ?? 0}</span></div></td>
+        <td style="font-size:.76rem;color:var(--text-muted)" title="${_esc(this._fmtDT(p.last_sign_in_at, true))}">${_esc(this._relTime(p.last_sign_in_at))}</td>
+        <td>${this._subCell(p)}</td>
+        <td>${stB}</td>
+        <td><div class="admin-acts">${acts.join('')}</div></td>
       </tr>`;
     }).join('');
+
     el.innerHTML = `
       <div class="admin-banner">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;position:relative;z-index:1">
           <div><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2>
-            <p>إدارة المعلمين والتحكم بالمنصة — <span class="badge">${isPO?'🟢 مفتوحة':'🔴 مغلقة'}</span></p></div>
-          <div style="display:flex;gap:.5rem">
-            <button class="btn btn-sm" style="background:${isPO?'rgba(255,255,255,.15)':'#10b981'};color:#fff;border:1px solid rgba(255,255,255,.25)" onclick="Pages._adminSetPlatform(true)" ${isPO?'disabled':''}><i class="fas fa-lock-open"></i> فتح</button>
-            <button class="btn btn-sm" style="background:${!isPO?'rgba(255,255,255,.15)':'#ef4444'};color:#fff;border:1px solid rgba(255,255,255,.25)" onclick="Pages._adminSetPlatform(false)" ${!isPO?'disabled':''}><i class="fas fa-lock"></i> إغلاق</button>
+            <p>إدارة المعلمين والاشتراكات — المنصة <span class="badge">${isPO ? '🟢 مفتوحة' : '🔴 مغلقة'}</span></p></div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25)" onclick="Pages.admin()" title="تحديث"><i class="fas fa-rotate"></i></button>
+            <button class="btn btn-sm" style="background:${isPO ? 'rgba(255,255,255,.15)' : '#10b981'};color:#fff;border:1px solid rgba(255,255,255,.25)" onclick="Pages._adminSetPlatform(true)" ${isPO ? 'disabled' : ''}><i class="fas fa-lock-open"></i> فتح</button>
+            <button class="btn btn-sm" style="background:${!isPO ? 'rgba(255,255,255,.15)' : '#ef4444'};color:#fff;border:1px solid rgba(255,255,255,.25)" onclick="Pages._adminSetPlatform(false)" ${!isPO ? 'disabled' : ''}><i class="fas fa-lock"></i> إغلاق</button>
           </div>
         </div>
       </div>
@@ -5999,6 +6116,7 @@ const Pages = {
         <div class="admin-stat" style="--stat-accent:#ec4899"><div class="admin-stat-icon" style="background:#fce7f3;color:#db2777"><i class="fas fa-female"></i></div><div><div class="admin-stat-val">${F}</div><div class="admin-stat-lbl">معلمة</div></div></div>
         <div class="admin-stat" style="--stat-accent:#10b981"><div class="admin-stat-icon" style="background:#d1fae5;color:#059669"><i class="fas fa-user-check"></i></div><div><div class="admin-stat-val">${appr.length}</div><div class="admin-stat-lbl">مفعّل</div></div></div>
         <div class="admin-stat" style="--stat-accent:#f59e0b"><div class="admin-stat-icon" style="background:#fef3c7;color:#d97706"><i class="fas fa-user-clock"></i></div><div><div class="admin-stat-val">${pend.length}</div><div class="admin-stat-lbl">معلّق</div></div></div>
+        <div class="admin-stat" style="--stat-accent:#0ea5a3"><div class="admin-stat-icon" style="background:#ccfbf1;color:#0d9488"><i class="fas fa-credit-card"></i></div><div><div class="admin-stat-val">${subOk}</div><div class="admin-stat-lbl">اشتراك ساري${subBad ? ` · ${subBad} منتهي` : ''}</div></div></div>
       </div>
       <div class="admin-grid-2">
         <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chart-pie"></i> توزيع المعلمين</h3></div>
@@ -6011,72 +6129,176 @@ const Pages = {
             </div>
           </div>
         </div>
-        <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-history"></i> سجل النشاط</h3></div>
-          <div class="admin-log">${logHtml||'<p style="text-align:center;color:var(--text-muted);padding:1rem">لا يوجد نشاط</p>'}</div>
+        <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-clipboard-list"></i> سجل التدقيق</h3></div>
+          <div class="admin-log">${logHtml || `<p style="text-align:center;color:var(--text-muted);padding:1rem">${logRes.error ? 'سجل التدقيق غير مُهيّأ بعد — نفّذ ملف SQL أولاً' : 'لا توجد إجراءات مسجّلة بعد'}</p>`}</div>
         </div>
       </div>
       <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chalkboard-teacher"></i> قائمة المعلمين (${T.length})</h3></div>
         <div class="admin-toolbar">
-          <input class="admin-search" type="text" placeholder="🔍 ابحث بالاسم..." oninput="Pages._filterAdminRows(this.value)">
+          <input class="admin-search" type="text" placeholder="🔍 ابحث بالاسم أو البريد أو المدرسة..." oninput="Pages._filterAdminRows(this.value)">
           <button class="admin-filter-btn active" onclick="Pages._filterAdminStatus(this,'all')">الكل (${T.length})</button>
           <button class="admin-filter-btn" onclick="Pages._filterAdminStatus(this,'approved')">مفعّل (${appr.length})</button>
           <button class="admin-filter-btn" onclick="Pages._filterAdminStatus(this,'pending')">معلّق (${pend.length})</button>
         </div>
-        ${T.length?`<div style="overflow-x:auto"><table class="admin-table">
-          <thead><tr><th>#</th><th>المعلم</th><th>الجنس</th><th>المدرسة</th><th>المادة</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead>
+        ${T.length ? `<div style="overflow-x:auto"><table class="admin-table">
+          <thead><tr><th>#</th><th>المعلم</th><th>الجنس</th><th>المدرسة / المادة</th><th>الاستخدام</th><th>آخر دخول</th><th>الاشتراك</th><th>الحالة</th><th></th></tr></thead>
           <tbody id="admin-tbody">${rows}</tbody></table></div>`
-        :`<div class="empty-state"><i class="fas fa-users fa-2x"></i><p>لا يوجد معلمون</p></div>`}
+        : `<div class="empty-state"><i class="fas fa-users fa-2x"></i><p>لا يوجد معلمون</p></div>`}
       </div>`;
   },
 
   _filterAdminRows(q) {
     const rows = document.querySelectorAll('#admin-tbody tr');
     q = q.trim().toLowerCase();
-    rows.forEach(r => { r.style.display = (!q || (r.dataset.name||'').includes(q)) ? '' : 'none'; });
+    rows.forEach(r => { r.style.display = (!q || (r.dataset.name || '').includes(q)) ? '' : 'none'; });
   },
+
   _filterAdminStatus(btn, status) {
     document.querySelectorAll('.admin-filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('#admin-tbody tr').forEach(r => {
-      r.style.display = (status==='all' || r.dataset.status===status) ? '' : 'none';
+      r.style.display = (status === 'all' || r.dataset.status === status) ? '' : 'none';
     });
   },
-  async _approveAll() {
-    const T = ((await _sb.rpc('get_all_users')).data||[]).filter(p => !p.approved && p.email !== _ADMIN_EMAIL);
-    if (!T.length) { Toast.show('لا يوجد طلبات معلّقة'); return; }
-    if (!confirm(`تفعيل ${T.length} حساب؟`)) return;
-    for (const p of T) { await _sb.from('profiles').update({approved:true}).eq('id',p.id); }
-    Toast.show(`✓ تم تفعيل ${T.length} حساب`);
+
+  _adminUser(id) { return (this._adminCache || []).find(u => u.id === id) || null; },
+
+  _approveAll() {
+    const pend = (this._adminCache || []).filter(p => !p.approved && p.role !== 'admin');
+    if (!pend.length) { Toast.show('لا يوجد طلبات معلّقة'); return; }
+    Modal.confirm('تفعيل جميع الطلبات',
+      `سيتم تفعيل <strong>${pend.length}</strong> حساب دفعة واحدة، وسيتمكن أصحابها من الدخول فوراً.`,
+      async () => {
+        const { data, error } = await _sb.rpc('admin_approve_all');
+        if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
+        Toast.show(`✓ تم تفعيل ${data ?? pend.length} حساب`, 'success');
+        Pages.admin();
+      }, { okText: 'تفعيل الكل' });
+  },
+
+  _setApproval(userId, approve) {
+    const u  = this._adminUser(userId);
+    const nm = _esc(u?.name || u?.email || 'هذا الحساب');
+    Modal.confirm(approve ? 'تفعيل الحساب' : 'تعليق الحساب',
+      approve ? `سيتمكن <strong>${nm}</strong> من الدخول للمنصة.`
+              : `لن يتمكن <strong>${nm}</strong> من الدخول حتى تُعيد تفعيله. بياناته تبقى محفوظة.`,
+      async () => {
+        const { error } = await _sb.rpc('admin_set_approval', { p_user: userId, p_approved: approve });
+        if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
+        Toast.show(approve ? 'تم تفعيل الحساب' : 'تم تعليق الحساب', approve ? 'success' : 'info');
+        Pages.admin();
+      }, { okText: approve ? 'تفعيل' : 'تعليق', danger: !approve });
+  },
+
+  _deleteUser(userId) {
+    const u  = this._adminUser(userId);
+    const nm = _esc(u?.name || u?.email || 'هذا الحساب');
+    Modal.confirm('حذف الحساب نهائياً',
+      `سيُحذف <strong>${nm}</strong> مع كل فصوله وطلابه ودرجاته وسجل حضوره.
+       <br><span style="color:#dc2626;font-weight:700">لا يمكن التراجع عن هذا الإجراء.</span>`,
+      async () => {
+        const { error } = await _sb.rpc('admin_delete_user', { p_user: userId });
+        if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
+        Toast.show('تم حذف الحساب نهائياً', 'info');
+        Pages.admin();
+      }, { okText: 'حذف نهائي', danger: true });
+  },
+
+  _setRole(userId, role) {
+    const u  = this._adminUser(userId);
+    const nm = _esc(u?.name || u?.email || 'هذا الحساب');
+    Modal.confirm(role === 'admin' ? 'ترقية لأدمن' : 'إرجاعه معلماً',
+      role === 'admin'
+        ? `سيحصل <strong>${nm}</strong> على صلاحيات كاملة: إدارة الحسابات والاشتراكات وقفل المنصة.`
+        : `ستُسحب صلاحيات الإدارة من <strong>${nm}</strong> ويعود معلماً عادياً.`,
+      async () => {
+        const { error } = await _sb.rpc('admin_set_role', { p_user: userId, p_role: role });
+        if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
+        Toast.show('تم تحديث الصلاحية', 'success');
+        Pages.admin();
+      }, { okText: role === 'admin' ? 'ترقية' : 'سحب الصلاحية', danger: role !== 'admin' });
+  },
+
+  /* ---- الاشتراكات ---- */
+  _subModal(userId) {
+    const u = this._adminUser(userId);
+    if (!u) return;
+    const cur = u.expires_at ? new Date(u.expires_at) : null;
+    const val = cur && !isNaN(cur.getTime()) ? cur.toISOString().slice(0, 10) : '';
+    Modal.open(`اشتراك: ${u.name || u.email || ''}`, `
+      <div class="form-group">
+        <label><i class="fas fa-calendar-check"></i> تاريخ انتهاء الاشتراك</label>
+        <input type="date" id="sub-date" value="${val}">
+      </div>
+      <div class="sub-quick">
+        <button class="btn btn-sm btn-outline" onclick="Pages._subQuick(30)">+ شهر</button>
+        <button class="btn btn-sm btn-outline" onclick="Pages._subQuick(120)">+ فصل دراسي</button>
+        <button class="btn btn-sm btn-outline" onclick="Pages._subQuick(365)">+ سنة</button>
+      </div>
+      <div class="form-group">
+        <label><i class="fas fa-note-sticky"></i> ملاحظة (اختياري)</label>
+        <input type="text" id="sub-note" value="${_esc(u.sub_note)}" placeholder="مثال: حوّل 200 ريال — 2026/07/28">
+      </div>
+      <div class="sub-actions">
+        ${u.expires_at ? `<button class="btn btn-sm btn-danger" onclick="Pages._clearSub('${u.id}')"><i class="fas fa-ban"></i> إلغاء الاشتراك</button>` : '<span></span>'}
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-outline" onclick="Modal.close()">إلغاء</button>
+          <button class="btn btn-primary" onclick="Pages._saveSub('${u.id}')"><i class="fas fa-save"></i> حفظ</button>
+        </div>
+      </div>`);
+  },
+
+  _subQuick(days) {
+    const inp = document.getElementById('sub-date');
+    if (!inp) return;
+    const today = new Date();
+    let base = inp.value ? new Date(inp.value + 'T12:00:00') : today;
+    if (isNaN(base.getTime()) || base < today) base = today;   // التمديد يبدأ من اليوم لا من تاريخ منتهٍ
+    base.setDate(base.getDate() + days);
+    inp.value = base.toISOString().slice(0, 10);
+  },
+
+  async _saveSub(userId) {
+    const v    = document.getElementById('sub-date')?.value;
+    const note = document.getElementById('sub-note')?.value.trim() || null;
+    if (!v) { Toast.show('اختر تاريخ الانتهاء أولاً', 'error'); return; }
+    const iso = new Date(v + 'T23:59:59').toISOString();
+    const { error } = await _sb.rpc('admin_set_subscription', { p_user: userId, p_expires: iso, p_note: note });
+    if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
+    Modal.close();
+    Toast.show('تم تحديث الاشتراك', 'success');
     Pages.admin();
   },
 
-  async _setApproval(userId, approve) {
-    const action = approve ? 'تفعيل' : 'تعليق';
-    if (!confirm(`هل تريد ${action} هذا الحساب؟`)) return;
-    const { error } = await _sb.from('profiles').update({ approved: approve }).eq('id', userId);
+  async _clearSub(userId) {
+    const { error } = await _sb.rpc('admin_set_subscription', { p_user: userId, p_expires: null, p_note: null });
     if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
-    Toast.show(approve ? 'تم تفعيل الحساب بنجاح' : 'تم تعليق الحساب', approve ? 'success' : 'info');
+    Modal.close();
+    Toast.show('تم إلغاء الاشتراك', 'info');
     Pages.admin();
   },
 
-  async _adminSetPlatform(open) {
-    const { data: { session } } = await _sb.auth.getSession();
-    if (!session) return;
-    const { error } = await _sb.from('user_data').upsert(
-      { user_id: session.user.id, key: 'platform_open', value: open ? '1' : '0' },
-      { onConflict: 'user_id,key' }
-    );
-    if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
-    Toast.show(open ? 'تم فتح المنصة للجميع' : 'تم إغلاق المنصة', open ? 'success' : 'info');
-    Pages.admin();
+  _adminSetPlatform(open) {
+    Modal.confirm(open ? 'فتح المنصة' : 'إغلاق المنصة',
+      open ? 'سيُسمح بالتسجيل والدخول لجميع المعلمين المفعّلين.'
+           : 'سيُمنع التسجيل والدخول لجميع المعلمين. حسابات الأدمن تبقى قادرة على الدخول.',
+      async () => {
+        const { error } = await _sb.rpc('admin_set_setting', { p_key: 'platform_open', p_value: open ? '1' : '0' });
+        if (error) { Toast.show('حدث خطأ: ' + error.message, 'error'); return; }
+        Toast.show(open ? 'تم فتح المنصة للجميع' : 'تم إغلاق المنصة', open ? 'success' : 'info');
+        Pages.admin();
+      }, { okText: open ? 'فتح' : 'إغلاق', danger: !open });
   }
 };
 
 
 
 
-const _ADMIN_EMAIL = 'nassserf999@gmail.com';
-const _isAdmin = () => (localStorage.getItem('tm_user_email') || '').toLowerCase() === _ADMIN_EMAIL;
+/* صلاحية الأدمن مصدرها عمود profiles.role عبر الدالة me_is_admin().
+   القيمة المخزّنة هنا للواجهة فقط (إظهار زر اللوحة)؛ الحماية الفعلية في
+   سياسات RLS ودوال SECURITY DEFINER التي تتحقق من is_admin() في كل نداء. */
+let _adminFlag = localStorage.getItem('tm_is_admin') === '1';
+const _isAdmin = () => _adminFlag;
 
 /* ==================== AUTH ==================== */
 const SBAuth = {
@@ -6109,9 +6331,16 @@ const SBAuth = {
     }
   },
 
+  /* حالة المنصة تُقرأ من app_settings — جدول عام قابل للقراءة حتى للزائر.
+     كانت تُقرأ من user_data وسياستها (auth.uid() = user_id) تمنع أي أحد من
+     رؤية قيمة الأدمن، فكان زر الإغلاق بلا أي أثر فعلي. */
+  async isPlatformOpen() {
+    const { data } = await _sb.from('app_settings').select('value').eq('key', 'platform_open').maybeSingle();
+    return (data?.value ?? '1') !== '0';
+  },
+
   async signUp(email, password, name, school, subject, gender, region, stage) {
-    const { data: platRow } = await _sb.from('user_data').select('value').eq('key','platform_open').maybeSingle();
-    if (platRow?.value === '0') throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
+    if (!await this.isPlatformOpen()) throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
     const { data, error } = await _sb.auth.signUp({ email, password });
     if (error) throw error;
     if (data.user) {
@@ -6123,6 +6352,8 @@ const SBAuth = {
       await _sb.from('profiles').upsert({ id: data.user.id, name, school, subject, stage, gender, email: email.toLowerCase(), approved: false });
       localStorage.setItem(DB._k.teacher, JSON.stringify({ name, school, subject, stage, gender, region }));
       localStorage.setItem('tm_user_email', email.toLowerCase());
+      _adminFlag = false;
+      localStorage.setItem('tm_is_admin', '0');
     }
     return data;
   },
@@ -6142,15 +6373,19 @@ const SBAuth = {
   async signIn(email, password) {
     const { data, error } = await _sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    if (email.toLowerCase() !== _ADMIN_EMAIL) {
-      const { data: platRow } = await _sb.from('user_data').select('value').eq('key','platform_open').maybeSingle();
-      if (platRow?.value === '0') throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
-      const { data: prof } = await _sb.from('profiles').select('approved').eq('id', data.user.id).maybeSingle();
+    const { data: prof } = await _sb.from('profiles').select('approved, role').eq('id', data.user.id).maybeSingle();
+    if (prof?.role !== 'admin') {
+      if (!await this.isPlatformOpen()) {
+        await _sb.auth.signOut();
+        throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
+      }
       if (!prof || prof.approved !== true) {
         await _sb.auth.signOut();
         throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
       }
     }
+    _adminFlag = prof?.role === 'admin';
+    localStorage.setItem('tm_is_admin', _adminFlag ? '1' : '0');
     const prevId = localStorage.getItem('tm_current_user');
     if (prevId && prevId !== data.user.id) {
       Object.values(DB._k).forEach(k => localStorage.removeItem(k));
@@ -6187,13 +6422,15 @@ const App = {
     const { data: { session } } = await _sb.auth.getSession();
     if (session) {
       localStorage.setItem('tm_user_email', session.user.email.toLowerCase());
+      /* لو حُدِّثت الصفحة أثناء وضع المعاينة، تُعاد بيانات الأدمن قبل أي شيء */
+      if (Pages._restorePreviewData()) setTimeout(() => Toast.show('تم الخروج من وضع المعاينة واستعادة بياناتك', 'info'), 400);
       try {
         await SBAuth.checkSubscription(session.user.id, session.user.email);
-        if (session.user.email.toLowerCase() !== _ADMIN_EMAIL) {
-          const { data: prof } = await _sb.from('profiles').select('approved').eq('id', session.user.id).maybeSingle();
-          if (!prof || prof.approved !== true) {
-            throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
-          }
+        const { data: prof } = await _sb.from('profiles').select('approved, role').eq('id', session.user.id).maybeSingle();
+        _adminFlag = prof?.role === 'admin';
+        localStorage.setItem('tm_is_admin', _adminFlag ? '1' : '0');
+        if (!_adminFlag && (!prof || prof.approved !== true)) {
+          throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
         }
       } catch (err) {
         await SBAuth.signOut();
@@ -6308,12 +6545,10 @@ const App = {
     document.getElementById('sb-name').textContent   = teacher.name   || '—';
     document.getElementById('sb-school').textContent = teacher.school || '—';
     document.getElementById('sb-email').textContent  = localStorage.getItem('tm_user_email') || '—';
-    if (_isAdmin()) {
-      const _adminBtn = document.getElementById('admin-nav-btn');
-      const _adminDiv = document.getElementById('admin-divider');
-      if (_adminBtn) _adminBtn.style.display = '';
-      if (_adminDiv) _adminDiv.style.display = '';
-    }
+    const _adminBtn = document.getElementById('admin-nav-btn');
+    const _adminDiv = document.getElementById('admin-divider');
+    if (_adminBtn) _adminBtn.style.display = _isAdmin() ? '' : 'none';
+    if (_adminDiv) _adminDiv.style.display = _isAdmin() ? '' : 'none';
     CmdPalette.init();
     TimeAware.init();
     Router.go('dashboard');

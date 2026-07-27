@@ -2816,7 +2816,7 @@ select option { background: #fff; color: var(--text-primary); }
 
 /* Stats row */
 .admin-stats {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   gap: .75rem; margin-bottom: 1.25rem;
 }
 .admin-stat {
@@ -2945,11 +2945,71 @@ select option { background: #fff; color: var(--text-primary); }
 .admin-log-text strong { color: var(--text-primary); }
 .admin-log-time { font-size: .72rem; color: var(--text-muted); white-space: nowrap; }
 
+.admin-log-actor {
+  font-size: .7rem; color: var(--text-muted); margin-top: .12rem; direction: ltr; text-align: right;
+}
+
 /* Layout grid */
 .admin-grid-2 {
   display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;
 }
 @media (max-width: 768px) { .admin-grid-2 { grid-template-columns: 1fr; } }
+
+/* مؤشرات الاستخدام داخل الجدول */
+.admin-usage {
+  display: flex; gap: .5rem; flex-wrap: wrap;
+  font-size: .76rem; color: var(--text-secondary); font-variant-numeric: tabular-nums;
+}
+.admin-usage span {
+  display: inline-flex; align-items: center; gap: .25rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: .12rem .5rem;
+}
+.admin-usage i { font-size: .68rem; color: var(--text-muted); }
+
+/* خلية الاشتراك */
+.admin-sub-date { font-size: .68rem; color: var(--text-muted); margin-top: .2rem; white-space: nowrap; }
+.admin-table tbody td .badge { white-space: nowrap; }
+
+/* أزرار الإجراءات في الجدول */
+.admin-table tbody td:last-child { white-space: nowrap; }
+.admin-acts { display: flex; gap: .3rem; flex-wrap: nowrap; }
+.admin-act {
+  width: 30px; height: 30px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-secondary);
+  font-size: .76rem; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.admin-act:hover      { background: var(--surface-hover); color: var(--primary); border-color: var(--primary); }
+.admin-act.ok:hover   { background: rgba(16,185,129,.12); color: #059669; border-color: #10b981; }
+.admin-act.danger:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
+
+/* نافذة الاشتراك */
+.sub-quick { display: flex; gap: .4rem; flex-wrap: wrap; margin: -.4rem 0 .9rem; }
+.sub-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem; flex-wrap: wrap; margin-top: .75rem;
+}
+
+/* ==================== نافذة التأكيد ==================== */
+.confirm-body { display: flex; align-items: flex-start; gap: .85rem; padding: .25rem 0 .5rem; }
+.confirm-icon {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 1.05rem;
+  background: var(--primary-light); color: var(--primary);
+}
+.confirm-icon.danger { background: var(--red-light); color: var(--red); }
+.confirm-msg {
+  margin: 0; padding-top: .35rem; line-height: 1.75;
+  color: var(--text-secondary); font-size: .9rem;
+}
+.confirm-msg strong { color: var(--text-primary); }
+.confirm-actions {
+  display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap;
+  margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--border);
+}
 
 /* ==================== الكتاب الدراسي (تبويب الفصل) ==================== */
 .bk-wrap { padding: .25rem 0 1.5rem; }
