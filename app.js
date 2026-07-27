@@ -5743,8 +5743,10 @@ const Pages = {
             <input type="text" id="sett-region" placeholder="مثال: الرياض، جدة، الدمام..." value="${t.region||''}"></div>
           <div class="form-group"><label>اسم المدرسة</label>
             <input type="text" id="sett-school" value="${t.school||''}"></div>
-          <div class="form-group"><label>المادة الافتراضية</label>
-            <input type="text" id="sett-subject" value="${t.subject||''}"></div>
+          <div class="form-group"><label>المرحلة الدراسية</label>
+            <select id="sett-stage" onchange="Subjects.fillSubjectSelect(this.value,'sett-subject')">${Subjects.stageOptionsHtml(t.stage)}</select></div>
+          <div class="form-group"><label>المادة</label>
+            <select id="sett-subject"${t.stage ? '' : ' disabled'}>${Subjects.subjectOptionsHtml(t.stage, t.subject)}</select></div>
           <div class="form-actions">
             <button class="btn btn-primary" onclick="Pages._saveProfile()"><i class="fas fa-save"></i> حفظ</button>
           </div>
@@ -5814,9 +5816,11 @@ const Pages = {
     const name    = document.getElementById('sett-name').value.trim();
     const region  = document.getElementById('sett-region').value.trim();
     const school  = document.getElementById('sett-school').value.trim();
-    const subject = document.getElementById('sett-subject').value.trim();
+    const stage   = document.getElementById('sett-stage').value;
+    const subject = document.getElementById('sett-subject').value;
     if (!name) { Toast.show(`يرجى إدخال اسم ${_T.theTch}`, 'error'); return; }
-    DB.setTeacher({ ...DB.teacher(), name, region, school, subject });
+    if (!Subjects.isValid(stage, subject)) { Toast.show('يرجى اختيار المرحلة والمادة', 'error'); return; }
+    DB.setTeacher({ ...DB.teacher(), name, region, school, stage, subject });
     document.getElementById('sb-name').textContent   = name;
     document.getElementById('sb-school').textContent = school;
     Toast.show('تم حفظ البيانات!', 'success');
