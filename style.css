@@ -408,12 +408,14 @@ textarea { resize: vertical; min-height: 80px; }
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, #4f46e5 0%, #4338ca 55%, #1e1b4b 100%);
   padding: 1rem;
+  overflow-y: auto;
 }
 .setup-card {
   background: #fff; border-radius: var(--radius-xl);
   padding: 2.5rem 2rem; width: 100%; max-width: 420px;
   box-shadow: var(--shadow-lg);
   text-align: center;
+  margin: auto;
 }
 .setup-logo {
   width: 68px; height: 68px; border-radius: 18px; margin: 0 auto 1.25rem;
