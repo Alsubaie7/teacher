@@ -4751,11 +4751,7 @@ const Pages = {
     this.lessons();
   },
 
-  lessons(params = {}) {
-    const tab = params.tab || this._lessonsTab || 'timetable';
-    this._lessonsTab = tab;
-    if (tab === 'plan') return this._pacingPlanView();
-
+  lessons() {
     const classes   = DB.get('classes');
     const schedule  = DB.get('schedule');
     const settings  = DB.settings();
@@ -4844,10 +4840,6 @@ const Pages = {
           <button class="btn btn-sm btn-outline-danger" onclick="Pages.clearSchedule()"><i class="fas fa-trash"></i> مسح</button>
         </div>
       </div>
-      <div class="lp-tabs">
-        <button class="lp-tab active" onclick="Router.go('lessons',{tab:'timetable'})"><i class="fas fa-table-cells"></i> جدول الحصص</button>
-        <button class="lp-tab" onclick="Router.go('lessons',{tab:'plan'})"><i class="fas fa-calendar-week"></i> خطة الفصل</button>
-      </div>
       ${classes.length === 0 ? `
         <div class="empty-state">
           <div class="empty-icon"><i class="fas fa-calendar-alt"></i></div>
@@ -4865,81 +4857,6 @@ const Pages = {
         </div>
         <p class="tt-hint"><i class="fas fa-info-circle"></i> اضغط فصلاً لفتح الحضور — اسحب لنقله — ✎ للتعديل — انقر مرتين على وقت الحصة لتعديل الأوقات</p>`}
     `;
-  },
-
-  /* ---- خطة الفصل (تقويم دراسي عام: رقم الأسبوع وتاريخه فقط، مع تمييز الأسبوع الحالي) ---- */
-  _pacingPlanView() {
-    const today  = new Date().toISOString().slice(0,10);
-    const weeks  = Books.academicCalendar.s1;
-
-    const header = `
-      <div class="page-header"><h2>جدول الحصص</h2></div>
-      <div class="lp-tabs">
-        <button class="lp-tab" onclick="Router.go('lessons',{tab:'timetable'})"><i class="fas fa-table-cells"></i> جدول الحصص</button>
-        <button class="lp-tab active" onclick="Router.go('lessons',{tab:'plan'})"><i class="fas fa-calendar-week"></i> خطة الفصل</button>
-      </div>`;
-
-    const fmtShort   = iso => new Date(iso + 'T00:00:00').toLocaleDateString('ar-SA', { day:'numeric', month:'short' });
-    const monthLabel = iso => new Date(iso + 'T00:00:00').toLocaleDateString('ar-SA', { month:'long', year:'numeric' });
-    const hijriShort = h => h.split('/').slice(0,2).join('/');
-
-    const cardHtml = w => {
-      const dateRange  = `${fmtShort(w.greg[0])} – ${fmtShort(w.greg[1])}`;
-      const hijriRange = `${hijriShort(w.hijri[0])} – ${hijriShort(w.hijri[1])}هـ`;
-      const isCurrent = today >= w.greg[0] && today <= w.greg[1];
-      const isPast    = today > w.greg[1];
-      const cls = ['plan-card'];
-      if (isCurrent) cls.push('current');
-      if (isPast) cls.push('past');
-
-      if (w.exam || w.generalReview || w.break) {
-        const type  = w.exam ? 'exam' : w.generalReview ? 'review' : 'break';
-        const icon  = w.exam ? 'fa-file-signature' : w.generalReview ? 'fa-rotate' : 'fa-umbrella-beach';
-        const title = w.exam || (w.generalReview ? 'مراجعة عامة' : w.break);
-        cls.push('type-' + type);
-        return `<div class="${cls.join(' ')}">
-          ${isCurrent ? '<span class="pc-now">الآن</span>' : ''}
-          <div class="pc-num type-${type}">${w.n ? _ar(w.n) : `<i class="fas ${icon}"></i>`}</div>
-          <div class="pc-title">${title}</div>
-          <div class="pc-dates"><span class="pc-date">${dateRange}</span><span class="pc-date-h">${hijriRange}</span></div>
-        </div>`;
-      }
-
-      if (w.holiday) cls.push('has-holiday');
-      return `<div class="${cls.join(' ')}">
-        ${isCurrent ? '<span class="pc-now">الآن</span>' : ''}
-        <div class="pc-num">${_ar(w.n)}</div>
-        <div class="pc-dates"><span class="pc-date">${dateRange}</span><span class="pc-date-h">${hijriRange}</span></div>
-        ${w.holiday ? `<div class="pc-holiday"><i class="fas fa-umbrella-beach"></i> ${w.holiday}</div>` : ''}
-      </div>`;
-    };
-
-    // تجميع الأسابيع في صفوف حسب الشهر الميلادي اللي يبدأ فيه كل أسبوع
-    const months = [];
-    weeks.forEach(w => {
-      const label = monthLabel(w.greg[0]);
-      let m = months.find(x => x.label === label);
-      if (!m) { m = { label, weeks: [] }; months.push(m); }
-      m.weeks.push(w);
-    });
-
-    const monthsHtml = months.map(m => `
-      <div class="plan-month">
-        <div class="plan-month-hdr">${m.label}</div>
-        <div class="plan-grid">${m.weeks.map(cardHtml).join('')}</div>
-      </div>`).join('');
-
-    document.getElementById('content').innerHTML = header + `
-      <div class="plan-section">
-        <div class="plan-section-hdr">
-          <i class="fas fa-calendar-days"></i>
-          <div>
-            <div class="plan-section-title">التقويم الدراسي</div>
-            <div class="plan-section-sub">الفصل الدراسي الأول · ١٤٤٨هـ</div>
-          </div>
-        </div>
-        ${monthsHtml}
-      </div>`;
   },
 
   editPeriodsModal() {
