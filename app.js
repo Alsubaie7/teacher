@@ -1917,6 +1917,76 @@ const Books = {
     }
   ],
 
+  // التقويم الدراسي العام (وزارة التعليم) — أرقام الأسابيع وتواريخها وإجازاتها، عام لكل الصفوف والمواد
+  // مصدره الرسمي حالياً يغطي الفصل الدراسي الأول فقط (١٤٤٨هـ). exam/generalReview/break/holiday لأسابيع خاصة
+  academicCalendar: {
+    s1: [
+      { n: 1,  greg: ['2026-08-23','2026-08-27'], hijri: ['١٠/٣/١٤٤٨','١٤/٣/١٤٤٨'] },
+      { n: 2,  greg: ['2026-08-30','2026-09-03'], hijri: ['١٧/٣/١٤٤٨','٢١/٣/١٤٤٨'] },
+      { n: 3,  greg: ['2026-09-06','2026-09-10'], hijri: ['٢٤/٣/١٤٤٨','٢٨/٣/١٤٤٨'] },
+      { n: 4,  greg: ['2026-09-13','2026-09-17'], hijri: ['٢/٤/١٤٤٨','٦/٤/١٤٤٨'] },
+      { n: 5,  greg: ['2026-09-20','2026-09-24'], hijri: ['٩/٤/١٤٤٨','١٣/٤/١٤٤٨'], holiday: 'إجازة اليوم الوطني (٢٣ سبتمبر)' },
+      { n: 6,  greg: ['2026-09-27','2026-10-01'], hijri: ['١٦/٤/١٤٤٨','٢٠/٤/١٤٤٨'] },
+      { n: 7,  greg: ['2026-10-04','2026-10-08'], hijri: ['٢٣/٤/١٤٤٨','٢٧/٤/١٤٤٨'] },
+      { n: 8,  greg: ['2026-10-11','2026-10-15'], hijri: ['٣٠/٤/١٤٤٨','٤/٥/١٤٤٨'] },
+      { n: 9,  greg: ['2026-10-18','2026-10-22'], hijri: ['٧/٥/١٤٤٨','١١/٥/١٤٤٨'] },
+      { n: 10, greg: ['2026-10-25','2026-10-29'], hijri: ['١٤/٥/١٤٤٨','١٨/٥/١٤٤٨'] },
+      { n: 11, greg: ['2026-11-01','2026-11-05'], hijri: ['٢١/٥/١٤٤٨','٢٥/٥/١٤٤٨'] },
+      { n: 12, greg: ['2026-11-08','2026-11-12'], hijri: ['٢٨/٥/١٤٤٨','٢/٦/١٤٤٨'] },
+      { n: 13, greg: ['2026-11-15','2026-11-19'], hijri: ['٥/٦/١٤٤٨','٩/٦/١٤٤٨'] },
+      { break: 'إجازة الخريف', greg: ['2026-11-20','2026-11-28'], hijri: ['١٠/٦/١٤٤٨','١٨/٦/١٤٤٨'] },
+      { n: 14, greg: ['2026-11-29','2026-12-03'], hijri: ['١٩/٦/١٤٤٨','٢٣/٦/١٤٤٨'] },
+      { n: 15, greg: ['2026-12-06','2026-12-10'], hijri: ['٢٦/٦/١٤٤٨','١/٧/١٤٤٨'] },
+      { n: 16, greg: ['2026-12-13','2026-12-17'], hijri: ['٤/٧/١٤٤٨','٨/٧/١٤٤٨'] },
+      { n: 17, greg: ['2026-12-20','2026-12-24'], hijri: ['١١/٧/١٤٤٨','١٥/٧/١٤٤٨'], generalReview: true },
+      { n: 18, greg: ['2026-12-27','2026-12-31'], hijri: ['١٨/٧/١٤٤٨','٢٢/٧/١٤٤٨'], exam: 'اختبارات شفهية وعملية' },
+      { n: 19, greg: ['2027-01-03','2027-01-07'], hijri: ['٢٥/٧/١٤٤٨','٢٩/٧/١٤٤٨'], exam: 'اختبارات نهائية' },
+      { break: 'إجازة منتصف العام', greg: ['2027-01-08','2027-01-16'], hijri: ['٣٠/٧/١٤٤٨','٨/٨/١٤٤٨'] }
+    ]
+  },
+
+  // توزيع دروس المنهج فوق التقويم العام — خاص بكل مادة/صف، حالياً متوفر لرابع ابتدائي فقط
+  // مفتاح كل مادة = رقم الأسبوع من academicCalendar، والقيمة عناصر [{u,l}] أو project/review
+  pacingLessons: {
+    g4_s1: {
+      1: [{u:1,l:1}], 2: [{u:1,l:2}], 3: [{u:1,l:3}], 4: [{u:1,project:true,review:true}],
+      5: [{u:2,l:1}], 6: [{u:2,l:2}], 7: [{u:2,l:3},{u:2,l:4}], 8: [{u:2,project:true,review:true}],
+      9: [{u:3,l:1}], 10: [{u:3,l:2}], 11: [{u:3,l:3},{u:3,l:4}], 12: [{u:3,project:true,review:true}],
+      13: [{u:4,l:1},{u:4,l:2}], 14: [{u:4,l:3},{u:4,l:4}], 15: [{u:4,project:true}],
+      16: [{u:4,review:true,selftest:true}]
+    }
+  },
+
+  // يرجع مفتاح توزيع الدروس المتاح لكتاب معيّن (حالياً: رابع ابتدائي فصل أول فقط) — null يعني بس التقويم العام يشتغل له
+  pacingKeyFor(book) {
+    if (!book) return null;
+    if (book.key === 'g4') return 'g4_s1';
+    return null;
+  },
+
+  // يرجع أسبوع التقويم المطابق لتاريخ معيّن (اليوم افتراضياً)
+  calendarWeekFor(semKey, dateStr) {
+    const weeks = this.academicCalendar[semKey];
+    if (!weeks) return null;
+    const d = dateStr || new Date().toISOString().slice(0,10);
+    return weeks.find(w => d >= w.greg[0] && d <= w.greg[1]) || null;
+  },
+
+  // يحوّل دروس أسبوع معيّن (برقمه) إلى دروس فعلية من الكتالوج (عنوان + رابط العرض) — [] لو ما فيه بيانات لهالمادة/الأسبوع
+  pacingResolveItems(book, pacingKey, weekN) {
+    const items = this.pacingLessons[pacingKey]?.[weekN];
+    if (!items) return [];
+    return items.map(it => {
+      const unit = book.units.find(u => u.n === it.u && (u.part||1) === 1);
+      if (!unit) return null;
+      if (it.project) return { kind: it.review ? 'project+review' : 'project', unitTitle: unit.title, title: 'مشروع الوحدة' + (it.review ? ' + مراجعة' : ''), presentation: unit.review || null };
+      if (it.review) return { kind: 'review', unitTitle: unit.title, title: 'مراجعة ' + unit.title + (it.selftest ? ' (اختبر نفسك)' : ''), presentation: unit.review || null };
+      const lesson = unit.lessons.find(l => l.n === it.l);
+      if (!lesson) return null;
+      return { kind: 'lesson', unitTitle: unit.title, title: lesson.title, presentation: lesson.presentation };
+    }).filter(Boolean);
+  },
+
   // يعثر على كتاب الفصل من مرحلته ومادته، بمقارنة متسامحة مع فروقات الكتابة (ال، ة/ه)
   forClass(cls) {
     if (!cls) return null;
@@ -2257,6 +2327,71 @@ const Pages = {
     return card('muted','fa-mug-hot','إجازة', _T._f ? 'استمتعي بوقتك' : 'استمتع بوقتك', '', '');
   },
 
+  /* ---- درس هذا الأسبوع (من توزيع المنهج الرسمي) ---- */
+  _pacingCard() {
+    const week = Books.calendarWeekFor('s1');
+    if (!week) return '';
+
+    const fmt = iso => new Date(iso + 'T00:00:00').toLocaleDateString('ar-SA', { day: 'numeric', month: 'long' });
+    const hijriShort = h => h.split('/').slice(0,2).join('/');
+    const dateRange = `${fmt(week.greg[0])} – ${fmt(week.greg[1])} · ${hijriShort(week.hijri[0])} – ${hijriShort(week.hijri[1])}هـ`;
+
+    if (week.exam) return `
+      <div class="now-card accent-red">
+        <div class="now-main">
+          <div class="now-lbl"><i class="fas fa-file-signature"></i> الأسبوع ${_ar(week.n)}</div>
+          <div class="now-title">${week.exam}</div>
+          <div class="now-meta">${dateRange}</div>
+        </div>
+      </div>`;
+
+    if (week.generalReview) return `
+      <div class="now-card accent-green">
+        <div class="now-main">
+          <div class="now-lbl"><i class="fas fa-rotate"></i> الأسبوع ${_ar(week.n)}</div>
+          <div class="now-title">مراجعة عامة</div>
+          <div class="now-meta">${dateRange} · استعداداً للاختبارات</div>
+        </div>
+      </div>`;
+
+    if (week.break) return `
+      <div class="now-card accent-amber">
+        <div class="now-main">
+          <div class="now-lbl"><i class="fas fa-umbrella-beach"></i> إجازة</div>
+          <div class="now-title">${week.break}</div>
+          <div class="now-meta">${dateRange}</div>
+        </div>
+      </div>`;
+
+    // أسبوع درس عادي — نبحث عن أول فصل عنده بيانات درس فعلية لهالأسبوع
+    const classes = DB.get('classes');
+    let book = null, cls = null, items = [];
+    for (const c of classes) {
+      const b = Books.forClass(c);
+      const key = Books.pacingKeyFor(b);
+      if (!key) continue;
+      const its = Books.pacingResolveItems(b, key, week.n);
+      if (its.length) { book = b; cls = c; items = its; break; }
+    }
+    if (!book) return '';
+
+    const title = items.map(i => i.title).join(' + ');
+    const actions = items.filter(i => i.presentation).map(i =>
+      `<a class="now-btn solid" href="${i.presentation}" target="_blank"><i class="fas fa-play"></i> ${items.length > 1 ? i.title : 'العرض التقديمي'}</a>`
+    ).join('');
+    const holidayNote = week.holiday ? ` · ${week.holiday}` : '';
+
+    return `
+      <div class="now-card accent-primary">
+        <div class="now-main">
+          <div class="now-lbl"><i class="fas fa-calendar-week"></i> درس هذا الأسبوع · الأسبوع ${_ar(week.n)}</div>
+          <div class="now-title">${title}</div>
+          <div class="now-meta">${items[0].unitTitle} · ${cls.name} · ${dateRange}${holidayNote}</div>
+        </div>
+        <div class="now-actions">${actions}</div>
+      </div>`;
+  },
+
   _xlWidget(cls, students, todayAtt, activeClsId) {
     const cnt       = students.filter(s => s.classId === cls.id).length;
     const att       = todayAtt.find(a => a.classId === cls.id);
@@ -2423,6 +2558,7 @@ const Pages = {
     document.getElementById('content').innerHTML = `
       <div class="dash-greet"><h1>مرحباً ${greetName || _T.tch} 👋</h1><p>${dateStr} · لديك ${todayLessons.length} ${lessonWord} اليوم</p></div>
       <div id="home-hero-wrap">${this._heroCard()}</div>
+      ${this._pacingCard()}
       <div class="dash-stats">
         <div class="dash-stat"><div><div class="dash-stat-val">${classes.length}</div><div class="dash-stat-lbl">الفصول</div></div><div class="dash-stat-ic indigo"><i class="fas fa-door-open"></i></div></div>
         <div class="dash-stat"><div><div class="dash-stat-val">${students.length}</div><div class="dash-stat-lbl">${_T.theStus}</div></div><div class="dash-stat-ic green"><i class="fas fa-users"></i></div></div>
@@ -4615,7 +4751,11 @@ const Pages = {
     this.lessons();
   },
 
-  lessons() {
+  lessons(params = {}) {
+    const tab = params.tab || this._lessonsTab || 'timetable';
+    this._lessonsTab = tab;
+    if (tab === 'plan') return this._pacingPlanView();
+
     const classes   = DB.get('classes');
     const schedule  = DB.get('schedule');
     const settings  = DB.settings();
@@ -4704,6 +4844,10 @@ const Pages = {
           <button class="btn btn-sm btn-outline-danger" onclick="Pages.clearSchedule()"><i class="fas fa-trash"></i> مسح</button>
         </div>
       </div>
+      <div class="lp-tabs">
+        <button class="lp-tab active" onclick="Router.go('lessons',{tab:'timetable'})"><i class="fas fa-table-cells"></i> جدول الحصص</button>
+        <button class="lp-tab" onclick="Router.go('lessons',{tab:'plan'})"><i class="fas fa-calendar-week"></i> خطة الفصل</button>
+      </div>
       ${classes.length === 0 ? `
         <div class="empty-state">
           <div class="empty-icon"><i class="fas fa-calendar-alt"></i></div>
@@ -4721,6 +4865,81 @@ const Pages = {
         </div>
         <p class="tt-hint"><i class="fas fa-info-circle"></i> اضغط فصلاً لفتح الحضور — اسحب لنقله — ✎ للتعديل — انقر مرتين على وقت الحصة لتعديل الأوقات</p>`}
     `;
+  },
+
+  /* ---- خطة الفصل (تقويم دراسي عام: رقم الأسبوع وتاريخه فقط، مع تمييز الأسبوع الحالي) ---- */
+  _pacingPlanView() {
+    const today  = new Date().toISOString().slice(0,10);
+    const weeks  = Books.academicCalendar.s1;
+
+    const header = `
+      <div class="page-header"><h2>جدول الحصص</h2></div>
+      <div class="lp-tabs">
+        <button class="lp-tab" onclick="Router.go('lessons',{tab:'timetable'})"><i class="fas fa-table-cells"></i> جدول الحصص</button>
+        <button class="lp-tab active" onclick="Router.go('lessons',{tab:'plan'})"><i class="fas fa-calendar-week"></i> خطة الفصل</button>
+      </div>`;
+
+    const fmtShort   = iso => new Date(iso + 'T00:00:00').toLocaleDateString('ar-SA', { day:'numeric', month:'short' });
+    const monthLabel = iso => new Date(iso + 'T00:00:00').toLocaleDateString('ar-SA', { month:'long', year:'numeric' });
+    const hijriShort = h => h.split('/').slice(0,2).join('/');
+
+    const cardHtml = w => {
+      const dateRange  = `${fmtShort(w.greg[0])} – ${fmtShort(w.greg[1])}`;
+      const hijriRange = `${hijriShort(w.hijri[0])} – ${hijriShort(w.hijri[1])}هـ`;
+      const isCurrent = today >= w.greg[0] && today <= w.greg[1];
+      const isPast    = today > w.greg[1];
+      const cls = ['plan-card'];
+      if (isCurrent) cls.push('current');
+      if (isPast) cls.push('past');
+
+      if (w.exam || w.generalReview || w.break) {
+        const type  = w.exam ? 'exam' : w.generalReview ? 'review' : 'break';
+        const icon  = w.exam ? 'fa-file-signature' : w.generalReview ? 'fa-rotate' : 'fa-umbrella-beach';
+        const title = w.exam || (w.generalReview ? 'مراجعة عامة' : w.break);
+        cls.push('type-' + type);
+        return `<div class="${cls.join(' ')}">
+          ${isCurrent ? '<span class="pc-now">الآن</span>' : ''}
+          <div class="pc-num type-${type}">${w.n ? _ar(w.n) : `<i class="fas ${icon}"></i>`}</div>
+          <div class="pc-title">${title}</div>
+          <div class="pc-dates"><span class="pc-date">${dateRange}</span><span class="pc-date-h">${hijriRange}</span></div>
+        </div>`;
+      }
+
+      if (w.holiday) cls.push('has-holiday');
+      return `<div class="${cls.join(' ')}">
+        ${isCurrent ? '<span class="pc-now">الآن</span>' : ''}
+        <div class="pc-num">${_ar(w.n)}</div>
+        <div class="pc-dates"><span class="pc-date">${dateRange}</span><span class="pc-date-h">${hijriRange}</span></div>
+        ${w.holiday ? `<div class="pc-holiday"><i class="fas fa-umbrella-beach"></i> ${w.holiday}</div>` : ''}
+      </div>`;
+    };
+
+    // تجميع الأسابيع في صفوف حسب الشهر الميلادي اللي يبدأ فيه كل أسبوع
+    const months = [];
+    weeks.forEach(w => {
+      const label = monthLabel(w.greg[0]);
+      let m = months.find(x => x.label === label);
+      if (!m) { m = { label, weeks: [] }; months.push(m); }
+      m.weeks.push(w);
+    });
+
+    const monthsHtml = months.map(m => `
+      <div class="plan-month">
+        <div class="plan-month-hdr">${m.label}</div>
+        <div class="plan-grid">${m.weeks.map(cardHtml).join('')}</div>
+      </div>`).join('');
+
+    document.getElementById('content').innerHTML = header + `
+      <div class="plan-section">
+        <div class="plan-section-hdr">
+          <i class="fas fa-calendar-days"></i>
+          <div>
+            <div class="plan-section-title">التقويم الدراسي</div>
+            <div class="plan-section-sub">الفصل الدراسي الأول · ١٤٤٨هـ</div>
+          </div>
+        </div>
+        ${monthsHtml}
+      </div>`;
   },
 
   editPeriodsModal() {
