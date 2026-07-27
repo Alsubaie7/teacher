@@ -3031,7 +3031,7 @@ const Pages = {
           <div id="class-name-preview" style="font-size:1.1rem;font-weight:700;color:var(--primary);background:var(--primary-light);border-radius:8px;padding:.5rem 1rem;text-align:center">${gl} ${sec}</div>
         </div>
         <div class="form-group"><label>المادة الدراسية *</label>
-          <input type="text" name="subject" placeholder="الرياضيات، العلوم..." value="${cls?.subject||''}" required></div>
+          <select name="subject" required>${Subjects.allSubjectOptionsHtml(cls?.subject || (!editId ? DB.teacher()?.subject : '') || '')}</select></div>
         <div class="form-group"><label>لون الفصل في الجدول</label>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="color-picker">
             ${['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899','#84CC16','#F97316','#6366F1'].map(c =>
