@@ -6,7 +6,7 @@
   <title>منصة المعلم | Teacher Platform</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=35">
+  <link rel="stylesheet" href="style.css?v=36">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -50,8 +50,19 @@
             <input type="text" id="setup-school" placeholder="اسم المدرسة">
           </div>
           <div class="form-group">
-            <label><i class="fas fa-book"></i> المادة الرئيسية</label>
-            <input type="text" id="setup-subject" placeholder="الرياضيات، العلوم، اللغة العربية...">
+            <label><i class="fas fa-layer-group"></i> المرحلة الدراسية</label>
+            <select id="setup-stage" onchange="Subjects.fillSubjectSelect(this.value,'setup-subject')">
+              <option value="">اختر المرحلة</option>
+              <option value="lower">الصفوف الأولية (١-٣ ابتدائي)</option>
+              <option value="upper">الصفوف العليا (٤-٦ ابتدائي)</option>
+              <option value="middle">المرحلة المتوسطة</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-book"></i> المادة</label>
+            <select id="setup-subject" disabled>
+              <option value="">اختر المرحلة أولاً</option>
+            </select>
           </div>
           <div class="form-group">
             <label><i class="fas fa-map-marker-alt"></i> المنطقة التعليمية</label>
@@ -228,7 +239,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');</script>
 </body>
 </html>
