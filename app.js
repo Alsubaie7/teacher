@@ -99,6 +99,54 @@ const GRADE_LEVELS = [
   'أول متوسط','ثاني متوسط','ثالث متوسط',
   'أول ثانوي','ثاني ثانوي','ثالث ثانوي'
 ];
+const TEACHING_STAGES = [
+  { key: 'lower',  label: 'الصفوف الأولية (١-٣ ابتدائي)' },
+  { key: 'upper',  label: 'الصفوف العليا (٤-٦ ابتدائي)' },
+  { key: 'middle', label: 'المرحلة المتوسطة' }
+];
+const SUBJECTS_BY_STAGE = {
+  lower: [
+    'القرآن الكريم والدراسات الإسلامية', 'اللغة العربية (لغتي)', 'الرياضيات', 'العلوم',
+    'اللغة الإنجليزية', 'المهارات الحياتية والأسرية', 'التربية البدنية', 'التربية الفنية'
+  ],
+  upper: [
+    'القرآن الكريم والدراسات الإسلامية', 'اللغة العربية (لغتي)', 'الرياضيات', 'العلوم',
+    'الدراسات الاجتماعية', 'اللغة الإنجليزية', 'المهارات الرقمية',
+    'المهارات الحياتية والأسرية', 'التربية البدنية', 'التربية الفنية'
+  ],
+  middle: [
+    'القرآن الكريم والدراسات الإسلامية', 'اللغة العربية (لغتي)', 'الرياضيات', 'العلوم',
+    'الدراسات الاجتماعية', 'اللغة الإنجليزية', 'المهارات الرقمية',
+    'المهارات الحياتية والأسرية', 'التربية البدنية', 'التربية الفنية', 'التفكير الناقد'
+  ]
+};
+const Subjects = {
+  stages: TEACHING_STAGES,
+  byStage: SUBJECTS_BY_STAGE,
+  all() { return [...new Set(Object.values(this.byStage).flat())]; },
+  stageOptionsHtml(selected) {
+    return `<option value="">اختر المرحلة</option>` +
+      this.stages.map(s => `<option value="${s.key}"${s.key === selected ? ' selected' : ''}>${s.label}</option>`).join('');
+  },
+  subjectOptionsHtml(stageKey, selected) {
+    const list = this.byStage[stageKey] || [];
+    return `<option value="">اختر المادة</option>` +
+      list.map(s => `<option${s === selected ? ' selected' : ''}>${s}</option>`).join('');
+  },
+  allSubjectOptionsHtml(selected) {
+    return `<option value="">اختر المادة</option>` +
+      this.all().map(s => `<option${s === selected ? ' selected' : ''}>${s}</option>`).join('');
+  },
+  fillSubjectSelect(stageKey, subjectSelId, selected) {
+    const el = document.getElementById(subjectSelId);
+    if (!el) return;
+    el.innerHTML = this.subjectOptionsHtml(stageKey, selected);
+    el.disabled = !stageKey;
+  },
+  isValid(stageKey, subject) {
+    return !!(this.byStage[stageKey] && this.byStage[stageKey].includes(subject));
+  }
+};
 const SECTIONS_LETTERS = ['أ','ب','ج','د','هـ','و','ز','ح'];
 const SECTIONS_NUMS    = ['1','2','3','4','5','6','7','8'];
 const _ORDINALS = { 'أول':1, 'ثاني':2, 'ثالث':3, 'رابع':4, 'خامس':5, 'سادس':6 };
