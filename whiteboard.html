@@ -66,6 +66,9 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);ove
 
 #board-area{position:fixed;top:var(--topbar-h);left:0;right:0;bottom:var(--toolbar-h);display:flex;align-items:center;justify-content:center;background:var(--bg);overflow:hidden}
 #page-container{position:relative;max-height:100%;max-width:100%;display:flex;align-items:center;justify-content:center}
+/* يظهر فقط عند القفز لصفحة بعيدة غير محمّلة مسبقاً — التقليب المتتابع لا يصله */
+.page-spinner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2rem;color:#fff;background:rgba(15,17,34,.45);border-radius:4px;pointer-events:none;z-index:5}
+.page-spinner.hidden{display:none}
 #page-image{max-height:calc(100vh - var(--topbar-h) - var(--toolbar-h) - 20px);max-width:calc(100vw - 120px);object-fit:contain;border-radius:4px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:block;pointer-events:none;background:#fff}
 #draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
 .laser-dot{position:absolute;width:14px;height:14px;background:radial-gradient(circle,#ff0000 30%,rgba(255,0,0,.5) 60%,transparent 100%);border-radius:50%;pointer-events:none;z-index:50;box-shadow:0 0 20px rgba(255,0,0,.8),0 0 60px rgba(255,0,0,.3);animation:laserPulse .8s ease-in-out infinite alternate;transform:translate(-50%,-50%)}
@@ -196,6 +199,7 @@ body[data-tool="text"] #draw-canvas{cursor:text}
       <div id="laser-dot" class="laser-dot hidden"></div>
       <div id="spotlight-overlay" class="spotlight-overlay hidden"></div>
       <textarea id="floating-text" class="floating-text hidden" placeholder="اكتب هنا..."></textarea>
+      <div id="page-spinner" class="page-spinner hidden"><i class="fas fa-spinner fa-spin"></i></div>
     </div>
     <button class="nav-arrow nav-next" onclick="Board.nextPage()" title="التالية" id="nav-next"><i class="fas fa-chevron-left"></i></button>
     <button class="nav-arrow nav-prev" onclick="Board.prevPage()" title="السابقة" id="nav-prev"><i class="fas fa-chevron-right"></i></button>
@@ -494,27 +498,87 @@ const Board = {
     this._redrawFromHistory();
   },
 
+  /* ---- تحميل مسبق للصفحات المجاورة ----
+     كان كل تقليب يبدأ تحميل الصورة من الشبكة بعد انتهاء حركة الخروج (200 مللي)،
+     فتبقى مساحة الصفحة فارغة طوال زمن التحميل — وهو ما يبدو كاختفاء الصفحة
+     ورجوعها. الآن تُسحب الصفحات المجاورة مسبقاً فتظهر من ذاكرة المتصفح فوراً. */
+  _cache: new Map(),
+  _token: 0,
+
+  _preload(p) {
+    if (p < 1 || p > BOOK.totalPages) return null;
+    let im = this._cache.get(p);
+    if (im) return im;
+    im = new Image();
+    im.decoding = 'async';
+    im.src = pagePath(p);
+    this._cache.set(p, im);
+    /* سقف للذاكرة: نتخلّص من الصفحات البعيدة عن موضع القراءة */
+    if (this._cache.size > 14) {
+      for (const k of this._cache.keys()) {
+        if (Math.abs(k - currentPage) > 4) { this._cache.delete(k); break; }
+      }
+    }
+    return im;
+  },
+
+  _warmNeighbors() {
+    [currentPage + 1, currentPage - 1, currentPage + 2, currentPage - 2]
+      .forEach(p => this._preload(p));
+  },
+
   goToPage(p) {
     if (p < 1 || p > BOOK.totalPages) return;
+    const img       = this._img;
+    const animate   = currentPage !== p;
     const direction = p > currentPage ? 'left' : 'right';
-    const img = this._img;
-    if (currentPage !== p) {
-      img.classList.add(direction === 'left' ? 'slide-out-left' : 'slide-out-right');
-      setTimeout(() => { currentPage = p; this._loadCurrentPage(direction); }, 200);
-    } else {
-      currentPage = p; this._loadCurrentPage(direction);
-    }
+    const token     = ++this._token;
+    /* الوجهة المطلوبة تُسجَّل فوراً حتى تتراكم النقرات السريعة:
+       ثلاث ضغطات متتابعة تنقلك ثلاث صفحات لا صفحة واحدة */
+    this._target = p;
+
+    /* التحميل يبدأ الآن بالتوازي مع حركة الخروج لا بعدها */
+    const pending = this._preload(p);
+
+    const slid = animate
+      ? new Promise(done => {
+          img.classList.add(direction === 'left' ? 'slide-out-left' : 'slide-out-right');
+          setTimeout(done, 180);
+        })
+      : Promise.resolve();
+
+    const ready = !pending || pending.complete
+      ? Promise.resolve()
+      : new Promise(done => { pending.onload = done; pending.onerror = done; });
+
+    /* مؤشر انتظار للقفزات البعيدة فقط — لا يظهر في التقليب المتتابع */
+    const spinner = document.getElementById('page-spinner');
+    const spinTimer = setTimeout(() => {
+      if (token === this._token) spinner.classList.remove('hidden');
+    }, 250);
+
+    Promise.all([slid, ready]).then(() => {
+      clearTimeout(spinTimer);
+      if (token !== this._token) return;   /* تجاوزتها نقرة أحدث */
+      spinner.classList.add('hidden');
+      this._target = null;
+      currentPage = p;
+      this._loadCurrentPage(direction);
+      this._warmNeighbors();
+    });
   },
 
   _loadCurrentPage(direction) {
     const img = this._img;
     img.classList.remove('slide-out-left','slide-out-right','slide-in-left','slide-in-right');
     img.src = pagePath(currentPage);
-    img.onload = () => {
+    const shown = () => {
       this._syncCanvasSize();
       img.classList.add(direction === 'left' ? 'slide-in-right' : 'slide-in-left');
       setTimeout(() => img.classList.remove('slide-in-right','slide-in-left'), 300);
     };
+    if (img.complete && img.naturalWidth) shown();
+    else img.onload = shown;
     document.getElementById('page-indicator').textContent = `${currentPage} / ${BOOK.totalPages}`;
     document.getElementById('nav-prev').disabled = currentPage === 1;
     document.getElementById('nav-next').disabled = currentPage === BOOK.totalPages;
@@ -537,8 +601,9 @@ const Board = {
     presBtn.style.display = this._curPres ? 'flex' : 'none';
   },
 
-  nextPage() { this.goToPage(currentPage + 1); },
-  prevPage() { this.goToPage(currentPage - 1); },
+  _target: null,
+  nextPage() { this.goToPage((this._target ?? currentPage) + 1); },
+  prevPage() { this.goToPage((this._target ?? currentPage) - 1); },
 
   _getPos(e) { const r = this._canvas.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; },
 
