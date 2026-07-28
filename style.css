@@ -184,7 +184,9 @@ textarea { resize: vertical; min-height: 80px; }
 @media (max-width: 860px) {
   .app { grid-template-columns: 1fr; }
   .side-nav { display: none; }
-  .content { padding: 1rem 1rem 5.5rem; }
+  /* ‏--bottom-nav-h يقيسها JS من الشريط السفلي نفسه فتشمل مساحة الأمان
+     في أجهزة آيفون. القيمة الاحتياطية تُستعمل قبل أن يعمل JS. */
+  .content { padding: 1rem 1rem calc(var(--bottom-nav-h, 5.5rem) + 1.25rem); }
   .topbar { padding: 0 1rem; }
   .cmd-trigger-label, .cmd-trigger-kbd { display: none; }
   .bottom-nav {
@@ -545,6 +547,8 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .install-close:hover { background: var(--surface-hover); color: var(--text-primary); }
 @media (min-width: 720px) { .install-banner { inset-inline: auto 20px; max-width: 420px; } }
+/* لا يجلس فوق الشريط السفلي على الجوال */
+@media (max-width: 860px) { .install-banner { bottom: calc(var(--bottom-nav-h, 5.5rem) + 12px); } }
 .install-steps { margin: .25rem 0; padding-inline-start: 1.2rem; line-height: 2; color: var(--text-secondary); font-size: .88rem; }
 .install-steps li { margin-bottom: .3rem; }
 .install-steps strong { color: var(--text-primary); }
@@ -1572,7 +1576,8 @@ select option { background: #fff; color: var(--text-primary); }
    AI ASSISTANT PANEL
    ============================================================ */
 .ai-panel {
-  position: fixed; bottom: 1.25rem; left: 1.25rem;
+  /* على الجوال يرتفع فوق الشريط السفلي — القيمة صفر على الحاسب */
+  position: fixed; bottom: calc(var(--bottom-nav-h, 0px) + 1.25rem); left: 1.25rem;
   width: 360px; max-width: calc(100vw - 2.5rem);
   background: #0d1020;
   border: 1px solid rgba(124,58,237,.3);
@@ -2101,7 +2106,8 @@ select option { background: #fff; color: var(--text-primary); }
 
 @media (max-width: 480px) {
   .cmd-trigger-label { display: none; }
-  .app-body .content { padding: .85rem .75rem; }
+  /* الاختصار هنا كان يمسح الحشوة السفلية فيختفي آخر عنصر خلف الشريط السفلي */
+  .app-body .content { padding: .85rem .75rem calc(var(--bottom-nav-h, 5.5rem) + 1.25rem); }
   .home-class-grid { grid-template-columns: 1fr; }
   .hero-timer { display: none; }
   .hero-title { font-size: 1.15rem; }

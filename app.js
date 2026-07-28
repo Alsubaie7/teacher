@@ -6581,6 +6581,27 @@ const SBAuth = {
   }
 };
 
+/* ==================== ارتفاع الشريط السفلي ====================
+   حشوة أسفل المحتوى كانت ثابتة 5.5rem، وارتفاع الشريط على آيفون يزيد
+   عليها بمساحة الأمان (home indicator) — فيُحجب آخر عنصر في كل صفحة.
+   القياس من الشريط نفسه يضبطها على أي جهاز ومهما تغيّر حجم الخط. */
+const BottomBar = {
+  _apply() {
+    const nav = document.getElementById('bottom-nav');
+    if (!nav) return;
+    const h = getComputedStyle(nav).display === 'none' ? 0 : Math.ceil(nav.getBoundingClientRect().height);
+    document.documentElement.style.setProperty('--bottom-nav-h', h + 'px');
+  },
+  init() {
+    this._apply();
+    const nav = document.getElementById('bottom-nav');
+    if (nav) new ResizeObserver(() => this._apply()).observe(nav);
+    addEventListener('resize', () => this._apply());
+    addEventListener('orientationchange', () => setTimeout(() => this._apply(), 300));
+    window.visualViewport?.addEventListener('resize', () => this._apply());
+  }
+};
+
 /* ==================== قائمة «المزيد» على الجوال ====================
    الشريط الجانبي مخفي تحت 860px، ومعه كانت تختفي الإحالات والإعدادات
    وتصدير البيانات وتسجيل الخروج ولوحة الإدارة — لا يصلها المستخدم إلا
@@ -6985,6 +7006,7 @@ const App = {
     if (_adminDiv) _adminDiv.style.display = _isAdmin() ? '' : 'none';
     CmdPalette.init();
     TimeAware.init();
+    BottomBar.init();
     InstallPWA.init();
     Router.go('dashboard');
     this._startSubWatcher();
