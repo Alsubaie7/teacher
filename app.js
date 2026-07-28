@@ -24,8 +24,18 @@ const DEFAULT_GRADE_SCHEMA = [
 const _schema     = cls => cls?.gradeSchema || DEFAULT_GRADE_SCHEMA;
 const _sumBySchema = (grades, schema) =>
   schema.reduce((s, c) => s + (grades[c.key] != null ? Number(grades[c.key]) : 0), 0);
-const _sumGrades = g => DEFAULT_GRADE_SCHEMA
-  .reduce((a, c) => a + (g[c.key] != null ? Number(g[c.key]) : 0), 0);
+const _schemaMax  = schema => schema.reduce((s, c) => s + Number(c.max || 0), 0);
+/* درجة الطالب محسوبة بمخطط فصله لا بالمخطط الافتراضي: الفصل قد يضيف
+   مهارات بمفاتيح خاصة، وقد يكون مجموعه أقل من 100. لذلك تُرجَع النسبة
+   مطبَّعة على مجموع المخطط، وتُرجَع pct=null إذا لم تُرصد أي درجة بعد
+   ليُميَّز «بلا درجة» عن «صفر». */
+const _gradeStats = (grades, cls) => {
+  const schema = _schema(cls);
+  const g      = grades || {};
+  const scored = schema.some(c => g[c.key] != null);
+  const max    = _schemaMax(schema) || 100;
+  return { tot: _sumBySchema(g, schema), max, scored, pct: scored ? Math.round(_sumBySchema(g, schema) / max * 100) : null };
+};
 
 const _countAtt = (studentId, status, allAtt) =>
   allAtt.reduce((n, a) => n + a.records.filter(r => r.studentId === studentId && r.status === status).length, 0);
@@ -126,7 +136,7 @@ const Subjects = {
   all() { return [...new Set(Object.values(this.byStage).flat())]; },
   stageOptionsHtml(selected) {
     return `<option value="">اختر المرحلة</option>` +
-      this.stages.map(s => `<option value="${s.key}"${s.key === selected ? ' selected' : ''}>${s.label}</option>`).join('');
+      this.stages.map(s => `<option value="${s.key}"${s.key === selected ? ' selected' : ''}>${_esc(s.label)}</option>`).join('');
   },
   subjectOptionsHtml(stageKey, selected) {
     const list = this.byStage[stageKey] || [];
@@ -156,8 +166,21 @@ const _classBadge = (gradeLevel, name, section) => {
   return `${word ? _ORDINALS[word] : ''}${section || ''}`;
 };
 const _normAr = s => (s || '').split(' ').map(w => w.replace(/^ال/, '')).join(' ').trim().replace(/[اإ]/g, 'أ');
-const _esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* يهرّب كل ما يُحقن في innerHTML. يشمل ' لأن كثيراً من السمات في القوالب
+   مكتوبة بعلامة مفردة، فتركها يفتح ثغرة حقن داخل السمة لا داخل النص فقط. */
+const _esc = s => String(s ?? '')
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+/* لنص يُوضع داخل سلسلة JS مفردة داخل سمة HTML (مثل onclick="f('...')").
+   يُهرَّب لـ JS أولاً ثم لـ HTML: المحلل يفكّ كيانات HTML قبل تنفيذ JS،
+   فلو هرّبنا لـ HTML وحده لعاد ' كما هو وكسر السلسلة. */
+const _jsq = s => _esc(String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'));
 const _ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+/* تاريخ اليوم بتقويم الجهاز لا بـ UTC. toISOString يحوّل للتوقيت العالمي،
+   فبين منتصف الليل والثالثة فجراً بتوقيت السعودية كان يرجع تاريخ أمس
+   بينما getDay() المستعمل بجانبه محلي — فيتناقض اليومُ مع تاريخه. */
+const _isoDate = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 // يوحّد نص عربي للمقارنة المرنة: يشيل "ال" من بداية كل كلمة، يوحّد الألف والتاء المربوطة، ويشيل الفراغات الزائدة
 const _bookNorm = s => (s || '')
   .split(' ').map(w => w.replace(/^ال/, '')).join(' ')
@@ -280,7 +303,12 @@ const Toast = {
     const el = document.createElement('div');
     el.className = `toast ${type}`;
     const icons = { success: 'check-circle', error: 'times-circle', info: 'info-circle' };
-    el.innerHTML = `<i class="fas fa-${icons[type] || 'info-circle'}"></i><span>${msg}</span>`;
+    /* نص الرسالة يُركَّب كعقدة نصية: كثير من النداءات تمرّر اسم طالب أو فصل،
+       وحقنه في innerHTML كان يجعل التنبيه نفسه منفذ تنفيذ. */
+    el.innerHTML = `<i class="fas fa-${icons[type] || 'info-circle'}"></i>`;
+    const span = document.createElement('span');
+    span.textContent = String(msg ?? '');
+    el.appendChild(span);
     document.getElementById('toasts').appendChild(el);
     requestAnimationFrame(() => el.classList.add('show'));
     setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 3000);
@@ -310,7 +338,7 @@ const Print = {
       const stBg    = {present:'#f0fdf4',absent:'#fef2f2',late:'#fffbeb'}[st];
       return `<tr class="${i%2===0?'even':'odd'}">
         <td class="num">${i+1}</td>
-        <td class="name">${s.name}</td>
+        <td class="name">${_esc(s.name)}</td>
         <td><span class="badge" style="background:${stBg};color:${stColor};border:1pt solid ${stColor}">${stAr}</span></td>
         <td class="notes"></td>
       </tr>`;
@@ -368,7 +396,7 @@ const Print = {
       </style></head><body>
       <div class="page">
         <div class="print-hdr">
-          <div class="print-hdr-right">الإدارة العامة للتعليم<br>بمنطقة ${teacher.region||'___________'}<br>مدرسة ${teacher.school||'—'}</div>
+          <div class="print-hdr-right">الإدارة العامة للتعليم<br>بمنطقة ${_esc(teacher.region||'___________')}<br>مدرسة ${_esc(teacher.school||'—')}</div>
           <div class="print-hdr-center">
             <img class="print-hdr-logo" src="${logo}">
             <div class="print-hdr-logo-ar">كشف الحضور والغياب</div>
@@ -377,9 +405,9 @@ const Print = {
         </div>
 
         <div class="info-row">
-          <div class="ifield"><div class="ifield-lbl">الفصل الدراسي / الشعبة</div><div class="ifield-val">${cls?.name||'—'}</div></div>
-          <div class="ifield"><div class="ifield-lbl">المادة / المقرر</div><div class="ifield-val">${cls?.subject||teacher.subject||'—'}</div></div>
-          <div class="ifield"><div class="ifield-lbl">اسم ${_T.theTch}</div><div class="ifield-val">${teacher.name||'—'}</div></div>
+          <div class="ifield"><div class="ifield-lbl">الفصل الدراسي / الشعبة</div><div class="ifield-val">${_esc(cls?.name||'—')}</div></div>
+          <div class="ifield"><div class="ifield-lbl">المادة / المقرر</div><div class="ifield-val">${_esc(cls?.subject||teacher.subject||'—')}</div></div>
+          <div class="ifield"><div class="ifield-lbl">اسم ${_T.theTch}</div><div class="ifield-val">${_esc(teacher.name||'—')}</div></div>
           <div class="ifield"><div class="ifield-lbl">عدد ${_T.theStus}</div><div class="ifield-val">${stus.length}</div></div>
         </div>
 
@@ -414,7 +442,7 @@ const Print = {
         </table>
 
         <div class="sigs">
-          <div class="sig"><div class="sig-title">توقيع ${_T.theTch}</div><div class="sig-line">${teacher.name||'—'}</div></div>
+          <div class="sig"><div class="sig-title">توقيع ${_T.theTch}</div><div class="sig-line">${_esc(teacher.name||'—')}</div></div>
         </div>
       </div>
       <div class="no-print"><button onclick="window.print()">🖨️ طباعة</button></div>
@@ -427,30 +455,29 @@ const Print = {
     const teacher = DB.teacher() || {};
     const stus    = DB.get('students').filter(s => s.classId === classId);
     const gd      = DB.get('grades');
-    const tots    = stus.map(s => { const g=gd.find(x=>x.studentId===s.id&&x.classId===classId)?.grades||{}; return _sumGrades(g); });
-    const hasTots = tots.filter(t=>t>0);
-    const avg     = hasTots.length ? Math.round(hasTots.reduce((a,x)=>a+x,0)/hasTots.length) : 0;
-    const maxVal  = hasTots.length ? Math.max(...hasTots) : 0;
-    const minVal  = hasTots.length ? Math.min(...hasTots) : 0;
-    const passed  = tots.filter(t=>t>=50).length;
+    /* الكشف يتبع مخطط درجات الفصل. الشكل الرسمي بصفَّي ترويسة محفوظ
+       للمخطط الافتراضي وحده؛ المخطط المخصص يُطبع بترويسة واحدة مولّدة. */
+    const schema    = _schema(cls);
+    const isDefault = !cls?.gradeSchema;
+    const schemaMax = _schemaMax(schema) || 100;
+    const stats   = stus.map(s => _gradeStats(gd.find(x=>x.studentId===s.id&&x.classId===classId)?.grades, cls));
+    const scored  = stats.filter(x => x.scored);
+    const avg     = scored.length ? Math.round(scored.reduce((a,x)=>a+x.tot,0)/scored.length) : 0;
+    const maxVal  = scored.length ? Math.max(...scored.map(x=>x.tot)) : 0;
+    const minVal  = scored.length ? Math.min(...scored.map(x=>x.tot)) : 0;
+    const passed  = stats.filter(x => x.pct !== null && x.pct >= 50).length;
     const today   = new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
     const C = '#1a6b5a';
-    const _lc = l => ({'ممتاز+':'#065f46','ممتاز':'#16a34a','جيد جداً+':'#0369a1','جيد جداً':'#2563eb','جيد+':'#7c3aed','جيد':'#9333ea','مقبول':'#d97706','راسب':'#dc2626','—':'#9ca3af'})[l]||'#374151';
     const _cell = v => v != null ? `<td>${v}</td>` : `<td style="color:#ccc">—</td>`;
     const rows = stus.map((s,i) => {
       const g   = gd.find(x=>x.studentId===s.id&&x.classId===classId)?.grades||{};
-      const tot = tots[i];
-      const ltr = tot>0?_letter(tot):'—';
-      const fail = tot>0&&tot<50;
+      const st  = stats[i];
+      const fail = st.pct !== null && st.pct < 50;
       return `<tr class="${i%2===0?'even':'odd'}${fail?' fail':''}">
         <td class="num">${i+1}</td>
-        <td class="name">${s.name}</td>
-        ${_cell(g.homework??null)}
-        ${_cell(g.participation??null)}
-        ${_cell(g.exam1??null)}
-        ${_cell(g.exam2??null)}
-        ${_cell(g.final??null)}
-        <td class="total ${fail?'fail-val':'pass-val'}">${tot||'—'}</td>
+        <td class="name">${_esc(s.name)}</td>
+        ${schema.map(c => _cell(g[c.key] ?? null)).join('')}
+        <td class="total ${fail?'fail-val':'pass-val'}">${st.scored ? st.tot : '—'}</td>
       </tr>`;
     }).join('');
 
@@ -513,7 +540,7 @@ const Print = {
       <div class="page">
 
         <div class="print-hdr">
-          <div class="print-hdr-right">الإدارة العامة للتعليم<br>بمنطقة ${teacher.region||'___________'}<br>مدرسة ${teacher.school||'—'}</div>
+          <div class="print-hdr-right">الإدارة العامة للتعليم<br>بمنطقة ${_esc(teacher.region||'___________')}<br>مدرسة ${_esc(teacher.school||'—')}</div>
           <div class="print-hdr-center">
             <img class="print-hdr-logo" src="${_LOGO_B64}">
             <div class="print-hdr-logo-ar">كشف الدرجات</div>
@@ -524,9 +551,9 @@ const Print = {
         </div>
 
         <div class="info-row">
-          <div class="ifield"><div class="ifield-lbl">الفصل الدراسي / الشعبة</div><div class="ifield-val">${cls?.name||'—'}</div></div>
-          <div class="ifield"><div class="ifield-lbl">المادة / المقرر</div><div class="ifield-val">${cls?.subject||teacher.subject||'—'}</div></div>
-          <div class="ifield"><div class="ifield-lbl">اسم ${_T.theTch}</div><div class="ifield-val">${teacher.name||'—'}</div></div>
+          <div class="ifield"><div class="ifield-lbl">الفصل الدراسي / الشعبة</div><div class="ifield-val">${_esc(cls?.name||'—')}</div></div>
+          <div class="ifield"><div class="ifield-lbl">المادة / المقرر</div><div class="ifield-val">${_esc(cls?.subject||teacher.subject||'—')}</div></div>
+          <div class="ifield"><div class="ifield-lbl">اسم ${_T.theTch}</div><div class="ifield-val">${_esc(teacher.name||'—')}</div></div>
           <div class="ifield"><div class="ifield-lbl">عدد ${_T.theStus}</div><div class="ifield-val">${stus.length}</div></div>
         </div>
 
@@ -551,38 +578,33 @@ const Print = {
             <col style="width:14%">
           </colgroup>
           <thead>
-            <tr>
+            ${isDefault ? `<tr>
               <th style="background:${C};border-bottom:1pt solid rgba(255,255,255,.3)"></th>
               <th style="text-align:right;padding-right:6pt;background:${C};border-bottom:1pt solid rgba(255,255,255,.3)"></th>
               <th colspan="2" class="grp" style="border-bottom:1pt solid rgba(255,255,255,.3)">الأعمال الفصلية الأولى<br><small style="font-weight:400;font-size:7pt">20 درجة</small></th>
               <th colspan="2" class="grp" style="border-bottom:1pt solid rgba(255,255,255,.3)">الاختبارات الفصلية<br><small style="font-weight:400;font-size:7pt">40 درجة</small></th>
               <th style="background:#2e9e85;border-bottom:1pt solid rgba(255,255,255,.3)"></th>
               <th style="background:#0f5132;border-bottom:1pt solid rgba(255,255,255,.3)"></th>
-            </tr>
+            </tr>` : ''}
             <tr>
               <th>#</th>
               <th style="text-align:right;padding-right:6pt">اسم ${_T.theStu}</th>
-              <th class="sub">الواجب<br><small>10</small></th>
-              <th class="sub">مشاركة<br><small>10</small></th>
-              <th class="sub">اختبار 1<br><small>20</small></th>
-              <th class="sub">اختبار 2<br><small>20</small></th>
-              <th class="grp">النهائي<br><small style="font-weight:400;font-size:7pt">40</small></th>
-              <th style="background:#0f5132">المجموع<br><small style="font-weight:400;font-size:7pt">100</small></th>
+              ${schema.map((c, ci) => `<th class="${isDefault && ci === schema.length-1 ? 'grp' : 'sub'}">${_esc(c.label)}<br><small>${c.max}</small></th>`).join('')}
+              <th style="background:#0f5132">المجموع<br><small style="font-weight:400;font-size:7pt">${schemaMax}</small></th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
           <tbody>
             <tr class="summary-row">
               <td colspan="2" style="text-align:right;padding-right:6pt">المجموع: ${stus.length} ${_T.stu}</td>
-              <td colspan="5" style="text-align:center">المعدل العام: ${avg} / 100</td>
-              <td>ناجح: ${passed}</td>
-              <td>راسب: ${stus.length-passed}</td>
+              <td colspan="${schema.length}" style="text-align:center">المعدل العام: ${avg} / ${schemaMax}</td>
+              <td>ناجح: ${passed} · راسب: ${stus.length-passed}</td>
             </tr>
           </tbody>
         </table>
 
         <div class="sigs">
-          <div class="sig"><div class="sig-title">توقيع ${_T.theTch}</div><div class="sig-line">${teacher.name||'—'}</div></div>
+          <div class="sig"><div class="sig-title">توقيع ${_T.theTch}</div><div class="sig-line">${_esc(teacher.name||'—')}</div></div>
           <div class="sig"><div class="sig-title">اعتماد ${_T.dir}</div><div class="sig-line">_________________</div></div>
         </div>
       </div>
@@ -698,30 +720,34 @@ const Print = {
     const lateCount = _countAtt(studentId,'late',atts);
     const totalSess = presCount+absCount+lateCount;
     const attRate   = totalSess>0?Math.round((presCount/totalSess)*100):100;
-    const tot       = _sumGrades(g);
-    const letter    = tot>0?_letter(tot):'—';
+    const gs        = _gradeStats(g, cls);
+    const tot       = gs.tot;
+    const letter    = gs.pct !== null ? _letter(gs.pct) : '—';
     const behCounts = s.behaviors||{};
     const date      = new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
-    const school    = teacher.school||'—';
-    const teacherName = teacher.name||'—';
-    const region    = teacher.region||'';
+    const school    = _esc(teacher.school||'—');
+    const teacherName = _esc(teacher.name||'—');
+    const region    = _esc(teacher.region||'');
     const C         = '#1a6b5a';
-    const gradeColor= tot>=90?'#16a34a':tot>=75?'#0284c7':tot>=60?'#d97706':'#dc2626';
-    const gradePct  = tot>0?Math.min(tot,100):0;
+    /* اللون والشريط بالنسبة المئوية لا بالمجموع الخام: مجموع مخطط الفصل
+       قد لا يكون 100، فالمقارنة بالمجموع كانت تلوّن الممتاز أحمر. */
+    const gpc       = gs.pct ?? 0;
+    const gradeColor= gpc>=90?'#16a34a':gpc>=75?'#0284c7':gpc>=60?'#d97706':'#dc2626';
+    const gradePct  = Math.min(gpc, 100);
     const posBehHtml= BEH_TYPES.filter(b=>b.pos).map(b=>`
       <div class="beh-item">
         <span class="beh-icon">${_bIcon(b)}</span>
-        <span class="beh-lbl">${b.label}</span>
+        <span class="beh-lbl">${_esc(b.label)}</span>
         <span class="beh-cnt" style="color:${b.color}">${behCounts[b.key]||0}</span>
       </div>`).join('');
     const negBehHtml= BEH_TYPES.filter(b=>!b.pos).map(b=>`
       <div class="beh-item">
         <span class="beh-icon">${_bIcon(b)}</span>
-        <span class="beh-lbl">${b.label}</span>
+        <span class="beh-lbl">${_esc(b.label)}</span>
         <span class="beh-cnt" style="color:${b.color}">${behCounts[b.key]||0}</span>
       </div>`).join('');
     const markup = `<!DOCTYPE html><html dir="rtl" lang="ar"><head>
-      <meta charset="UTF-8"><title>تقرير ولي الأمر — ${s.name}</title>
+      <meta charset="UTF-8"><title>تقرير ولي الأمر — ${_esc(s.name)}</title>
       <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
       <style>
         @page{size:A4 portrait;margin:0}
@@ -783,9 +809,9 @@ const Print = {
         <div class="ftlines"><span></span><span></span><span></span></div>
       </div>
       <div class="info-grid" style="grid-template-columns:2fr 1fr 1fr">
-        <div class="ifield"><span class="ifield-lbl">اسم الطالب :</span><div class="ifield-val">${s.name}</div></div>
-        <div class="ifield"><span class="ifield-lbl">الفصل :</span><div class="ifield-val">${cls?.name||'—'}</div></div>
-        <div class="ifield"><span class="ifield-lbl">المادة :</span><div class="ifield-val">${cls?.subject||'—'}</div></div>
+        <div class="ifield"><span class="ifield-lbl">اسم الطالب :</span><div class="ifield-val">${_esc(s.name)}</div></div>
+        <div class="ifield"><span class="ifield-lbl">الفصل :</span><div class="ifield-val">${_esc(cls?.name||'—')}</div></div>
+        <div class="ifield"><span class="ifield-lbl">المادة :</span><div class="ifield-val">${_esc(cls?.subject||'—')}</div></div>
       </div>
       <div class="info-grid" style="grid-template-columns:2fr 1fr">
         <div class="ifield"><span class="ifield-lbl">اسم المعلم :</span><div class="ifield-val">${teacherName}</div></div>
@@ -817,7 +843,7 @@ const Print = {
         <div style="display:flex;align-items:center;gap:12pt;margin-bottom:6pt">
           <div style="flex:1">
             <div style="display:flex;justify-content:space-between;font-size:8.5pt;font-weight:700;color:#555;margin-bottom:4pt">
-              <span>المجموع الكلي</span><span style="color:${gradeColor}">${tot||0} / 100</span>
+              <span>المجموع الكلي</span><span style="color:${gradeColor}">${tot||0} / ${gs.max}</span>
             </div>
             <div class="grade-bar-wrap"><div class="grade-bar" style="width:${gradePct}%;background:${gradeColor}"></div></div>
           </div>
@@ -827,10 +853,10 @@ const Print = {
           </div>
         </div>
         <table class="grades-table">
-          <thead><tr><th>الواجب /10</th><th>المشاركة /10</th><th>اختبار1 /20</th><th>اختبار2 /20</th><th>النهائي /40</th><th>المجموع</th></tr></thead>
+          <thead><tr>${_schema(cls).map(c => `<th>${_esc(c.label)} /${c.max}</th>`).join('')}<th>المجموع</th></tr></thead>
           <tbody><tr>
-            <td>${g.homework??'—'}</td><td>${g.participation??'—'}</td><td>${g.exam1??'—'}</td><td>${g.exam2??'—'}</td><td>${g.final??'—'}</td>
-            <td style="font-weight:900;color:${gradeColor};font-size:11pt">${tot||'—'}</td>
+            ${_schema(cls).map(c => `<td>${g[c.key] ?? '—'}</td>`).join('')}
+            <td style="font-weight:900;color:${gradeColor};font-size:11pt">${gs.scored ? tot : '—'}</td>
           </tr></tbody>
         </table>
       </div>
@@ -880,7 +906,7 @@ const Print = {
     if (!s) return null;
     const cls        = DB.get('classes').find(c => c.id === s.classId);
     const teacher    = DB.teacher() || {};
-    const date       = document.getElementById('ref-date')?.value || new Date().toISOString().slice(0,10);
+    const date       = document.getElementById('ref-date')?.value || _isoDate();
     const region     = document.getElementById('ref-region')?.value.trim() || '';
     const school     = document.getElementById('ref-school')?.value.trim() || teacher.school || '—';
     const teacherSig = document.getElementById('ref-teacher-name')?.value.trim() || teacher.name || '—';
@@ -900,7 +926,7 @@ const Print = {
     const newCount    = (s.referralCount || 0) + 1;
     const clearedBehs = { ...(s.behaviors || {}) };
     BEH_TYPES.filter(b => !b.pos).forEach(b => { clearedBehs[b.key] = 0; });
-    const today       = new Date().toISOString().slice(0,10);
+    const today       = _isoDate();
     const histEntry   = { date: today, refTo, reason, notes, teacherName: teacherSig };
     const prevHistory = s.referralHistory || [];
     DB.set('students', students.map(x => x.id === stuId
@@ -1058,7 +1084,11 @@ const Print = {
 
   /* تصميم النموذج المطبوع — يُستعمل للطباعة ولتحويله صورة تُرسل بالواتساب */
   _referralMarkup(d) {
-    const { s, cls, date, region, school, teacherSig, refTo, refToName, reason, notes, subject, newCount } = d;
+    const { s, cls, newCount } = d;
+    /* بقية الحقول نصوص يكتبها المعلم وتُحفظ خاماً في الملف الشخصي،
+       فتُهرَّب هنا عند بناء الوسم لا عند التخزين. */
+    const [date, region, school, teacherSig, refTo, refToName, reason, notes, subject] =
+      [d.date, d.region, d.school, d.teacherSig, d.refTo, d.refToName, d.reason, d.notes, d.subject].map(_esc);
     const _allReasons = ['ضعف تحصيل دراسي','كثرة الغياب','سلوك سلبي متكرر','مشكلة صحية','مشكلة اجتماعية أو أسرية','تأخر مستمر','أخرى (تُحدد في الملاحظات)'];
     const reasonsHtml = _allReasons.map(r => r===reason
       ? `<div class="r-item r-selected">☑&nbsp;<strong>${r}</strong></div>`
@@ -1134,11 +1164,11 @@ const Print = {
       <div class="info-grid" style="margin-top:0;grid-template-columns:2fr 1fr 1fr">
         <div class="ifield">
           <span class="ifield-lbl">اسم ${_T.theStu} :</span>
-          <div class="ifield-val">${s.name}</div>
+          <div class="ifield-val">${_esc(s.name)}</div>
         </div>
         <div class="ifield">
           <span class="ifield-lbl">الفصل الدراسي :</span>
-          <div class="ifield-val">${cls?.name ? (cls.subject ? cls.name+' — '+cls.subject : cls.name) : '—'}</div>
+          <div class="ifield-val">${_esc(cls?.name ? (cls.subject ? cls.name+' — '+cls.subject : cls.name) : '—')}</div>
         </div>
         <div class="ifield">
           <span class="ifield-lbl">المادة :</span>
@@ -1224,7 +1254,7 @@ const Print = {
       const c = COLORS[gi % COLORS.length];
       return `<div class="gcard" style="border-color:${c}">
         <div class="gcard-hdr" style="background:${c}">المجموعة ${gi + 1} (${g.length})</div>
-        <ol>${g.map(n => `<li>${n}</li>`).join('')}</ol>
+        <ol>${g.map(n => `<li>${_esc(n)}</li>`).join('')}</ol>
       </div>`;
     }).join('');
 
@@ -1242,7 +1272,7 @@ ol{list-style:decimal;padding:8px 24px;display:flex;flex-direction:column;gap:3p
 li{font-size:.85rem}
 @media print{body{padding:10px}}
 </style></head><body>
-<h1>تقسيم المجموعات — ${teacher.teacherName || ''}</h1>
+<h1>تقسيم المجموعات — ${_esc(teacher.name || '')}</h1>
 <div class="sub">${today} | ${groups.length} مجموعات | ${groups.reduce((s,g)=>s+g.length,0)} طالب</div>
 <div class="grid">${cards}</div>
 </body></html>`;
@@ -1260,7 +1290,7 @@ const Backup = {
     const blob = new Blob([JSON.stringify({ _v: 1, teacher, data }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `teacher-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `teacher-backup-${_isoDate()}.json`;
     a.click(); URL.revokeObjectURL(a.href);
     Toast.show('تم تصدير النسخة الاحتياطية!');
   },
@@ -2207,7 +2237,7 @@ const Books = {
   calendarWeekFor(semKey, dateStr) {
     const weeks = this.academicCalendar[semKey];
     if (!weeks) return null;
-    const d = dateStr || new Date().toISOString().slice(0,10);
+    const d = dateStr || _isoDate();
     return weeks.find(w => d >= w.greg[0] && d <= w.greg[1]) || null;
   },
 
@@ -2364,7 +2394,7 @@ const CmdPalette = {
         `<div class="cmd-item" data-i="${item._i}" onclick="CmdPalette._exec(${item._i})">
           <div class="cmd-item-icon ${item.color}"><i class="fas ${item.icon}"></i></div>
           <div style="min-width:0;flex:1">
-            <div class="cmd-item-label">${item.label}</div>
+            <div class="cmd-item-label">${_esc(item.label)}</div>
             ${item.sub ? `<div class="cmd-item-sub">${item.sub}</div>` : ''}
           </div>
           <i class="fas fa-arrow-left cmd-item-arrow"></i>
@@ -2505,12 +2535,14 @@ const Pages = {
       const slot = sch.find(s => s.day === dayKey && s.period == p.p);
       return slot ? DB.get('classes').find(c => c.id === slot.classId) : null;
     };
+    /* title/meta نصّان دائماً وقد يحملان اسم فصل — يُهرّبان هنا مرة واحدة
+       بدل تكرار _esc في كل نداء. actions وحدها هي الوسم الجاهز. */
     const card = (accent, icon, lbl, title, meta, actions) => `
       <div class="now-card accent-${accent}">
         <div class="now-main">
-          <div class="now-lbl"><i class="fas ${icon}"></i> ${lbl}</div>
-          <div class="now-title">${title}</div>
-          ${meta ? `<div class="now-meta">${meta}</div>` : ''}
+          <div class="now-lbl"><i class="fas ${icon}"></i> ${_esc(lbl)}</div>
+          <div class="now-title">${_esc(title)}</div>
+          ${meta ? `<div class="now-meta">${_esc(meta)}</div>` : ''}
         </div>
         ${actions ? `<div class="now-actions">${actions}</div>` : ''}
       </div>`;
@@ -2560,7 +2592,7 @@ const Pages = {
 
     if (z === 'post') {
       const todaySch = sch.filter(s => s.day === dayKey);
-      const today = new Date().toISOString().slice(0,10);
+      const today = _isoDate();
       const todayAtt = DB.get('attendance').filter(a => a.date === today);
       const pres = todayAtt.reduce((n,a) => n + a.records.filter(r => r.status==='present').length, 0);
       const exp  = todayAtt.reduce((n,a) => n + a.records.length, 0);
@@ -2632,120 +2664,16 @@ const Pages = {
         <div class="now-main">
           <div class="now-lbl"><i class="fas fa-calendar-week"></i> درس هذا الأسبوع · الأسبوع ${_ar(week.n)}</div>
           <div class="now-title">${title}</div>
-          <div class="now-meta">${items[0].unitTitle} · ${cls.name} · ${dateRange}${holidayNote}</div>
+          <div class="now-meta">${items[0].unitTitle} · ${_esc(cls.name)} · ${dateRange}${holidayNote}</div>
         </div>
         <div class="now-actions">${actions}</div>
       </div>`;
   },
 
-  _xlWidget(cls, students, todayAtt, activeClsId) {
-    const cnt       = students.filter(s => s.classId === cls.id).length;
-    const att       = todayAtt.find(a => a.classId === cls.id);
-    const pres      = att ? att.records.filter(r => r.status === 'present').length : 0;
-    const attDone   = !!att;
-    const isNow     = cls.id === activeClsId;
-    const warnCount = students.filter(s => s.classId === cls.id && _behWarn(s).length > 0).length;
-    const filename  = `سجل_${cls.name.replace(/\s+/g,'_')}.xlsx`;
-    const formula   = attDone ? '=TRUE()' : '=FALSE()';
-    const cfClass   = attDone ? 'xl-cf-green' : 'xl-cf-red';
-    const cfB       = attDone
-      ? `<span class="xl-formula-text" style="color:#375623">=TRUE()</span>`
-      : `<span class="xl-formula-text" style="color:#9C0006">=FALSE()</span>`;
-    const cfC       = attDone
-      ? `<span style="font-size:.7rem">✓ ${pres} / ${cnt}</span>`
-      : `<span style="font-size:.7rem">⚠ لم يُسجل</span>`;
-    const warnRow   = warnCount ? `
-      <tr>
-        <td class="xl-rownum">5</td>
-        <td class="xl-cell label">تحذيرات</td>
-        <td class="xl-cell xl-cf-orange" style="font-family:monospace;font-weight:700">${warnCount}</td>
-        <td class="xl-cell xl-cf-orange" style="font-size:.7rem">طالب بحاجة انتباه</td>
-      </tr>` : '';
-
-    return `
-    <div class="xl-widget${isNow ? ' xl-active-now' : ''}">
-      <div class="xl-titlebar">
-        <div class="xl-title-icon">X</div>
-        ${isNow ? '<div class="xl-live-dot"></div>' : ''}
-        <div class="xl-title-filename">${filename}</div>
-        <div class="xl-winctrl">
-          <span class="xl-wc-min" title="مصغّر">—</span>
-          <span class="xl-wc-max" title="تكبير">□</span>
-          <span class="xl-wc-cls" title="تعديل الفصل" onclick="Pages.editClass('${cls.id}')">✕</span>
-        </div>
-      </div>
-      <div class="xl-formulabar">
-        <div class="xl-fb-cellref">B4</div>
-        <div class="xl-fb-sep"></div>
-        <span class="xl-fb-fx">fx</span>
-        <div class="xl-fb-formula">${formula}</div>
-      </div>
-      <div class="xl-sheet">
-        <table class="xl-table">
-          <colgroup>
-            <col style="width:26px">
-            <col style="width:32%">
-            <col style="width:36%">
-            <col>
-          </colgroup>
-          <thead>
-            <tr>
-              <td class="xl-col-hdr-cell corner"></td>
-              <td class="xl-col-hdr-cell">A</td>
-              <td class="xl-col-hdr-cell">B</td>
-              <td class="xl-col-hdr-cell">C</td>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="xl-rownum">1</td>
-              <td class="xl-cell label">الفصل</td>
-              <td class="xl-cell" style="font-weight:800;color:#1D6F42">${cls.name}</td>
-              <td class="xl-cell"></td>
-            </tr>
-            <tr>
-              <td class="xl-rownum">2</td>
-              <td class="xl-cell label">المادة</td>
-              <td class="xl-cell">${cls.subject || '—'}</td>
-              <td class="xl-cell"></td>
-            </tr>
-            <tr>
-              <td class="xl-rownum">3</td>
-              <td class="xl-cell label">الطلاب</td>
-              <td class="xl-cell" style="font-weight:700;color:#1F497D;font-family:monospace">${cnt}</td>
-              <td class="xl-cell" style="color:#888;font-size:.72rem">طالب</td>
-            </tr>
-            <tr>
-              <td class="xl-rownum">4</td>
-              <td class="xl-cell label selected">الحضور</td>
-              <td class="xl-cell selected ${cfClass}">${cfB}</td>
-              <td class="xl-cell ${cfClass}">${cfC}</td>
-            </tr>
-            ${warnRow}
-          </tbody>
-        </table>
-      </div>
-      <div class="xl-actions">
-        <button class="xl-action-btn xl-action-green" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
-          <i class="fas fa-clipboard-check"></i> حضور
-        </button>
-        <button class="xl-action-btn xl-action-gray" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'groups'})">
-          <i class="fas fa-object-group"></i> مجموعات
-        </button>
-        <button class="xl-action-btn xl-action-blue" onclick="Router.go('grades',{classId:'${cls.id}'})">
-          <i class="fas fa-star"></i> درجات
-        </button>
-        <button class="xl-action-btn xl-action-gray" style="margin-right:auto" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'manage'})">
-          <i class="fas fa-cog"></i> إدارة
-        </button>
-      </div>
-    </div>`;
-  },
-
   dashboard() {
     const classes  = DB.get('classes');
     const students = DB.get('students');
-    const today    = new Date().toISOString().slice(0,10);
+    const today    = _isoDate();
     const todayAtt = DB.get('attendance').filter(a => a.date === today);
     const dayKey   = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
     const todayLessons = DB.get('schedule').filter(l => l.day === dayKey);
@@ -2753,7 +2681,7 @@ const Pages = {
     const totalExpected = todayAtt.reduce((n,a) => n + a.records.length, 0);
     const attRate = totalExpected ? Math.round(totalPresent/totalExpected*100) : 0;
 
-    const sevenAgo   = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+    const sevenAgo   = _isoDate(new Date(Date.now() - 7 * 864e5));
     const recentEvts = DB.get('behaviorEvents').filter(e => e.date >= sevenAgo);
     const recentIds  = new Set(recentEvts.map(e => e.studentId));
     const dismissed  = new Set(DB.get('dismissedWarnings').filter(d => d.date >= sevenAgo).map(d => d.studentId));
@@ -2783,7 +2711,7 @@ const Pages = {
       const rate = att && att.records.length ? Math.round(att.records.filter(r=>r.status==='present').length/att.records.length*100) : null;
       return `<div class="dash-cls" onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})">
         <span class="dash-cls-dot" style="background:${cls.color||'#4f46e5'}"></span>
-        <div style="min-width:0"><div class="dash-cls-name">${cls.name}</div><div class="dash-cls-sub">${cls.subject ? cls.subject + ' · ' : ''}${cnt} ${_T.stu}</div></div>
+        <div style="min-width:0"><div class="dash-cls-name">${_esc(cls.name)}</div><div class="dash-cls-sub">${_esc(cls.subject ? cls.subject + ' · ' : '')}${cnt} ${_T.stu}</div></div>
         <span class="dash-cls-badge">${rate !== null ? 'حضور ' + rate + '%' : 'لم يُسجّل'}</span>
       </div>`;
     }).join('');
@@ -2835,7 +2763,7 @@ const Pages = {
     }
     const selId   = params.classId || classes[0].id;
     const tab     = params.tab    || 'att';
-    const today   = new Date().toISOString().slice(0, 10);
+    const today   = _isoDate();
     const selDate = params.date   || today;
     const cls     = classes.find(c => c.id === selId);
     if (!cls) { Router.go('classes'); return; }
@@ -2878,12 +2806,12 @@ const Pages = {
       ? `<button class="cw-tab ${tab==='book'?'active':''}" onclick="Pages.classDetail({classId:'${selId}',tab:'book'})"><i class="fas fa-book-open"></i> الكتاب والعروض</button>`
       : '';
     const header = `
-      <div class="cw-crumb"><b onclick="Router.go('classes')">فصولي</b> ‹ ${cls.name}</div>
+      <div class="cw-crumb"><b onclick="Router.go('classes')">فصولي</b> ‹ ${_esc(cls.name)}</div>
       <div class="cw-head">
         <div class="cw-avatar" style="background:${clr}">${initials}</div>
         <div class="cw-title">
-          <div class="cw-name">${cls.name}</div>
-          <div class="cw-sub">${cls.subject ? cls.subject + ' · ' : ''}${cnt} ${_T.stu}</div>
+          <div class="cw-name">${_esc(cls.name)}</div>
+          <div class="cw-sub">${_esc(cls.subject ? cls.subject + ' · ' : '')}${cnt} ${_T.stu}</div>
         </div>
         <div class="cw-switch" id="cw-switch">
           <button class="cw-switch-btn" onclick="document.getElementById('cw-switch').classList.toggle('open')">
@@ -2891,7 +2819,7 @@ const Pages = {
           </button>
           <div class="cw-switch-menu">
             ${classes.map(c => `<div class="cw-switch-item" onclick="Router.go('classDetail',{classId:'${c.id}',tab:'${tab==='book' && !Books.forClass(c) ? 'att' : tab}'})">
-              <span class="dot" style="background:${c.color||'#4f46e5'}"></span> ${c.name}${c.id===selId?' <i class="fas fa-check" style="margin-inline-start:auto;color:var(--primary)"></i>':''}
+              <span class="dot" style="background:${c.color||'#4f46e5'}"></span> ${_esc(c.name)}${c.id===selId?' <i class="fas fa-check" style="margin-inline-start:auto;color:var(--primary)"></i>':''}
             </div>`).join('')}
           </div>
         </div>
@@ -2946,7 +2874,7 @@ const Pages = {
       const ready = (u.lessons && u.lessons.length);
       return `<button class="bk-unit ${i===unitIdx?'active':''} ${ready?'':'locked'}"
         ${ready?`onclick="Pages._bookUnit=${i};Pages.classDetail({classId:'${cls.id}',tab:'book'})"`:'disabled'}>
-        <span class="bk-unit-n">${_ar(u.n)}</span> ${u.title}
+        <span class="bk-unit-n">${_ar(u.n)}</span> ${_esc(u.title)}
         ${ready?'':'<i class="fas fa-lock" style="font-size:.62rem;opacity:.6"></i>'}
       </button>`;
     }).join('');
@@ -2958,7 +2886,7 @@ const Pages = {
       const label = `الدرس ${_ar(l.n)}: ${l.title} · من ص ${_ar(l.from)} إلى ص ${_ar(l.to)}`;
       const topics = l.topics.map(t => {
         const [name, pg, apply] = t;
-        return `<li class="${apply?'apply':''}" onclick="Books.open('${bk}',${pg},'${_esc(label)}')" title="افتح ص ${_ar(pg)}">
+        return `<li class="${apply?'apply':''}" onclick="Books.open('${bk}',${pg},'${_jsq(label)}')" title="افتح ص ${_ar(pg)}">
           <span class="bk-dot"></span><span>${name}</span><span class="bk-pg">ص ${_ar(pg)}</span></li>`;
       }).join('');
       const pres = l.presentation
@@ -2969,7 +2897,7 @@ const Pages = {
           <div class="bk-lesson-hd" onclick="this.parentElement.classList.toggle('open')">
             <div class="bk-lnum">${_ar(l.n)}</div>
             <div class="bk-ltitle">
-              <div class="t">الدرس ${_ar(l.n)}: ${l.title}</div>
+              <div class="t">الدرس ${_ar(l.n)}: ${_esc(l.title)}</div>
               <div class="m">${_ar(l.topics.length)} موضوعاً · ${l.presentation?'عرض تقديمي متاح':'بلا عرض تقديمي'}</div>
             </div>
             <div class="bk-lpage">ص ${_ar(l.from)}</div>
@@ -2979,7 +2907,7 @@ const Pages = {
             <ul class="bk-topics">${topics}</ul>
             <div class="bk-lactions">
               ${pres}
-              <button class="btn btn-sm btn-outline" onclick="Books.open('${bk}',${l.from},'${_esc(label)}')"><i class="fas fa-book-open"></i> افتح الكتاب</button>
+              <button class="btn btn-sm btn-outline" onclick="Books.open('${bk}',${l.from},'${_jsq(label)}')"><i class="fas fa-book-open"></i> افتح الكتاب</button>
             </div>
           </div>
         </div>`;
@@ -2993,15 +2921,15 @@ const Pages = {
         <div class="bk-hero">
           <div class="bk-cover"><i class="fas fa-laptop-code"></i></div>
           <div class="bk-meta">
-            <h2>${book.title}</h2>
-            <div class="bk-sub">${book.grade} · ${book.edition}</div>
+            <h2>${_esc(book.title)}</h2>
+            <div class="bk-sub">${_esc(book.grade)} · ${book.edition}</div>
             <div class="bk-chips">
               <span><i class="fas fa-layer-group"></i> ${_ar(book.units.length)} وحدات</span>
               <span><i class="fas fa-chalkboard"></i> ${_ar(lessonCount)} دروس</span>
               <span><i class="fas fa-file-lines"></i> ${_ar(book.totalPages)} صفحة</span>
             </div>
           </div>
-          <button class="btn btn-sm btn-light" onclick="Books.open('${bk}',1,'${_esc(book.title)} — ${_esc(book.grade)}')">
+          <button class="btn btn-sm btn-light" onclick="Books.open('${bk}',1,'${_jsq(book.title + ' — ' + book.grade)}')">
             <i class="fas fa-book-open"></i> تصفّح الكتاب
           </button>
         </div>
@@ -3011,7 +2939,7 @@ const Pages = {
 
         ${goals ? `
         <div class="bk-card">
-          <div class="bk-card-hd"><i class="fas fa-bullseye" style="color:var(--primary)"></i> أهداف الوحدة ${_ar(unit.n)}: ${unit.title}</div>
+          <div class="bk-card-hd"><i class="fas fa-bullseye" style="color:var(--primary)"></i> أهداف الوحدة ${_ar(unit.n)}: ${_esc(unit.title)}</div>
           <ul class="bk-goals">${goals}</ul>
         </div>` : ''}
 
@@ -3061,12 +2989,12 @@ const Pages = {
       }).join('');
       const behs = BEH_TYPES.map(b => {
         const val = s.behaviors?.[b.key] || 0;
-        return `<span class="att2-beh" onclick="Pages.incBehavior('${s.id}','${b.key}','${selId}')" title="${b.label}">${b.emoji}<span class="att2-beh-count" id="beh-${s.id}-${b.key}" style="color:${b.color}">${val||''}</span></span>`;
+        return `<span class="att2-beh" onclick="Pages.incBehavior('${s.id}','${b.key}','${selId}')" title="${_esc(b.label)}">${b.emoji}<span class="att2-beh-count" id="beh-${s.id}-${b.key}" style="color:${b.color}">${val||''}</span></span>`;
       }).join('');
       const warn = _behWarn(s).length ? `<i class="fas fa-triangle-exclamation att2-warn" title="${_behWarn(s).map(b=>b.label).join('، ')}"></i>` : '';
       return `<tr id="ar-${s.id}" class="att2-row att2-${st}">
         <td style="color:var(--text-muted);font-size:.8rem;width:36px">${i+1}</td>
-        <td><div class="att2-stu" onclick="Pages.studentProfile('${s.id}')"><span class="att2-ini">${s.name.charAt(0)}</span><span class="att2-name">${s.name}${warn}</span></div></td>
+        <td><div class="att2-stu" onclick="Pages.studentProfile('${s.id}')"><span class="att2-ini">${_esc(s.name.charAt(0))}</span><span class="att2-name">${_esc(s.name)}${warn}</span></div></td>
         <td><div class="att2-seg-wrap">${seg}</div></td>
         <td><div class="att2-behs">${behs}</div></td>
       </tr>`;
@@ -3126,9 +3054,9 @@ const Pages = {
         <td style="text-align:center;width:32px;color:#888;font-size:.78rem">${i+1}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px">
-            <div class="student-avatar-sm" style="flex-shrink:0;background:${cls.color||'#3B82F6'}">${s.name.charAt(0)}</div>
+            <div class="student-avatar-sm" style="flex-shrink:0;background:${cls.color||'#3B82F6'}">${_esc(s.name.charAt(0))}</div>
             <div>
-              <div style="font-weight:600;font-size:.85rem">${s.name}</div>
+              <div style="font-weight:600;font-size:.85rem">${_esc(s.name)}</div>
               ${warns.length ? `<span style="background:#fee2e2;color:#dc2626;border-radius:20px;padding:1px 7px;font-size:.68rem;font-weight:700"><i class="fas fa-triangle-exclamation"></i> ${warns.map(b=>b.label).join('، ')}</span>` : ''}
             </div>
           </div>
@@ -3152,7 +3080,7 @@ const Pages = {
         <button class="btn btn-sm btn-primary" onclick="Pages.addStudentModal('${selId}')"><i class="fas fa-user-plus"></i> إضافة ${_T.stu}</button>
         <div style="margin-right:auto;display:flex;gap:.4rem">
           <button class="btn btn-sm btn-outline" onclick="Router.go('grades',{classId:'${selId}'})"><i class="fas fa-star"></i> الدرجات</button>
-          <button class="btn btn-sm btn-outline" onclick="Print.attendance('${selId}',new Date().toISOString().slice(0,10))"><i class="fas fa-print"></i> طباعة</button>
+          <button class="btn btn-sm btn-outline" onclick="Print.attendance('${selId}',_isoDate())"><i class="fas fa-print"></i> طباعة</button>
           <button class="btn btn-sm btn-outline-danger" onclick="Pages.deleteClass('${selId}')"><i class="fas fa-trash"></i> حذف الفصل</button>
         </div>
       </div>
@@ -3176,7 +3104,7 @@ const Pages = {
   classes() {
     const classes  = DB.get('classes');
     const students = DB.get('students');
-    const todayStr = new Date().toISOString().slice(0,10);
+    const todayStr = _isoDate();
     const allAtt   = DB.get('attendance').filter(a => a.date === todayStr);
 
     const cards = classes.map(c => {
@@ -3194,7 +3122,7 @@ const Pages = {
         <div class="cls-card-head">
           <div class="cls-card-id">
             <div class="cls-card-dot" style="background:${clr}22;color:${clr}">${initials}</div>
-            <div style="min-width:0"><div class="cls-card-name">${c.name}</div><div class="cls-card-sub">${c.subject || '—'}</div></div>
+            <div style="min-width:0"><div class="cls-card-name">${_esc(c.name)}</div><div class="cls-card-sub">${_esc(c.subject || '—')}</div></div>
           </div>
           <div class="dot-menu-wrap" id="dm-${menuId}">
             <button class="dot-btn" onclick="Pages._dotToggle('${menuId}',event)" aria-label="مزيد"><i class="fas fa-ellipsis"></i></button>
@@ -3277,7 +3205,7 @@ const Pages = {
           <div id="class-name-preview" style="font-size:1.1rem;font-weight:700;color:var(--primary);background:var(--primary-light);border-radius:8px;padding:.5rem 1rem;text-align:center">${gl} ${sec}</div>
         </div>
         <div class="form-group"><label>المادة الدراسية *</label>
-          <select name="subject" required>${Subjects.allSubjectOptionsHtml(cls?.subject || (!editId ? DB.teacher()?.subject : '') || '')}</select></div>
+          <select name="subject" required>${_esc(Subjects.allSubjectOptionsHtml(cls?.subject || (!editId ? DB.teacher()?.subject : '') || ''))}</select></div>
         <div class="form-group"><label>لون الفصل في الجدول</label>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="color-picker">
             ${['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899','#84CC16','#F97316','#6366F1'].map(c =>
@@ -3350,22 +3278,29 @@ const Pages = {
     Toast.show('تم الحذف', 'error'); this.classes();
   },
 
+  /* كود مشاركة بطول ثابت من مولّد التعمية. Math.random().toString(36) كان
+     قد يعطي سلسلة أقصر من المطلوب فيخرج كود بأربعة أحرف أو خمسة. */
+  _shareCode(len = 6) {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   /* بلا I O 0 1 لالتباسها */
+    return Array.from(crypto.getRandomValues(new Uint8Array(len)), b => A[b % A.length]).join('');
+  },
+
   async shareClassModal(clsId) {
     const cls      = DB.get('classes').find(c => c.id === clsId);
     const students = DB.get('students').filter(s => s.classId === clsId);
     if (!cls) return;
-    const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const code = this._shareCode();
     const payload = {
       class:    { name: cls.name, subject: cls.subject, grade: cls.grade, semester: cls.semester, color: cls.color },
       students: students.map(s => ({ name: s.name, gender: s.gender, notes: s.notes }))
     };
-    const { error } = await _sb.from('shared_classes').insert({ code, data: payload });
+    const { error } = await _sb.from('shared_classes').insert({ code, data: payload, owner_id: (await _sb.auth.getUser()).data.user?.id });
     if (error) { Toast.show('حدث خطأ أثناء المشاركة', 'error'); return; }
     Modal.open('مشاركة الفصل', `
       <div style="text-align:center;padding:1rem 0">
         <p style="color:var(--gray-500);margin-bottom:1rem">شارك هذا الكود مع أي ${_T.tch} ليستورد الفصل و${_T.theStus}</p>
         <div style="font-size:2.5rem;font-weight:900;letter-spacing:.4rem;color:var(--primary);background:var(--primary-light);border-radius:12px;padding:1rem 2rem;margin-bottom:1rem;font-family:monospace">${code}</div>
-        <p style="font-size:.8rem;color:var(--gray-400);margin-bottom:1.25rem">الفصل: ${cls.name} — ${students.length} ${_T.stu}</p>
+        <p style="font-size:.8rem;color:var(--gray-400);margin-bottom:1.25rem">الفصل: ${_esc(cls.name)} — ${students.length} ${_T.stu}</p>
         <button class="btn btn-primary" onclick="navigator.clipboard.writeText('${code}').then(()=>Toast.show('تم النسخ!'))">
           <i class="fas fa-copy"></i> نسخ الكود
         </button>
@@ -3377,7 +3312,7 @@ const Pages = {
     const classes  = DB.get('classes');
     const students = DB.get('students');
     if (!classes.length) { Toast.show('لا يوجد فصول للمشاركة', 'error'); return; }
-    const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const code = this._shareCode();
     const payload = {
       all: true,
       classes: classes.map(cls => ({
@@ -3385,7 +3320,7 @@ const Pages = {
         students: students.filter(s => s.classId === cls.id).map(s => ({ name: s.name, gender: s.gender, notes: s.notes }))
       }))
     };
-    const { error } = await _sb.from('shared_classes').insert({ code, data: payload });
+    const { error } = await _sb.from('shared_classes').insert({ code, data: payload, owner_id: (await _sb.auth.getUser()).data.user?.id });
     if (error) { Toast.show('حدث خطأ أثناء المشاركة', 'error'); return; }
     const totalStudents = students.length;
     Modal.open('مشاركة جميع الفصول', `
@@ -3419,9 +3354,10 @@ const Pages = {
   async _doImportClass() {
     const code = document.getElementById('import-code').value.trim().toUpperCase();
     if (code.length !== 6) { Toast.show('الكود يجب أن يكون 6 أحرف', 'error'); return; }
-    const { data, error } = await _sb.from('shared_classes').select('data').eq('code', code).maybeSingle();
-    if (error || !data) { Toast.show('الكود غير صحيح أو منتهي', 'error'); return; }
-    const payload = data.data;
+    /* عبر دالة get_shared_class لا بقراءة مباشرة من الجدول: القراءة المفتوحة
+       كانت تتيح سحب كل المشاركات بأسماء طلابها بلا تسجيل دخول. */
+    const { data: payload, error } = await _sb.rpc('get_shared_class', { p_code: code });
+    if (error || !payload) { Toast.show('الكود غير صحيح أو منتهي', 'error'); return; }
     this._importQueue = payload.all ? payload.classes : [{ class: payload.class, students: payload.students }];
     document.getElementById('modal-title').textContent = 'استيراد الفصول';
     const rows = this._importQueue.map((item, i) => `
@@ -3429,9 +3365,9 @@ const Pages = {
         <input type="checkbox" class="import-chk" id="ichk-${i}" checked
           onchange="document.getElementById('irow-${i}').classList.toggle('import-row-off',!this.checked)">
         <div class="import-row-info">
-          <div class="import-row-name">${item.class.name}
-            ${item.class.grade ? `<span class="import-badge">${item.class.grade}</span>` : ''}
-            ${item.class.semester ? `<span class="import-badge">${item.class.semester}</span>` : ''}
+          <div class="import-row-name">${_esc(item.class.name)}
+            ${item.class.grade ? `<span class="import-badge">${_esc(item.class.grade)}</span>` : ''}
+            ${item.class.semester ? `<span class="import-badge">${_esc(item.class.semester)}</span>` : ''}
           </div>
           <div class="import-row-meta"><i class="fas fa-users"></i> ${item.students.length} ${_T.stu}</div>
         </div>
@@ -3511,7 +3447,7 @@ const Pages = {
   _diceQueues: {},
 
   diceRoll(classId) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = _isoDate();
     const allAtt = DB.get('attendance');
     const rec = allAtt.find(a => a.classId === classId && a.date === today);
     const absentIds = new Set((rec?.records || []).filter(r => r.status === 'absent').map(r => r.studentId));
@@ -3539,11 +3475,11 @@ const Pages = {
 
     Modal.open('🎲 النرد — اختيار عشوائي', `
       <div style="text-align:center;padding:.75rem 0">
-        <div id="dice-avatar" class="dice-avatar" style="opacity:0">${chosen.name.charAt(0)}</div>
+        <div id="dice-avatar" class="dice-avatar" style="opacity:0">${_esc(chosen.name.charAt(0))}</div>
         <div id="dice-display" style="font-size:1.8rem;font-weight:900;color:#0d9488;
           min-height:52px;line-height:52px;border-radius:14px;
           padding:0 1.2rem;margin-bottom:.4rem;letter-spacing:-.5px">&nbsp;</div>
-        <div id="dice-cls" style="color:#9ca3af;font-size:.78rem;margin-bottom:.2rem">${cls?.name || ''}</div>
+        <div id="dice-cls" style="color:#9ca3af;font-size:.78rem;margin-bottom:.2rem">${_esc(cls?.name || '')}</div>
         <div id="dice-grp" style="display:none;font-size:.8rem;font-weight:700;margin-bottom:.75rem"></div>
         <div id="dice-sub" style="color:#6b7280;font-size:.82rem;margin-bottom:.75rem">جاري الاختيار...</div>
         <div id="dice-remain" style="color:#9ca3af;font-size:.75rem;margin-bottom:.75rem;display:none"></div>
@@ -3704,7 +3640,7 @@ const Pages = {
           onmouseover="this.style.background='${b.color}25'"
           onmouseout="this.style.background='${b.color}10'">
           <span style="font-size:1.1rem">${b.emoji}</span>
-          <span style="font-size:.65rem;color:${b.color};font-weight:700;white-space:nowrap">${b.label}</span>
+          <span style="font-size:.65rem;color:${b.color};font-weight:700;white-space:nowrap">${_esc(b.label)}</span>
         </button>`).join('');
 
       const items = g.map(s => `
@@ -3714,7 +3650,7 @@ const Pages = {
           style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;
             background:#fff;border:1px solid #e5e7eb;cursor:grab;transition:opacity .15s">
           <i class="fas fa-grip-vertical" style="color:#d1d5db;font-size:.7rem"></i>
-          <span style="font-size:.88rem;flex:1">${s.name}</span>
+          <span style="font-size:.88rem;flex:1">${_esc(s.name)}</span>
         </div>`).join('');
 
       const grpName = this._grpNames[gi] || `المجموعة ${gi + 1}`;
@@ -3944,7 +3880,7 @@ const Pages = {
 
   _grpSaveSession(classId) {
     if (!this._grpWork) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = _isoDate();
     const all = DB.get('groups') || [];
     const existing = all.find(g => g.classId === classId);
     if (!existing) { Toast.show('ثبّت المجموعات أولاً', 'warn'); return; }
@@ -4061,7 +3997,7 @@ const Pages = {
     const existing = all.find(g => g.classId === classId);
     const entry = {
       classId,
-      savedAt: new Date().toISOString().slice(0, 10),
+      savedAt: _isoDate(),
       members: this._grpWork.map(g => g.map(s => s.id)),
       totalPoints: existing?.totalPoints || this._grpWork.map(() => 0),
       sessions: existing?.sessions || [],
@@ -4082,10 +4018,10 @@ const Pages = {
   _studentForm(data = {}, classes = [], selClass = '') {
     return `
       <div class="form-group"><label>اسم ${_T.theStu} *</label>
-        <input type="text" name="name" value="${data.name||''}" placeholder="الاسم الرباعي" required></div>
+        <input type="text" name="name" value="${_esc(data.name||'')}" placeholder="الاسم الرباعي" required></div>
       <div class="form-group"><label>الفصل *</label>
         <select name="classId" required>
-          ${classes.map(c => `<option value="${c.id}" ${(data.classId||selClass)===c.id?'selected':''}>${c.name}</option>`).join('')}
+          ${classes.map(c => `<option value="${c.id}" ${(data.classId||selClass)===c.id?'selected':''}>${_esc(c.name)}</option>`).join('')}
         </select></div>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ</button>
@@ -4100,7 +4036,7 @@ const Pages = {
         <div class="form-group">
           <label>الفصل الدراسي *</label>
           <select name="classId" required>
-            ${classes.map(c => `<option value="${c.id}" ${c.id===classId?'selected':''}>${c.name}</option>`).join('')}
+            ${classes.map(c => `<option value="${c.id}" ${c.id===classId?'selected':''}>${_esc(c.name)}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -4191,7 +4127,7 @@ const Pages = {
       <div class="form-group">
         <label><i class="fas fa-door-open"></i> اختر الفصل الجديد</label>
         <select id="transfer-class">
-          ${classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+          ${classes.map(c => `<option value="${c.id}">${_esc(c.name)}</option>`).join('')}
         </select>
       </div>
       <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem">
@@ -4229,8 +4165,8 @@ const Pages = {
     const bDef = BEH_TYPES.find(b => b.key === key);
     if (bDef && !bDef.pos) {
       const events = DB.get('behaviorEvents');
-      const cutoff = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-      events.push({ studentId: stuId, key, classId: classId || '', date: new Date().toISOString().slice(0, 10) });
+      const cutoff = _isoDate(new Date(Date.now() - 30 * 864e5));
+      events.push({ studentId: stuId, key, classId: classId || '', date: _isoDate() });
       DB.set('behaviorEvents', events.filter(e => e.date >= cutoff));
     }
     const stu = updated.find(s => s.id === stuId);
@@ -4272,7 +4208,7 @@ const Pages = {
         <button class="btn btn-primary" onclick="Router.go('classes')">إضافة فصل</button></div>`;
       return;
     }
-    const today   = new Date().toISOString().slice(0, 10);
+    const today   = _isoDate();
     const selId   = params.classId || classes[0].id;
     const selDate = params.date || today;
     const cls     = classes.find(c => c.id === selId);
@@ -4288,7 +4224,7 @@ const Pages = {
 
     const tabs = classes.map(c =>
       `<button class="filter-btn ${c.id===selId?'active':''}" onclick="Pages.attendance({classId:'${c.id}',date:'${selDate}'})">
-        <span>${c.name}</span>${c.subject ? `<small style="display:block;font-size:.72em;opacity:.75">${c.subject}</small>` : ''}
+        <span>${_esc(c.name)}</span>${c.subject ? `<small style="display:block;font-size:.72em;opacity:.75">${_esc(c.subject)}</small>` : ''}
       </button>`
     ).join('');
 
@@ -4296,7 +4232,7 @@ const Pages = {
       const st = map[s.id] || 'present';
       return `<div class="att-row ${st==='absent'?'is-absent':st==='late'?'is-late':''}" id="ar-${s.id}">
         <div class="att-num">${i+1}</div>
-        <div class="att-info"><div class="student-avatar-sm">${s.name.charAt(0)}</div><div class="att-name">${s.name}</div></div>
+        <div class="att-info"><div class="student-avatar-sm">${_esc(s.name.charAt(0))}</div><div class="att-name">${_esc(s.name)}</div></div>
         <div class="att-btns">
           <button class="att-btn p ${st==='present'?'active':''}" onclick="Pages.setAtt('${s.id}','present','${selId}','${selDate}')"><i class="fas fa-check"></i> حاضر</button>
           <button class="att-btn a ${st==='absent'?'active':''}" onclick="Pages.setAtt('${s.id}','absent','${selId}','${selDate}')"><i class="fas fa-times"></i> غائب</button>
@@ -4315,7 +4251,7 @@ const Pages = {
       ${clsStu.length ? `
       <div class="section-card">
         <div class="card-header">
-          <h3><i class="fas fa-users"></i> ${cls?.name} — ${selDate}</h3>
+          <h3><i class="fas fa-users"></i> ${_esc(cls?.name)} — ${selDate}</h3>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap">
             <button class="btn btn-sm btn-outline" onclick="Pages.markAll('present')"><i class="fas fa-check-double"></i> حضور الكل</button>
             <button class="btn btn-sm btn-outline" onclick="Pages.markAll('absent')"><i class="fas fa-times"></i> غياب الكل</button>
@@ -4391,29 +4327,6 @@ const Pages = {
       this._xlRefreshRow(s.id, status);
     });
     this.saveAtt(Pages._attClassId, Pages._attDate, true);
-  },
-
-  dismissWarning(stuId) {
-    const sevenAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
-    const list = DB.get('dismissedWarnings').filter(d => d.date >= sevenAgo);
-    list.push({ studentId: stuId, date: new Date().toISOString().slice(0, 10) });
-    DB.set('dismissedWarnings', list);
-    // remove row from UI without full re-render
-    const row = document.getElementById(`wi-${stuId}`);
-    if (row) {
-      row.style.transition = 'opacity .2s';
-      row.style.opacity = '0';
-      setTimeout(() => {
-        row.remove();
-        const card = document.getElementById('home-warn-card');
-        const remaining = card?.querySelectorAll('.home-warn-item');
-        if (card && (!remaining || remaining.length === 0)) card.remove();
-        else if (card) {
-          const h3 = card.querySelector('h3');
-          if (h3) h3.innerHTML = `<i class="fas fa-triangle-exclamation"></i> تحذيرات هذا الأسبوع — ${remaining.length} ${_T.stu}`;
-        }
-      }, 200);
-    }
   },
 
   saveAtt(clsId, date, silent = false) {
@@ -4505,13 +4418,13 @@ const Pages = {
 
     const tabs = classes.map(c =>
       `<button class="grades-class-tab ${c.id===selId?'active':''}" onclick="Pages.grades({classId:'${c.id}'})">
-        <span class="grades-tab-name">${c.name}</span>
-        ${c.subject ? `<span class="grades-tab-subject">${c.subject}</span>` : ''}
+        <span class="grades-tab-name">${_esc(c.name)}</span>
+        ${c.subject ? `<span class="grades-tab-subject">${_esc(c.subject)}</span>` : ''}
       </button>`
     ).join('');
 
     const schemaHeads = schema.map(c =>
-      `<th style="min-width:80px;white-space:nowrap">${c.label}<br><small>/${c.max}</small>
+      `<th style="min-width:80px;white-space:nowrap">${_esc(c.label)}<br><small>/${c.max}</small>
         <div class="bulk-input-row">
           <input type="number" min="0" max="${c.max}" step=".5" placeholder="—"
             id="bulk-${c.key}" class="bulk-inline-input"
@@ -4549,8 +4462,8 @@ const Pages = {
       return `<tr class="${rowCls(d)}">
         <td>${i+1}</td>
         <td><div class="student-name-cell">
-          <div class="student-avatar-sm" style="${avatarStyle(d)}">${s.name.charAt(0)}</div>
-          ${s.name}
+          <div class="student-avatar-sm" style="${avatarStyle(d)}">${_esc(s.name.charAt(0))}</div>
+          ${_esc(s.name)}
         </div></td>
         ${cells}
         <td class="grade-cell total-grade" id="tot-${s.id}">${totDisp}</td>
@@ -4599,12 +4512,12 @@ const Pages = {
       </div>`;
 
     document.getElementById('content').innerHTML = `
-      <div class="cw-crumb"><b onclick="Router.go('classes')">فصولي</b> ‹ ${cls.name}</div>
+      <div class="cw-crumb"><b onclick="Router.go('classes')">فصولي</b> ‹ ${_esc(cls.name)}</div>
       <div class="cw-head">
-        <div class="cw-avatar" style="background:${cls.color||'#4f46e5'}">${_classBadge(cls.gradeLevel, cls.name, cls.section)}</div>
+        <div class="cw-avatar" style="background:${cls.color||'#4f46e5'}">${_esc(_classBadge(cls.gradeLevel, cls.name, cls.section))}</div>
         <div class="cw-title">
-          <div class="cw-name">${cls.name}</div>
-          <div class="cw-sub">${cls.subject ? cls.subject + ' · ' : ''}${clsStu.length} ${_T.stu}</div>
+          <div class="cw-name">${_esc(cls.name)}</div>
+          <div class="cw-sub">${_esc(cls.subject ? cls.subject + ' · ' : '')}${clsStu.length} ${_T.stu}</div>
         </div>
         <div class="cw-switch" id="cw-switch">
           <button class="cw-switch-btn" onclick="document.getElementById('cw-switch').classList.toggle('open')">
@@ -4612,7 +4525,7 @@ const Pages = {
           </button>
           <div class="cw-switch-menu">
             ${classes.map(c => `<div class="cw-switch-item" onclick="Router.go('grades',{classId:'${c.id}'})">
-              <span class="dot" style="background:${c.color||'#4f46e5'}"></span> ${c.name}${c.id===selId?' <i class="fas fa-check" style="margin-inline-start:auto;color:var(--primary)"></i>':''}
+              <span class="dot" style="background:${c.color||'#4f46e5'}"></span> ${_esc(c.name)}${c.id===selId?' <i class="fas fa-check" style="margin-inline-start:auto;color:var(--primary)"></i>':''}
             </div>`).join('')}
           </div>
         </div>
@@ -4640,7 +4553,7 @@ const Pages = {
         </div>
         <div class="section-card">
           <div class="card-header">
-            <h3><i class="fas fa-star-half-alt"></i> ${cls?.name}${cls?.subject ? ' — '+cls.subject : ''}</h3>
+            <h3><i class="fas fa-star-half-alt"></i> ${_esc(cls?.name)}${_esc(cls?.subject ? ' — '+cls.subject : '')}</h3>
             <span style="font-size:.78rem;color:var(--text-muted)"><i class="fas fa-circle-info"></i> اضغط على أي خانة لتعديلها مباشرةً</span>
           </div>
           <div class="table-container">
@@ -4702,7 +4615,7 @@ const Pages = {
         <i class="fas fa-grip-vertical"></i>
       </span>
       <input type="hidden" class="s-key" value="${comp.key}">
-      <input type="text" class="s-label" placeholder="اسم المهارة" value="${comp.label}"
+      <input type="text" class="s-label" placeholder="اسم المهارة" value="${_esc(comp.label)}"
         style="padding:.45rem .6rem;border:1px solid var(--gray-200);border-radius:6px;font-family:inherit;font-size:.9rem;width:100%"
         oninput="Pages._updateSchemaTotal()">
       <input type="number" class="s-max" min="1" max="200" value="${comp.max}"
@@ -5031,7 +4944,7 @@ const Pages = {
     const now = new Date();
     const d = new Date(now);
     d.setDate(now.getDate() - ((now.getDay() - idx + 7) % 7));   /* أقرب يوم مضى بهذا الاسم */
-    const iso = d.toISOString().slice(0, 10);
+    const iso = _isoDate(d);
     return DB.get('attendance').some(a => a.date === iso && a.classId === classId && a.records?.length);
   },
 
@@ -5066,7 +4979,7 @@ const Pages = {
     const headerCells = this._days.map(d => {
       const isToday = d.key === todayKey;
       return `<th class="tt-day-hdr${isToday?' tt-today-hdr':''}">
-        <span class="tt-day-ar">${d.label}</span>
+        <span class="tt-day-ar">${_esc(d.label)}</span>
         ${isToday ? '<span class="tt-today-pill">اليوم</span>' : ''}
       </th>`;
     }).join('');
@@ -5089,13 +5002,13 @@ const Pages = {
             ondragend="this.classList.remove('tt-dragging')"
             onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})"
             style="--cell-color:${color}">
-            <div class="tt-chip" style="color:${color}">${cls.name}</div>
+            <div class="tt-chip" style="color:${color}">${_esc(cls.name)}</div>
             ${(() => { const sub = entry.subject || cls.subject || '';
                        return sub && sub !== mainSubject ? `<div class="tt-subject">${sub}</div>` : ''; })()}
             ${!isToday ? '' : this._ttAttDone(cls.id, d.key)
               ? '<span class="tt-att tt-att-ok" title="سُجّل حضور اليوم"><i class="fas fa-check"></i></span>'
               : '<span class="tt-att tt-att-no" title="لم يُسجَّل حضور اليوم"><i class="fas fa-exclamation"></i></span>'}
-            ${entry.notes?`<div class="tt-notes"><i class="fas fa-tag"></i>${entry.notes}</div>`:''}
+            ${entry.notes?`<div class="tt-notes"><i class="fas fa-tag"></i>${_esc(entry.notes)}</div>`:''}
             <button class="tt-edit-btn" onclick="event.stopPropagation();Pages.editScheduleModal('${entry.id}')" title="تعديل">
               <i class="fas fa-pen"></i>
             </button>
@@ -5127,8 +5040,8 @@ const Pages = {
         onclick="Pages.changeClassColor('${c.id}')" title="اسحب لوضع في الجدول / انقر لتغيير اللون">
         <div class="tt-legend-dot" style="background:${clsColor[c.id]};box-shadow:0 0 0 3px ${clsColor[c.id]}30"></div>
         <div style="display:flex;flex-direction:column;gap:.1rem">
-          <span>${c.name}</span>
-          ${c.subject && c.subject !== mainSubject ? `<small style="font-size:.72em;opacity:.7">${c.subject}</small>` : ''}
+          <span>${_esc(c.name)}</span>
+          ${c.subject && c.subject !== mainSubject ? `<small style="font-size:.72em;opacity:.7">${_esc(c.subject)}</small>` : ''}
         </div>
         <i class="fas fa-grip-vertical" style="font-size:.65rem;color:var(--gray-400);cursor:grab"></i>
       </div>`
@@ -5171,7 +5084,7 @@ const Pages = {
 
     const chips = this._days.map(d => `
       <button class="ttd-chip ${d.key === sel ? 'active' : ''} ${d.key === todayKey ? 'is-today' : ''}"
-        onclick="Pages._ttGoDay('${d.key}')">${d.label}</button>`).join('');
+        onclick="Pages._ttGoDay('${d.key}')">${_esc(d.label)}</button>`).join('');
 
     const dayEntries = periods.map(p => ({ p, entry: data.entry(sel, p) })).filter(x => x.entry);
 
@@ -5476,7 +5389,7 @@ const Pages = {
         <div class="form-group"><label>الفصل الدراسي *</label>
           <select name="classId" required onchange="Pages._fillSubject(this)">
             <option value="">اختر الفصل</option>
-            ${classes.map(c => `<option value="${c.id}" data-subject="${c.subject}">${c.name} — ${c.subject}</option>`).join('')}
+            ${classes.map(c => `<option value="${c.id}" data-subject="${_esc(c.subject)}">${_esc(c.name)} — ${_esc(c.subject)}</option>`).join('')}
           </select></div>
         <div class="form-group"><label>المادة *</label>
           <input type="text" name="subject" id="sch-subject" placeholder="تُملأ تلقائياً" required></div>
@@ -5511,12 +5424,12 @@ const Pages = {
         <div class="form-group"><label>الفصل الدراسي *</label>
           <select name="classId" required onchange="Pages._fillSubject(this)">
             <option value="">اختر الفصل</option>
-            ${classes.map(c => `<option value="${c.id}" data-subject="${c.subject}" ${c.id===s.classId?'selected':''}>${c.name} — ${c.subject}</option>`).join('')}
+            ${classes.map(c => `<option value="${c.id}" data-subject="${_esc(c.subject)}" ${c.id===s.classId?'selected':''}>${_esc(c.name)} — ${_esc(c.subject)}</option>`).join('')}
           </select></div>
         <div class="form-group"><label>المادة *</label>
-          <input type="text" name="subject" id="sch-subject" value="${s.subject}" required></div>
+          <input type="text" name="subject" id="sch-subject" value="${_esc(s.subject)}" required></div>
         <div class="form-group"><label>ملاحظة</label>
-          <input type="text" name="notes" value="${s.notes||''}"></div>
+          <input type="text" name="notes" value="${_esc(s.notes||'')}"></div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ</button>
           <button class="btn btn-danger" type="button" onclick="Pages.deleteSchedule('${id}')"><i class="fas fa-trash"></i> حذف</button>
@@ -5563,7 +5476,8 @@ const Pages = {
                              .sort((a,b) => (b.referralCount||0) - (a.referralCount||0));
     const warned   = students.filter(s => _behWarn(s).length > 0)
                              .sort((a,b) => _behWarn(b).length - _behWarn(a).length);
-    const cls = id => classes.find(c => c.id === id)?.name || '—';
+    /* تُحقن مباشرة في خلايا الجدول، فتُهرَّب عند المصدر لا عند كل استعمال */
+    const cls = id => _esc(classes.find(c => c.id === id)?.name || '—');
     const cntBadge = n => {
       const color = n >= 5 ? '#dc2626' : n >= 3 ? '#d97706' : '#0d9488';
       return `<span style="background:${color};color:#fff;border-radius:20px;padding:2px 10px;font-size:.78rem;font-weight:700">${n}</span>`;
@@ -5575,7 +5489,7 @@ const Pages = {
           ${_bIcon(b)} ${b.label}: ${s.behaviors[b.key]}
         </span>`).join(' ');
       return `<tr>
-        <td><strong>${s.name}</strong></td>
+        <td><strong>${_esc(s.name)}</strong></td>
         <td>${cls(s.classId)}</td>
         <td style="line-height:2">${triggers}</td>
         <td>
@@ -5597,14 +5511,14 @@ const Pages = {
         <div style="border-right:3px solid #0d9488;padding:6px 10px;margin-bottom:6px;background:#f9fafb;border-radius:0 6px 6px 0;font-size:.82rem">
           <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
             <span style="color:#6b7280"><i class="fas fa-calendar-alt"></i> ${h.date||'—'}</span>
-            <span style="font-weight:700;color:#065f46">${reasonLabel(h.reason||'—')}</span>
-            <span style="color:#0d9488"><i class="fas fa-arrow-left"></i> ${h.refTo||'—'}</span>
-            ${h.notes ? `<span style="color:#6b7280;font-style:italic">${h.notes}</span>` : ''}
+            <span style="font-weight:700;color:#065f46">${_esc(reasonLabel(h.reason||'—'))}</span>
+            <span style="color:#0d9488"><i class="fas fa-arrow-left"></i> ${_esc(h.refTo||'—')}</span>
+            ${h.notes ? `<span style="color:#6b7280;font-style:italic">${_esc(h.notes)}</span>` : ''}
           </div>
         </div>`).join('');
       return `
       <tr>
-        <td><strong>${s.name}</strong></td>
+        <td><strong>${_esc(s.name)}</strong></td>
         <td>${cls(s.classId)}</td>
         <td style="text-align:center">${cntBadge(s.referralCount)}</td>
         <td style="text-align:center">
@@ -5659,10 +5573,11 @@ const Pages = {
   _pickStudentForReferral() {
     const students = DB.get('students').sort((a,b) => a.name.localeCompare(b.name,'ar'));
     const classes  = DB.get('classes');
-    const cls = id => classes.find(c => c.id === id)?.name || '—';
+    /* تُحقن مباشرة في خلايا الجدول، فتُهرَّب عند المصدر لا عند كل استعمال */
+    const cls = id => _esc(classes.find(c => c.id === id)?.name || '—');
     const rows = students.map(s => `
       <tr style="cursor:pointer" onclick="Modal.close();Pages.referralModal('${s.id}')">
-        <td><strong>${s.name}</strong></td>
+        <td><strong>${_esc(s.name)}</strong></td>
         <td>${cls(s.classId)}</td>
         <td style="text-align:center;color:var(--gray-400);font-size:.8rem">${s.referralCount||0} إحالة</td>
       </tr>`).join('');
@@ -5729,14 +5644,16 @@ const Pages = {
       .sort()
       .reverse();
     const g    = DB.get('grades').find(x => x.studentId===stuId && x.classId===s.classId)?.grades || {};
-    const tot  = _sumGrades(g);
+    const gs   = _gradeStats(g, cls);
+    const tot  = gs.tot;
+    const gpc  = gs.pct ?? 0;      /* النسبة مطبَّعة على مخطط الفصل */
     const behCounts = s.behaviors || {};
     const posBeh = BEH_TYPES.filter(b => b.pos);
     const negBeh = BEH_TYPES.filter(b => !b.pos);
 
-    const gradeColor = tot >= 90 ? '#059669' : tot >= 75 ? '#2563eb' : tot >= 60 ? '#d97706' : tot >= 50 ? '#ea580c' : '#dc2626';
-    const gradeStatus = tot > 0 ? (tot >= 50 ? 'ناجح' : 'راسب') : '—';
-    const gradeStatusColor = tot >= 50 ? '#059669' : '#dc2626';
+    const gradeColor = gpc >= 90 ? '#059669' : gpc >= 75 ? '#2563eb' : gpc >= 60 ? '#d97706' : gpc >= 50 ? '#ea580c' : '#dc2626';
+    const gradeStatus = gs.pct !== null ? (gpc >= 50 ? 'ناجح' : 'راسب') : '—';
+    const gradeStatusColor = gpc >= 50 ? '#059669' : '#dc2626';
     const totalSessions = pres + abs + late;
     const attRate = totalSessions ? Math.round(pres / totalSessions * 100) : 0;
 
@@ -5744,12 +5661,12 @@ const Pages = {
       <!-- Banner header -->
       <div class="profile-banner">
         <div class="profile-banner-top">
-          <div class="profile-big-avatar">${s.name.charAt(0)}</div>
+          <div class="profile-big-avatar">${_esc(s.name.charAt(0))}</div>
           <div style="flex:1;min-width:0">
-            <div class="profile-main-name">${s.name}</div>
+            <div class="profile-main-name">${_esc(s.name)}</div>
             <div class="profile-banner-sub">
-              ${cls ? `<span class="profile-badge"><i class="fas fa-door-open"></i> ${cls.name}</span>` : ''}
-              ${cls?.subject ? `<span class="profile-badge"><i class="fas fa-book-open"></i> ${cls.subject}</span>` : ''}
+              ${cls ? `<span class="profile-badge"><i class="fas fa-door-open"></i> ${_esc(cls.name)}</span>` : ''}
+              ${cls?.subject ? `<span class="profile-badge"><i class="fas fa-book-open"></i> ${_esc(cls.subject)}</span>` : ''}
               <span class="profile-badge" style="background:rgba(255,255,255,.25)"><i class="fas fa-chart-line"></i> ${attRate}% حضور</span>
             </div>
           </div>
@@ -5791,17 +5708,17 @@ const Pages = {
       <!-- Grades section -->
       <div class="profile-section">
         <div class="profile-section-title"><i class="fas fa-star-half-alt"></i> الدرجات</div>
-        ${tot > 0 ? `
+        ${gs.scored ? `
         <div class="profile-grade-row" style="margin-bottom:.75rem">
           <div class="profile-grade-bar-wrap">
-            <div class="profile-grade-bar" style="width:${tot}%;background:linear-gradient(90deg,${gradeColor},${gradeColor}cc)"></div>
+            <div class="profile-grade-bar" style="width:${Math.min(gpc,100)}%;background:linear-gradient(90deg,${gradeColor},${gradeColor}cc)"></div>
           </div>
           <div class="profile-grade-pill" style="background:${gradeColor}18;color:${gradeColor};border:1px solid ${gradeColor}33">
-            <span style="font-size:1.1rem;font-weight:900">${tot}</span><span style="font-size:.75rem">/100</span>
+            <span style="font-size:1.1rem;font-weight:900">${tot}</span><span style="font-size:.75rem">/${gs.max}</span>
           </div>
         </div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <span style="background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:.28rem .8rem;font-size:.78rem;font-weight:700;color:var(--text)"><i class="fas fa-medal"></i> ${_letter(tot)}</span>
+          <span style="background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:.28rem .8rem;font-size:.78rem;font-weight:700;color:var(--text)"><i class="fas fa-medal"></i> ${_letter(gpc)}</span>
           <span style="background:${gradeStatusColor}18;border:1px solid ${gradeStatusColor}33;border-radius:20px;padding:.28rem .8rem;font-size:.78rem;font-weight:700;color:${gradeStatusColor}">${gradeStatus}</span>
         </div>` : `<div style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:.5rem">لا توجد درجات مسجّلة</div>`}
       </div>
@@ -5814,7 +5731,7 @@ const Pages = {
           ${posBeh.map(b => {
             const cnt = behCounts[b.key]||0;
             return `<div class="profile-beh-chip" style="background:${b.color}14;border-color:${b.color}30;color:${b.color};opacity:${cnt?1:.45}">
-              ${_bIcon(b,true)} ${b.label} ${cnt > 0 ? `<strong>${cnt}</strong>` : ''}
+              ${_bIcon(b,true)} ${_esc(b.label)} ${cnt > 0 ? `<strong>${cnt}</strong>` : ''}
             </div>`;
           }).join('')}
         </div>
@@ -5823,7 +5740,7 @@ const Pages = {
           ${negBeh.map(b => {
             const cnt = behCounts[b.key]||0;
             return `<div class="profile-beh-chip" style="background:${b.color}14;border-color:${b.color}30;color:${b.color};opacity:${cnt?1:.45}">
-              ${_bIcon(b,true)} ${b.label} ${cnt > 0 ? `<strong>${cnt}</strong>` : ''}
+              ${_bIcon(b,true)} ${_esc(b.label)} ${cnt > 0 ? `<strong>${cnt}</strong>` : ''}
             </div>`;
           }).join('')}
         </div>
@@ -5908,16 +5825,23 @@ const Pages = {
         const b = s.behaviors || {};
         return n + BEH_TYPES.filter(bt => bt.pos).reduce((a, bt) => a + (b[bt.key]||0), 0);
       }, 0);
-      const clsGrades = grades.filter(g => stus.some(s => s.id === g.studentId));
-      const avgGrade  = clsGrades.length
-        ? Math.round(clsGrades.reduce((s, g) => s + _sumGrades(g.grades), 0) / clsGrades.length)
+      /* متوسط الفصل كنسبة مئوية من مخطط الفصل — فصول بمخططات مختلفة
+         تصير قابلة للمقارنة في جدول واحد. */
+      const clsPcts   = grades.filter(g => stus.some(s => s.id === g.studentId))
+        .map(g => _gradeStats(g.grades, cls).pct).filter(p => p !== null);
+      const avgGrade  = clsPcts.length
+        ? Math.round(clsPcts.reduce((a, p) => a + p, 0) / clsPcts.length)
         : null;
       return { cls, stus: stus.length, attRate, posBeh, avgGrade, sessions: attRecs.length };
     });
 
     // ── Grade distribution ────────────────────────────────────────────
     const distMap = {'ممتاز+':0,'ممتاز':0,'جيد جداً+':0,'جيد جداً':0,'جيد+':0,'جيد':0,'مقبول':0,'راسب':0};
-    grades.forEach(g => { const t = _sumGrades(g.grades); if (t > 0) distMap[_letter(t)]++; });
+    const _clsOf = id => classes.find(c => c.id === id) || null;
+    grades.forEach(g => {
+      const p = _gradeStats(g.grades, _clsOf(g.classId)).pct;
+      if (p !== null) distMap[_letter(p)]++;
+    });
     const distTotal   = Object.values(distMap).reduce((a,b) => a+b, 0);
     const passingCount = Object.entries(distMap).filter(([k]) => k !== 'راسب').reduce((s,[,v]) => s+v, 0);
     const gradeColors = {'ممتاز+':'#1D6F42','ممتاز':'#22c55e','جيد جداً+':'#4ade80','جيد جداً':'#86efac','جيد+':'#fbbf24','جيد':'#f59e0b','مقبول':'#fb923c','راسب':'#dc2626'};
@@ -5928,7 +5852,7 @@ const Pages = {
     const trendData = [], trendLabels = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
-      const ds = d.toISOString().slice(0,10);
+      const ds = _isoDate(d);
       trendLabels.push(ds.slice(5));
       const dayAtt = allAtt.filter(a => a.date === ds);
       if (dayAtt.length) {
@@ -5950,7 +5874,9 @@ const Pages = {
     const needsAtt = students.map(s => {
       const absCount = _countAtt(s.id,'absent',allAtt);
       const gr  = grades.find(g => g.studentId === s.id && g.classId === s.classId);
-      const tot = gr ? _sumGrades(gr.grades) : null;
+      /* بالنسبة المئوية: طالبٌ كامل الدرجة في مخطط مجموعه 60 كان يُحسب
+         راسباً ويُدرج هنا. tot يبقى null إذا لم تُرصد له درجة بعد. */
+      const tot = gr ? _gradeStats(gr.grades, _clsOf(s.classId)).pct : null;
       const negBeh = BEH_TYPES.filter(b => !b.pos).reduce((n,b) => n+(s.behaviors?.[b.key]||0), 0);
       const score  = (absCount>=3?2:absCount>=1?1:0) + (tot!==null&&tot<50?2:tot!==null&&tot<60?1:0) + (negBeh>=5?2:negBeh>=2?1:0);
       if (!score) return null;
@@ -5986,7 +5912,8 @@ const Pages = {
       if (v === null) return '<span style="color:var(--text-muted)">—</span>';
       const thr = type === 'att' ? [85,70] : [80,60];
       const c = v >= thr[0] ? 'ok' : v >= thr[1] ? 'mid' : 'bad';
-      return `<span class="an2-pill ${c}">${v}${type==='att'?'%':''}</span>`;
+      /* كلا القيمتين نسبة مئوية الآن — متوسط الدرجة مطبَّع على مخطط كل فصل */
+      return `<span class="an2-pill ${c}">${v}%</span>`;
     };
 
     document.getElementById('content').innerHTML = `
@@ -6027,7 +5954,7 @@ const Pages = {
                 <div style="flex:1;min-width:80px">
                   ${donutSegs.map(s=>`<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem">
                     <span style="width:11px;height:11px;border-radius:3px;background:${s.color};flex-shrink:0;display:inline-block"></span>
-                    <span style="font-size:.78rem;color:var(--text-secondary);font-weight:700;flex:1">${s.label}</span>
+                    <span style="font-size:.78rem;color:var(--text-secondary);font-weight:700;flex:1">${_esc(s.label)}</span>
                     <span style="font-size:.78rem;color:var(--text-muted);font-weight:800">${s.count}</span>
                   </div>`).join('')}
                 </div>`}
@@ -6051,7 +5978,7 @@ const Pages = {
             <tbody>
               ${sorted.map((x,i) => `<tr onclick="Router.go('classDetail',{classId:'${x.cls.id}'})">
                 <td style="color:var(--text-muted)">${i+1}</td>
-                <td style="font-weight:800;color:var(--primary)">${x.cls.name}</td>
+                <td style="font-weight:800;color:var(--primary)">${_esc(x.cls.name)}</td>
                 <td>${x.stus}</td>
                 <td style="color:var(--text-muted)">${x.sessions}</td>
                 <td>${_pill(x.attRate,'att')}</td>
@@ -6071,16 +5998,16 @@ const Pages = {
             : needsAtt.map(({s,cls,absCount,tot,negBeh,sev}) => {
                 const st = sevStyle(sev);
                 return `<div class="an2-att-row" onclick="Pages.studentProfile('${s.id}')">
-                  <div class="an2-att-avatar" style="background:${st.bg};color:${st.color};border-color:${st.border}">${s.name.charAt(0)}</div>
+                  <div class="an2-att-avatar" style="background:${st.bg};color:${st.color};border-color:${st.border}">${_esc(s.name.charAt(0))}</div>
                   <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-                      <div class="an2-att-name">${s.name}</div>
-                      <span style="padding:.12rem .5rem;border-radius:8px;font-size:.68rem;font-weight:800;${st.badge}">${st.label}</span>
+                      <div class="an2-att-name">${_esc(s.name)}</div>
+                      <span style="padding:.12rem .5rem;border-radius:8px;font-size:.68rem;font-weight:800;${st.badge}">${_esc(st.label)}</span>
                     </div>
                     <div class="an2-att-meta">
-                      <span style="color:var(--text-muted);font-size:.78rem">${cls?.name||'—'}</span>
+                      <span style="color:var(--text-muted);font-size:.78rem">${_esc(cls?.name||'—')}</span>
                       ${absCount>=1?`<span class="an2-att-tag tag-abs">غاب ${absCount}</span>`:''}
-                      ${tot!==null&&tot<60?`<span class="an2-att-tag tag-fail">درجة ${tot}</span>`:''}
+                      ${tot!==null&&tot<60?`<span class="an2-att-tag tag-fail">درجة ${tot}%</span>`:''}
                       ${negBeh>=2?`<span class="an2-att-tag tag-beh">سلوك ${negBeh}</span>`:''}
                     </div>
                   </div>
@@ -6181,15 +6108,15 @@ const Pages = {
         <div class="settings-card">
           <div class="settings-card-hdr"><i class="fas fa-user-tie"></i> بيانات الحساب</div>
           <div class="form-group"><label>اسم ${_T.theTch}</label>
-            <input type="text" id="sett-name" value="${t.name||''}"></div>
+            <input type="text" id="sett-name" value="${_esc(t.name||'')}"></div>
           <div class="form-group"><label>المنطقة التعليمية</label>
-            <input type="text" id="sett-region" placeholder="مثال: الرياض، جدة، الدمام..." value="${t.region||''}"></div>
+            <input type="text" id="sett-region" placeholder="مثال: الرياض، جدة، الدمام..." value="${_esc(t.region||'')}"></div>
           <div class="form-group"><label>اسم المدرسة</label>
-            <input type="text" id="sett-school" value="${t.school||''}"></div>
+            <input type="text" id="sett-school" value="${_esc(t.school||'')}"></div>
           <div class="form-group"><label>المرحلة الدراسية</label>
             <select id="sett-stage" onchange="Subjects.fillSubjectSelect(this.value,'sett-subject')">${Subjects.stageOptionsHtml(t.stage)}</select></div>
           <div class="form-group"><label>المادة</label>
-            <select id="sett-subject"${t.stage ? '' : ' disabled'}>${Subjects.subjectOptionsHtml(t.stage, t.subject)}</select></div>
+            <select id="sett-subject"${t.stage ? '' : ' disabled'}>${_esc(Subjects.subjectOptionsHtml(t.stage, t.subject))}</select></div>
           <div class="form-actions">
             <button class="btn btn-primary" onclick="Pages._saveProfile()"><i class="fas fa-save"></i> حفظ</button>
           </div>
@@ -6340,31 +6267,31 @@ const Pages = {
     if (!s) return;
     const cls = DB.get('classes').find(c => c.id === s.classId);
     const teacher = DB.teacher() || {};
-    const today = new Date().toISOString().slice(0, 10);
+    const today = _isoDate();
     Modal.open(`إحالة ${_T.stu} | Student Referral`, `
       <div class="form-group">
         <label>${_T.theStu} / Student</label>
-        <input type="text" value="${s.name}" readonly style="background:var(--gray-50)">
+        <input type="text" value="${_esc(s.name)}" readonly style="background:var(--gray-50)">
       </div>
       <div class="form-group">
         <label>الفصل / Class</label>
-        <input type="text" value="${cls?.name||'—'}" readonly style="background:var(--gray-50)">
+        <input type="text" value="${_esc(cls?.name||'—')}" readonly style="background:var(--gray-50)">
       </div>
       <div class="form-group">
         <label><i class="fas fa-map-marker-alt"></i> المنطقة / Region</label>
-        <input type="text" id="ref-region" value="${teacher.region||''}" placeholder="مثال: الرياض، مكة المكرمة...">
+        <input type="text" id="ref-region" value="${_esc(teacher.region||'')}" placeholder="مثال: الرياض، مكة المكرمة...">
       </div>
       <div class="form-group">
         <label><i class="fas fa-school"></i> المدرسة / School</label>
-        <input type="text" id="ref-school" value="${teacher.refSchool||teacher.school||''}" placeholder="اسم المدرسة">
+        <input type="text" id="ref-school" value="${_esc(teacher.refSchool||teacher.school||'')}" placeholder="اسم المدرسة">
       </div>
       <div class="form-group">
         <label><i class="fas fa-user-edit"></i> اسم ${_T.theTch} في النموذج</label>
-        <input type="text" id="ref-teacher-name" value="${teacher.refTeacherName||teacher.name||''}" placeholder="الاسم الذي يظهر في النموذج">
+        <input type="text" id="ref-teacher-name" value="${_esc(teacher.refTeacherName||teacher.name||'')}" placeholder="الاسم الذي يظهر في النموذج">
       </div>
       <div style="background:var(--gray-50);border-radius:8px;padding:10px 14px;margin-bottom:.75rem;display:flex;align-items:center;gap:10px;font-size:.85rem">
         <i class="fas fa-history" style="color:var(--primary)"></i>
-        <span>عدد إحالات <strong>${s.name}</strong> السابقة: <strong>${s.referralCount||0}</strong></span>
+        <span>عدد إحالات <strong>${_esc(s.name)}</strong> السابقة: <strong>${s.referralCount||0}</strong></span>
       </div>
       <div class="form-group">
         <label><i class="fas fa-calendar"></i> التاريخ / Date</label>
@@ -6731,7 +6658,7 @@ const Pages = {
     const u = this._adminUser(userId);
     if (!u) return;
     const cur = u.expires_at ? new Date(u.expires_at) : null;
-    const val = cur && !isNaN(cur.getTime()) ? cur.toISOString().slice(0, 10) : '';
+    const val = cur && !isNaN(cur.getTime()) ? _isoDate(cur) : '';
     Modal.open(`اشتراك: ${u.name || u.email || ''}`, `
       <div class="form-group">
         <label><i class="fas fa-calendar-check"></i> تاريخ انتهاء الاشتراك</label>
@@ -6762,7 +6689,7 @@ const Pages = {
     let base = inp.value ? new Date(inp.value + 'T12:00:00') : today;
     if (isNaN(base.getTime()) || base < today) base = today;   // التمديد يبدأ من اليوم لا من تاريخ منتهٍ
     base.setDate(base.getDate() + days);
-    inp.value = base.toISOString().slice(0, 10);
+    inp.value = _isoDate(base);
   },
 
   async _saveSub(userId) {
@@ -7241,7 +7168,13 @@ const App = {
     document.getElementById('auth-error').classList.add('hidden');
   },
 
+  /* يُنادى من _showLogin في كل دورة خروج/دخول. بلا هذا الحارس كان كل
+     رجوع لشاشة الدخول يضيف مستمعاً آخر، فتُنفَّذ signIn مرتين فأكثر
+     لضغطة واحدة على «دخول». */
+  _authFormBound: false,
   _bindAuthForm() {
+    if (this._authFormBound) return;
+    this._authFormBound = true;
     document.getElementById('setup-form').addEventListener('submit', async e => {
       e.preventDefault();
       const mode  = document.getElementById('setup-form').dataset.mode || 'login';
@@ -7410,11 +7343,8 @@ const FontSize = {
   apply(size) {
     document.documentElement.style.fontSize = size + 'px';
     localStorage.setItem(this._key, size);
-    const idx  = this._sizes.indexOf(size);
-    const down = document.getElementById('fs-down');
-    const up   = document.getElementById('fs-up');
-    if (down) down.disabled = idx === 0;
-    if (up)   up.disabled   = idx === this._sizes.length - 1;
+    /* حالة الزرين تُحدَّث في Pages._updateFsLabel — المعرّفان هنا كانا
+       fs-down/fs-up وهما اسمان قديمان لا وجود لهما في الصفحة. */
   },
   change(delta) {
     const idx  = this._sizes.indexOf(this.current());
@@ -7448,7 +7378,7 @@ const AI = {
 
   _welcome() {
     const teacher = DB.teacher();
-    const name = teacher?.teacherName || _T.tch;
+    const name = teacher?.name || _T.tch;
     this._addMsg(`مرحباً ${name}! 👋\nأنا مساعدك الذكي. أعرف بيانات فصولك وطلابك.\nكيف أقدر أساعدك اليوم؟`, 'bot');
     this._showChips([
       'ملخص أداء الفصل',
@@ -7463,20 +7393,22 @@ const AI = {
     const classes  = DB.get('classes');
     const students = DB.get('students');
     const allAtt   = DB.get('attendance');
-    const today    = new Date().toISOString().slice(0, 10);
+    const today    = _isoDate();
 
     const classInfo = classes.map(cls => {
       const stus = students.filter(s => s.classId === cls.id);
       const todayRec = allAtt.find(a => a.classId === cls.id && a.date === today);
       const absentToday = todayRec ? todayRec.records.filter(r => r.status === 'absent').length : 0;
-      const warns = stus.filter(s => _behWarn(s).length > 0).map(s => s.name);
-      return `• ${cls.name}${cls.subject?' ('+cls.subject+')':''}: ${stus.length} طالب، غائب اليوم: ${absentToday}${warns.length?'، تحذيرات سلوك: '+warns.join('، '):''}`;
+      /* عدد لا أسماء: نص المساعد يُرسل إلى خدمة خارجية، وأسماء الطلاب
+         بيانات قاصرين لا تغادر الجهاز. الإشارة التربوية تبقى قائمة بالعدد. */
+      const warns = stus.filter(s => _behWarn(s).length > 0).length;
+      return `• ${cls.name}${cls.subject?' ('+cls.subject+')':''}: ${stus.length} طالب، غائب اليوم: ${absentToday}${warns?'، طلاب لديهم تحذيرات سلوك: '+warns:''}`;
     }).join('\n');
 
     const isFemTch = _T._f;
     const tchRef   = isFemTch ? 'قامت المعلمة' : 'قام المعلم';
 
-    return `أنت مساعد تربوي ذكي تساعد ${_T.theTch} ${teacher.teacherName||''} في مدرسة ${teacher.school||''}، ${isFemTch?'مادتها':'مادته'} ${teacher.subject||''}.
+    return `أنت مساعد تربوي ذكي تساعد ${_T.theTch} ${teacher.name||''} في مدرسة ${teacher.school||''}، ${isFemTch?'مادتها':'مادته'} ${teacher.subject||''}.
 البيانات الحالية (${today}):
 ${classInfo || 'لا توجد فصول مسجّلة بعد.'}
 
