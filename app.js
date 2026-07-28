@@ -4947,18 +4947,71 @@ const Pages = {
     this.lessons();
   },
 
-  lessons() {
-    const classes   = DB.get('classes');
-    const schedule  = DB.get('schedule');
-    const settings  = DB.settings();
-    const colors    = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899','#84CC16'];
-    const todayKey  = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
-    const curPeriod = TimeAware.currentPeriod()?.p || null;
+  /* ---- جدول الحصص ----
+     البناء عمل مكاني على شبكة، والمتابعة اليومية سؤال زمني عن اليوم.
+     لذلك عرضان يقرآن من _ttData واحدة: شبكة أسبوعية على الحاسب،
+     وقائمة «يومك» الرأسية على الجوال بلا أي تمرير أفقي. */
+  _TT_MOBILE: '(max-width: 860px)',
 
+  _ttData() {
+    const classes  = DB.get('classes');
+    const schedule = DB.get('schedule');
+    const settings = DB.settings();
+    /* لوحة متقاربة الإشباع والعتمة: تتمايز بلا أن تتصارع، وبلا أحمر
+       صريح لأنه يُقرأ إنذاراً لا هوية فصل */
+    const colors   = ['#4f46e5','#0891b2','#059669','#d97706','#7c3aed','#0284c7','#65a30d','#c026d3'];
     const clsColor = {};
     classes.forEach((c, i) => { clsColor[c.id] = c.color || colors[i % colors.length]; });
+    return {
+      classes, schedule, settings, clsColor,
+      todayKey:  ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()],
+      curPeriod: TimeAware.currentPeriod()?.p || null,
+      /* يحترم عدد الحصص المعتمد فلا تظهر حصة ألغاها المعلم */
+      periods:   Array.from({ length: settings.periodCount || this._periods }, (_, i) => i + 1),
+      time:      p => settings.periods.find(x => x.p === p) || null,
+      cls:       id => classes.find(c => c.id === id) || null,
+      entry:     (day, p) => schedule.find(s => s.day === day && s.period === p) || null
+    };
+  },
 
-    const periods = Array.from({ length: settings.periodCount || this._periods }, (_, i) => i + 1);
+  /* هل سُجّل حضور هذا الفصل في هذا اليوم؟ */
+  _ttAttDone(classId, dayKey) {
+    const idx = ['sun','mon','tue','wed','thu','fri','sat'].indexOf(dayKey);
+    if (idx < 0) return false;
+    const now = new Date();
+    const d = new Date(now);
+    d.setDate(now.getDate() - ((now.getDay() - idx + 7) % 7));   /* أقرب يوم مضى بهذا الاسم */
+    const iso = d.toISOString().slice(0, 10);
+    return DB.get('attendance').some(a => a.date === iso && a.classId === classId && a.records?.length);
+  },
+
+  lessons() {
+    const d = this._ttData();
+    if (!this._ttMQ) {                          /* تبديل العرض عند عبور الحد بلا إعادة تحميل */
+      /* يُحتفظ بالكائن في خاصية: MediaQueryList مؤقت قد يُجمع فيسكت مستمعه */
+      this._ttMQ = matchMedia(this._TT_MOBILE);
+      this._ttMQ.addEventListener('change', () => {
+        if (Router.current === 'lessons') Pages.lessons();
+      });
+    }
+    if (!d.classes.length) {
+      document.getElementById('content').innerHTML = `
+        <div class="page-header"><h2>جدول الحصص</h2></div>
+        <div class="empty-state">
+          <div class="empty-icon"><i class="fas fa-calendar-alt"></i></div>
+          <h3>أضف فصولاً دراسية أولاً</h3>
+          <button class="btn btn-primary" onclick="Router.go('classes')">إضافة فصل</button>
+        </div>`;
+      return;
+    }
+    if (this._ttMQ.matches) this._ttDay(d);
+    else                                    this._ttGrid(d);
+  },
+
+  _ttGrid(data) {
+    const { classes, schedule, settings, clsColor, todayKey, curPeriod, periods } = data;
+    /* مادة المعلم الأساسية: تكرارها في كل خلية ضجيج بلا معلومة */
+    const mainSubject = (DB.teacher() || {}).subject || '';
 
     const headerCells = this._days.map(d => {
       const isToday = d.key === todayKey;
@@ -4986,8 +5039,12 @@ const Pages = {
             ondragend="this.classList.remove('tt-dragging')"
             onclick="Router.go('classDetail',{classId:'${cls.id}',tab:'att'})"
             style="--cell-color:${color}">
-            <div class="tt-chip" style="background:${color}20;border-color:${color}40;color:${color}">${cls.name}</div>
-            <div class="tt-subject">${entry.subject || cls.subject || ''}</div>
+            <div class="tt-chip" style="color:${color}">${cls.name}</div>
+            ${(() => { const sub = entry.subject || cls.subject || '';
+                       return sub && sub !== mainSubject ? `<div class="tt-subject">${sub}</div>` : ''; })()}
+            ${!isToday ? '' : this._ttAttDone(cls.id, d.key)
+              ? '<span class="tt-att tt-att-ok" title="سُجّل حضور اليوم"><i class="fas fa-check"></i></span>'
+              : '<span class="tt-att tt-att-no" title="لم يُسجَّل حضور اليوم"><i class="fas fa-exclamation"></i></span>'}
             ${entry.notes?`<div class="tt-notes"><i class="fas fa-tag"></i>${entry.notes}</div>`:''}
             <button class="tt-edit-btn" onclick="event.stopPropagation();Pages.editScheduleModal('${entry.id}')" title="تعديل">
               <i class="fas fa-pen"></i>
@@ -5021,7 +5078,7 @@ const Pages = {
         <div class="tt-legend-dot" style="background:${clsColor[c.id]};box-shadow:0 0 0 3px ${clsColor[c.id]}30"></div>
         <div style="display:flex;flex-direction:column;gap:.1rem">
           <span>${c.name}</span>
-          ${c.subject ? `<small style="font-size:.72em;opacity:.7">${c.subject}</small>` : ''}
+          ${c.subject && c.subject !== mainSubject ? `<small style="font-size:.72em;opacity:.7">${c.subject}</small>` : ''}
         </div>
         <i class="fas fa-grip-vertical" style="font-size:.65rem;color:var(--gray-400);cursor:grab"></i>
       </div>`
@@ -5036,12 +5093,7 @@ const Pages = {
           <button class="btn btn-sm btn-outline-danger" onclick="Pages.clearSchedule()"><i class="fas fa-trash"></i> مسح</button>
         </div>
       </div>
-      ${classes.length === 0 ? `
-        <div class="empty-state">
-          <div class="empty-icon"><i class="fas fa-calendar-alt"></i></div>
-          <h3>أضف فصولاً دراسية أولاً</h3>
-          <button class="btn btn-primary" onclick="Router.go('classes')">إضافة فصل</button>
-        </div>` : `
+      ${`
         <div class="tt-legend-bar">${legend}</div>
         <div class="tt-card">
           <div class="tt-scroll">
@@ -5053,6 +5105,234 @@ const Pages = {
         </div>
         <p class="tt-hint"><i class="fas fa-info-circle"></i> اضغط فصلاً لفتح الحضور — اسحب لنقله — ✎ للتعديل — انقر مرتين على وقت الحصة لتعديل الأوقات</p>`}
     `;
+  },
+
+  /* ---- شاشة «يومك» على الجوال ---- */
+  _ttDayKey: null,
+
+  _ttDay(data) {
+    const { clsColor, todayKey, curPeriod, periods } = data;
+    const mainSubject = (DB.teacher() || {}).subject || '';
+    /* الجمعة والسبت بلا حصص: نفتح على الأحد */
+    const validToday = this._days.some(d => d.key === todayKey) ? todayKey : 'sun';
+    const sel = this._ttDayKey && this._days.some(d => d.key === this._ttDayKey) ? this._ttDayKey : validToday;
+    this._ttDayKey = sel;
+    const isToday = sel === validToday && sel === todayKey;
+
+    const chips = this._days.map(d => `
+      <button class="ttd-chip ${d.key === sel ? 'active' : ''} ${d.key === todayKey ? 'is-today' : ''}"
+        onclick="Pages._ttGoDay('${d.key}')">${d.label}</button>`).join('');
+
+    const dayEntries = periods.map(p => ({ p, entry: data.entry(sel, p) })).filter(x => x.entry);
+
+    /* بطاقة الحصة القادمة — في اليوم الحالي فقط */
+    let nextCard = '';
+    if (isToday) {
+      const hm  = TimeAware._hhmm();
+      const cur = dayEntries.find(x => x.p === curPeriod);
+      const nxt = dayEntries.filter(x => (data.time(x.p)?.s || '') > hm).sort((a, b) => a.p - b.p)[0];
+      const mk = (lbl, icon, accent, title, meta) => `
+        <div class="ttd-next accent-${accent}">
+          <div class="ttd-next-ico"><i class="fas ${icon}"></i></div>
+          <div class="ttd-next-txt"><span>${lbl}</span><strong>${_esc(title)}</strong><small>${meta}</small></div>
+        </div>`;
+      if (cur) {
+        const t = data.time(cur.p), c = data.cls(cur.entry.classId);
+        const left = TimeAware._minDiff(hm, t.e);
+        nextCard = mk('الحصة الآن', 'fa-circle-play', 'primary', c?.name || '—',
+                      `الحصة ${cur.p} · متبقٍ ${left} دقيقة`);
+      } else if (nxt) {
+        const t = data.time(nxt.p), c = data.cls(nxt.entry.classId);
+        nextCard = mk('الحصة القادمة', 'fa-hourglass-half', 'amber', c?.name || '—',
+                      `الحصة ${nxt.p} · ${t.s} · بعد ${TimeAware._minDiff(hm, t.s)} دقيقة`);
+      } else if (dayEntries.length) {
+        nextCard = mk('انتهت حصصك', 'fa-moon', 'muted', 'يوم موفّق', `${dayEntries.length} حصص اليوم`);
+      }
+    }
+
+    let rows;
+    if (!dayEntries.length) {
+      rows = `<div class="ttd-free-day">
+        <i class="fas fa-mug-hot"></i>
+        <p>لا حصص في هذا اليوم</p>
+        <button class="btn btn-sm btn-outline" onclick="Pages._ttAddAt('${sel}',1)"><i class="fas fa-plus"></i> أضف حصة</button>
+      </div>`;
+    } else {
+      rows = periods.map(p => {
+        const t = data.time(p), entry = data.entry(sel, p);
+        const now = isToday && p === curPeriod;
+        const time = t ? `${t.s}<span class="ttd-dash">–</span>${t.e}` : '—';
+        if (!entry) return `
+          <button class="ttd-slot ttd-empty" onclick="Pages._ttAddAt('${sel}',${p})">
+            <span class="ttd-num">${p}</span>
+            <span class="ttd-empty-time">${t ? t.s : ''}</span>
+            <span class="ttd-empty-lbl"><i class="fas fa-plus"></i> فراغ — أضف حصة</span>
+          </button>`;
+        const c = data.cls(entry.classId);
+        if (!c) return '';
+        const color = clsColor[c.id];
+        const done  = this._ttAttDone(c.id, sel);
+        return `
+          <div class="ttd-slot ttd-filled ${now ? 'is-now' : ''}" style="--c:${color}">
+            <div class="ttd-head">
+              <span class="ttd-num">${p}</span>
+              <span class="ttd-time">${time}</span>
+              ${now ? '<span class="ttd-now-pill">● الآن</span>' : ''}
+            </div>
+            <div class="ttd-body" onclick="Router.go('classDetail',{classId:'${c.id}',tab:'att'})">
+              <div class="ttd-info">
+                <strong>${_esc(c.name)}</strong>
+                ${(() => { const sub = entry.subject || c.subject || '';
+                           const txt = [sub !== mainSubject ? sub : '', entry.notes || ''].filter(Boolean).join(' · ');
+                           return txt ? `<small>${_esc(txt)}</small>` : ''; })()}
+              </div>
+              <span class="ttd-att ${done ? 'ok' : 'no'}" title="${done ? 'سُجّل الحضور' : 'لم يُسجَّل الحضور'}">
+                <i class="fas ${done ? 'fa-check' : 'fa-exclamation'}"></i>
+              </span>
+              <button class="ttd-more" onclick="event.stopPropagation();Pages._ttActions('${entry.id}')" aria-label="خيارات">
+                <i class="fas fa-ellipsis"></i>
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    document.getElementById('content').innerHTML = `
+      <div class="page-header">
+        <h2>جدول الحصص</h2>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-sm btn-outline" onclick="Pages.editPeriodsModal()"><i class="fas fa-clock"></i> الأوقات</button>
+          <button class="btn btn-sm btn-outline" onclick="Print.timetable()"><i class="fas fa-print"></i> طباعة</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="Pages.clearSchedule()"><i class="fas fa-trash"></i> مسح</button>
+        </div>
+      </div>
+      <div class="ttd-days">${chips}</div>
+      ${nextCard}
+      <div class="ttd-list">${rows}</div>`;
+  },
+
+  _ttGoDay(key) { this._ttDayKey = key; this._ttDay(this._ttData()); },
+
+  _ttRefresh() {
+    if (Router.current === 'lessons') this.lessons();
+    const nw = document.getElementById('home-hero-wrap');
+    if (nw) nw.innerHTML = Pages._heroCard();
+    ActiveClass.updateBadge();
+  },
+
+  /* اختيار فصل لخانة فارغة */
+  _ttAddAt(day, period) {
+    const data = this._ttData();
+    const t = data.time(period);
+    const items = data.classes.map(c => `
+      <button class="ttd-pick" onclick="Pages._ttPlace('${day}',${period},'${c.id}')">
+        <span class="ttd-pick-dot" style="background:${data.clsColor[c.id]}"></span>
+        <span class="ttd-pick-txt"><strong>${_esc(c.name)}</strong><small>${_esc(c.subject || '')}</small></span>
+      </button>`).join('');
+    const dayLbl = this._days.find(d => d.key === day)?.label || '';
+    Modal.open(`إضافة حصة — ${dayLbl} / الحصة ${period}`, `
+      ${t ? `<p class="install-note">وقت الحصة ${t.s} – ${t.e}</p>` : ''}
+      <div class="ttd-pick-list">${items}</div>`);
+  },
+
+  _ttPlace(day, period, classId) {
+    const schedule = DB.get('schedule');
+    const cls = DB.get('classes').find(c => c.id === classId);
+    const tgt = schedule.find(s => s.day === day && s.period === period);
+    if (tgt) { tgt.classId = classId; tgt.subject = cls?.subject || ''; }
+    else schedule.push({ id: Math.random().toString(36).slice(2), day, period, classId,
+                         subject: cls?.subject || '', notes: '' });
+    DB.set('schedule', schedule);
+    Modal.close();
+    Toast.show('✓ تمت الإضافة', 'success');
+    this._ttRefresh();
+  },
+
+  /* قائمة إجراءات الحصة — تكافئ ما يفعله الحاسب */
+  _ttActions(entryId) {
+    const data = this._ttData();
+    const e = data.schedule.find(x => x.id === entryId);
+    if (!e) return;
+    const c = data.cls(e.classId);
+    const dayLbl = this._days.find(d => d.key === e.day)?.label || '';
+    Modal.open(`${c ? c.name : 'حصة'} — ${dayLbl} / الحصة ${e.period}`, `
+      <div class="more-list">
+        <button class="more-item" onclick="Modal.close();Router.go('classDetail',{classId:'${e.classId}',tab:'att'})">
+          <span class="more-icon" style="background:#4f46e51a;color:#4f46e5"><i class="fas fa-clipboard-check"></i></span>
+          <span class="more-label">فتح الحضور</span><i class="fas fa-chevron-left more-chev"></i></button>
+        <button class="more-item" onclick="Pages.editScheduleModal('${e.id}')">
+          <span class="more-icon" style="background:#2563eb1a;color:#2563eb"><i class="fas fa-pen"></i></span>
+          <span class="more-label">تعديل الحصة</span><i class="fas fa-chevron-left more-chev"></i></button>
+        <button class="more-item" onclick="Pages._ttMoveModal('${e.id}')">
+          <span class="more-icon" style="background:#0d94881a;color:#0d9488"><i class="fas fa-arrows-up-down-left-right"></i></span>
+          <span class="more-label">نقل إلى حصة أخرى</span><i class="fas fa-chevron-left more-chev"></i></button>
+        <button class="more-item" onclick="Modal.close();Pages.changeClassColor('${e.classId}')">
+          <span class="more-icon" style="background:#d977061a;color:#d97706"><i class="fas fa-palette"></i></span>
+          <span class="more-label">لون الفصل</span><i class="fas fa-chevron-left more-chev"></i></button>
+        <div class="more-sep"></div>
+        <button class="more-item danger" onclick="Pages._ttDelete('${e.id}')">
+          <span class="more-icon" style="background:#dc26261a;color:#dc2626"><i class="fas fa-trash"></i></span>
+          <span class="more-label">حذف من الجدول</span><i class="fas fa-chevron-left more-chev"></i></button>
+      </div>`);
+  },
+
+  _ttDelete(entryId) {
+    Modal.close();
+    Modal.confirm('حذف الحصة', 'ستُحذف هذه الحصة من الجدول. بيانات الفصل وطلابه لا تتأثر.', () => {
+      DB.set('schedule', DB.get('schedule').filter(s => s.id !== entryId));
+      Toast.show('تم الحذف', 'info');
+      this._ttRefresh();
+    }, { okText: 'حذف', danger: true });
+  },
+
+  /* شبكة مصغّرة لاختيار وجهة النقل — بديل السحب والإفلات باللمس */
+  _ttMoveModal(entryId) {
+    const data = this._ttData();
+    const src = data.schedule.find(x => x.id === entryId);
+    if (!src) return;
+    const head = this._days.map(d => `<th>${d.label.replace('الا','ال')}</th>`).join('');
+    const rows = data.periods.map(p => `
+      <tr>
+        <th>${p}</th>
+        ${this._days.map(d => {
+          const tgt = data.entry(d.key, p);
+          const isSrc = tgt && tgt.id === entryId;
+          const c = tgt ? data.cls(tgt.classId) : null;
+          return `<td class="ttm-cell ${isSrc ? 'is-src' : tgt ? 'is-busy' : 'is-free'}"
+            ${isSrc ? '' : `onclick="Pages._ttMoveTo('${entryId}','${d.key}',${p})"`}
+            style="${c ? `--c:${data.clsColor[c.id]}` : ''}">
+            ${isSrc ? '<i class="fas fa-location-dot"></i>' : c ? `<span>${_esc(c.name.slice(0, 6))}</span>` : ''}
+          </td>`;
+        }).join('')}
+      </tr>`).join('');
+    Modal.open('نقل الحصة — اختر الوجهة', `
+      <p class="install-note">الخانات الملوّنة مشغولة — اختيارها يبدّل الحصتين بعد تأكيدك.</p>
+      <div class="ttm-wrap"><table class="ttm-grid"><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`);
+  },
+
+  _ttMoveTo(entryId, day, period) {
+    const schedule = DB.get('schedule');
+    const src = schedule.find(s => s.id === entryId);
+    if (!src) return;
+    const tgt = schedule.find(s => s.day === day && s.period === period);
+    const dayLbl = this._days.find(d => d.key === day)?.label || '';
+    const apply = () => {
+      if (tgt) {                       /* تبديل: لا تضيع أي حصة */
+        const sd = src.day, sp = src.period;
+        src.day = day; src.period = period;
+        tgt.day = sd;  tgt.period = sp;
+      } else { src.day = day; src.period = period; }
+      DB.set('schedule', schedule);
+      Modal.close();
+      Toast.show(tgt ? '↔ تم التبديل' : '✓ تم النقل', 'success');
+      this._ttRefresh();
+    };
+    if (!tgt) return apply();
+    const tc = DB.get('classes').find(c => c.id === tgt.classId);
+    Modal.close();
+    Modal.confirm('تبديل الحصتين',
+      `الخانة (${dayLbl} / الحصة ${period}) مشغولة بـ <strong>${_esc(tc?.name || 'حصة')}</strong>.
+       سيتبادل الاثنان مواضعهما.`, apply, { okText: 'تبديل' });
   },
 
   editPeriodsModal() {
