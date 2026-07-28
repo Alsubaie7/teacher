@@ -71,8 +71,18 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);ove
 .page-spinner.hidden{display:none}
 #page-image{max-height:calc(100vh - var(--topbar-h) - var(--toolbar-h) - 20px);max-width:calc(100vw - 120px);object-fit:contain;border-radius:4px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:block;pointer-events:none;background:#fff}
 #draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
-/* أثر الليزر: يُرسم على طبقة خاصة ويتلاشى تدريجياً بدل نقطة ثابتة */
+/* أثر الليزر: يُرسم على طبقة خاصة ويتلاشى تدريجياً خلف النقطة */
 .laser-canvas{position:absolute;top:0;left:0;pointer-events:none;z-index:50}
+/* النقطة الحمراء هي مؤشر أداة الليزر — تتبع اليد دائماً، والأثر يظهر عند الضغط.
+   ‏--z معكوس نسبة التكبير حتى يبقى حجمها ثابتاً بصرياً مهما كبرت الصفحة. */
+.laser-dot{position:absolute;width:14px;height:14px;border-radius:50%;pointer-events:none;z-index:51;
+  background:radial-gradient(circle,#ff0000 30%,rgba(255,0,0,.5) 60%,transparent 100%);
+  box-shadow:0 0 20px rgba(255,0,0,.8),0 0 60px rgba(255,0,0,.3);
+  animation:laserPulse .8s ease-in-out infinite alternate}
+@keyframes laserPulse{
+  from{transform:translate(-50%,-50%) scale(var(--z,1));opacity:1}
+  to  {transform:translate(-50%,-50%) scale(calc(var(--z,1) * 1.3));opacity:.8}}
+.laser-dot.hidden{display:none}
 /* مستطيل التركيز أثناء السحب — الظل الخارجي يعتّم بقية الصفحة */
 .focus-sel{position:absolute;z-index:45;pointer-events:none;border:2px dashed rgba(255,255,255,.95);border-radius:3px;box-shadow:0 0 0 9999px rgba(8,10,24,.55),0 0 18px rgba(0,0,0,.4);background:rgba(255,255,255,.06)}
 .focus-sel.hidden{display:none}
@@ -138,7 +148,8 @@ body.fullscreen:hover #toolbar,body.fullscreen #toolbar:focus-within{bottom:0}
 body.fullscreen #board-area{top:0;bottom:0}
 body.fullscreen #page-image{max-height:calc(100vh - 20px);max-width:calc(100vw - 100px)}
 body[data-tool="eraser"] #draw-canvas{cursor:cell}
-body[data-tool="laser"] #draw-canvas,body[data-tool="spotlight"] #draw-canvas{cursor:crosshair}
+body[data-tool="laser"] #draw-canvas{cursor:none}          /* النقطة الحمراء تحلّ محل المؤشر */
+body[data-tool="spotlight"] #draw-canvas{cursor:crosshair}
 /* التنقّل داخل الصفحة المكبّرة بأداة المؤشر */
 body.zoomed[data-tool="pointer"] #draw-canvas,body.zoomed[data-tool="spotlight"] #draw-canvas,body.pan-ready #draw-canvas{cursor:grab}
 body.zoomed[data-tool="pointer"] #draw-canvas:active,body.zoomed[data-tool="spotlight"] #draw-canvas:active,body.pan-ready #draw-canvas:active{cursor:grabbing}
@@ -215,6 +226,7 @@ body[data-tool="text"] #draw-canvas{cursor:text}
       <img id="page-image" src="" alt="صفحة الكتاب" draggable="false">
       <canvas id="draw-canvas"></canvas>
       <canvas id="laser-canvas" class="laser-canvas"></canvas>
+      <div id="laser-dot" class="laser-dot hidden"></div>
       <div id="focus-sel" class="focus-sel hidden"></div>
       <textarea id="floating-text" class="floating-text hidden" placeholder="اكتب هنا..."></textarea>
       <div id="page-spinner" class="page-spinner hidden"><i class="fas fa-spinner fa-spin"></i></div>
@@ -571,7 +583,10 @@ const Board = {
     this._canvas.addEventListener('pointerdown', e => this._onDown(e));
     this._canvas.addEventListener('pointermove', e => this._onMove(e));
     this._canvas.addEventListener('pointerup', e => this._onUp(e));
-    this._canvas.addEventListener('pointerleave', e => this._onUp(e));
+    this._canvas.addEventListener('pointerleave', e => { this._onUp(e); this._hideLaserDot(); });
+    this._canvas.addEventListener('pointerenter', e => {
+      if (Tools.current === 'laser') this._moveLaserDot(this._getPos(e));
+    });
     document.addEventListener('keydown', e => {
       if (document.activeElement.tagName === 'TEXTAREA') { if (e.key==='Escape') this._img.focus?.(); else return; }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { this.nextPage(); e.preventDefault(); }
@@ -740,7 +755,7 @@ const Board = {
       return;
     }
     if (tool === 'pointer') return;
-    if (tool === 'laser')     { this._isDrawing = true; this._laserPush(pos); return; }
+    if (tool === 'laser')     { this._isDrawing = true; this._moveLaserDot(pos); this._laserPush(pos); return; }
     if (tool === 'spotlight') {
       this._isDrawing = true; this._startX = pos.x; this._startY = pos.y;
       this._drawFocusSel(pos.x, pos.y, 0, 0);
@@ -769,8 +784,8 @@ const Board = {
       return;
     }
     const tool = Tools.current, pos = this._getPos(e);
-    /* الليزر يعمل أثناء الضغط فقط — كان يتبع المؤشر دائماً ويبقى ثابتاً */
-    if (tool === 'laser') { if (this._isDrawing) this._laserPush(pos); return; }
+    /* النقطة تتبع اليد دائماً كمؤشر، والأثر يُرسم عند الضغط فقط */
+    if (tool === 'laser') { this._moveLaserDot(pos); if (this._isDrawing) this._laserPush(pos); return; }
     if (tool === 'spotlight') {
       if (this._isDrawing)
         this._drawFocusSel(Math.min(this._startX,pos.x), Math.min(this._startY,pos.y),
@@ -822,8 +837,18 @@ const Board = {
     this._ctx.stroke();
   },
 
-  /* ---- الليزر: خط يتبع اليد ويتلاشى خلف المؤشر ---- */
+  /* ---- الليزر: نقطة حمراء تحلّ محل المؤشر، وخلفها أثر يتلاشى ---- */
   _laser: { pts: [], raf: null, LIFE: 620 },
+
+  _moveLaserDot(pos) {
+    const dot = document.getElementById('laser-dot');
+    dot.classList.remove('hidden');
+    dot.style.left = pos.x + 'px';
+    dot.style.top  = pos.y + 'px';
+    dot.style.setProperty('--z', 1 / Zoom.scale);   /* حجم ثابت مهما كبرت الصفحة */
+  },
+
+  _hideLaserDot() { document.getElementById('laser-dot').classList.add('hidden'); },
 
   _laserPush(pos) {
     this._laser.pts.push({ x: pos.x, y: pos.y, t: performance.now() });
@@ -841,23 +866,15 @@ const Board = {
       if (!L.pts.length) { L.raf = null; return; }
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.shadowColor = 'rgba(255,0,0,.85)';
+      const k = 1 / Zoom.scale;                       /* سماكة ثابتة بصرياً عند التكبير */
       for (let i = 1; i < L.pts.length; i++) {
         const a = L.pts[i-1], b = L.pts[i];
         const life = 1 - (now - b.t) / L.LIFE;        /* 1 = طازج، 0 = تلاشى */
         if (life <= 0) continue;
         ctx.strokeStyle = `rgba(255,45,45,${life * .9})`;
-        ctx.lineWidth   = 2 + 7 * life;
-        ctx.shadowBlur  = 16 * life;
+        ctx.lineWidth   = (2 + 7 * life) * k;
+        ctx.shadowBlur  = 16 * life * k;
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      }
-      const head = L.pts[L.pts.length - 1];
-      const hLife = 1 - (now - head.t) / 260;
-      if (hLife > 0) {                                 /* رأس مضيء أثناء الحركة */
-        ctx.shadowBlur = 26 * hLife;
-        ctx.fillStyle = `rgba(255,60,60,${hLife})`;
-        ctx.beginPath(); ctx.arc(head.x, head.y, 7, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = `rgba(255,235,235,${hLife * .95})`;
-        ctx.beginPath(); ctx.arc(head.x, head.y, 2.6, 0, Math.PI*2); ctx.fill();
       }
       ctx.shadowBlur = 0;
       L.raf = requestAnimationFrame(step);
@@ -870,6 +887,7 @@ const Board = {
     if (this._laser.raf) { cancelAnimationFrame(this._laser.raf); this._laser.raf = null; }
     const c = this._laserCanvas;
     c.getContext('2d').clearRect(0, 0, c.width, c.height);
+    this._hideLaserDot();
   },
 
   /* ---- تحديد مستطيل التركيز ---- */
