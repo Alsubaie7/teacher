@@ -140,8 +140,8 @@ body.fullscreen #page-image{max-height:calc(100vh - 20px);max-width:calc(100vw -
 body[data-tool="eraser"] #draw-canvas{cursor:cell}
 body[data-tool="laser"] #draw-canvas,body[data-tool="spotlight"] #draw-canvas{cursor:crosshair}
 /* التنقّل داخل الصفحة المكبّرة بأداة المؤشر */
-body.zoomed[data-tool="pointer"] #draw-canvas{cursor:grab}
-body.zoomed[data-tool="pointer"] #draw-canvas:active{cursor:grabbing}
+body.zoomed[data-tool="pointer"] #draw-canvas,body.zoomed[data-tool="spotlight"] #draw-canvas,body.pan-ready #draw-canvas{cursor:grab}
+body.zoomed[data-tool="pointer"] #draw-canvas:active,body.zoomed[data-tool="spotlight"] #draw-canvas:active,body.pan-ready #draw-canvas:active{cursor:grabbing}
 #page-container{transform-origin:center center;will-change:transform}
 .zoom-ctl{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:999px;padding:2px}
 .zoom-level{min-width:46px;text-align:center;font-size:12px;font-weight:800;color:#cbd5e1;cursor:pointer;user-select:none;font-variant-numeric:tabular-nums;padding:4px 2px;border-radius:999px}
@@ -219,7 +219,7 @@ body[data-tool="text"] #draw-canvas{cursor:text}
       <textarea id="floating-text" class="floating-text hidden" placeholder="اكتب هنا..."></textarea>
       <div id="page-spinner" class="page-spinner hidden"><i class="fas fa-spinner fa-spin"></i></div>
     </div>
-    <button id="zoom-exit" class="zoom-exit hidden" onclick="Zoom.reset()"><i class="fas fa-compress"></i> خروج من التركيز <kbd>Esc</kbd></button>
+    <button id="zoom-exit" class="zoom-exit hidden" onclick="Zoom.reset()"><i class="fas fa-compress"></i> رجوع للحجم الطبيعي <kbd>Esc</kbd> · اسحب للتنقل</button>
     <button class="nav-arrow nav-next" onclick="Board.nextPage()" title="التالية" id="nav-next"><i class="fas fa-chevron-left"></i></button>
     <button class="nav-arrow nav-prev" onclick="Board.prevPage()" title="السابقة" id="nav-prev"><i class="fas fa-chevron-right"></i></button>
   </main>
@@ -482,6 +482,7 @@ function lessonForPage(p) {
    وتبقى التعليقات مثبّتة على مواضعها من الصورة. */
 const Zoom = {
   scale: 1, tx: 0, ty: 0, MIN: 1, MAX: 5, STEP: 0.25,
+  fromFocus: false,          /* هل جاء التكبير من أداة التركيز؟ */
 
   _el() { return document.getElementById('page-container'); },
 
@@ -497,14 +498,34 @@ const Zoom = {
 
   set(s, animate = true) {
     this.scale = Math.min(this.MAX, Math.max(this.MIN, s));
-    if (this.scale <= 1.001) { this.tx = this.ty = 0; }
+    if (this.scale <= 1.001) { this.tx = this.ty = 0; this.fromFocus = false; }
     this._clamp();
     this.apply(animate);
   },
 
+  /* تكبير حول نقطة بعينها (مؤشر الفأرة) بدل مركز الصفحة دائماً.
+     q = إزاحة النقطة عن مركز الصفحة غير المحوَّل، بالبكسل على الشاشة. */
+  setAt(s, qx, qy, animate = false) {
+    const ns = Math.min(this.MAX, Math.max(this.MIN, s));
+    if (ns <= 1.001) { return this.set(1, animate); }
+    const k = ns / this.scale;
+    this.tx = qx - k * (qx - this.tx);
+    this.ty = qy - k * (qy - this.ty);
+    this.scale = ns;
+    this._clamp();
+    this.apply(animate);
+  },
+
+  /* إزاحة نقطة على الشاشة عن مركز الصفحة الأصلي — تُستعمل مع setAt */
+  offsetOf(clientX, clientY) {
+    const r = this._el().getBoundingClientRect();
+    return { qx: clientX - (r.left + r.width  / 2 - this.tx),
+             qy: clientY - (r.top  + r.height / 2 - this.ty) };
+  },
+
   in()    { this.set(this.scale + this.STEP); },
   out()   { this.set(this.scale - this.STEP); },
-  reset() { this.scale = 1; this.tx = this.ty = 0; this.apply(); },
+  reset() { this.scale = 1; this.tx = this.ty = 0; this.fromFocus = false; this.apply(); },
 
   /* يملأ المستطيل المحدَّد مساحة العرض ويوسّطه */
   focusRect(x, y, w, h) {
@@ -514,6 +535,7 @@ const Zoom = {
     this.scale = s;
     this.tx = s * (W / 2 - (x + w / 2));
     this.ty = s * (H / 2 - (y + h / 2));
+    this.fromFocus = true;
     this._clamp();
     this.apply();
   },
@@ -543,7 +565,8 @@ const Board = {
     document.getElementById('board-area').addEventListener('wheel', e => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      Zoom.set(Zoom.scale + (e.deltaY < 0 ? Zoom.STEP : -Zoom.STEP), false);
+      const { qx, qy } = Zoom.offsetOf(e.clientX, e.clientY);   /* يكبّر عند المؤشر */
+      Zoom.setAt(Zoom.scale + (e.deltaY < 0 ? Zoom.STEP : -Zoom.STEP), qx, qy);
     }, { passive: false });
     this._canvas.addEventListener('pointerdown', e => this._onDown(e));
     this._canvas.addEventListener('pointermove', e => this._onMove(e));
@@ -563,10 +586,15 @@ const Board = {
         this._laserClear();
         if (Tools.current === 'spotlight' || Tools.current === 'laser') Tools.select('pointer');
       }
+      /* المسافة مع أي أداة = تحريك الصفحة المكبّرة */
+      if (e.code === 'Space' && Zoom.scale > 1.01) { this._spaceDown = true; document.body.classList.add('pan-ready'); e.preventDefault(); }
       if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) { Zoom.in();  e.preventDefault(); }
       if ((e.metaKey || e.ctrlKey) && e.key === '-')                    { Zoom.out(); e.preventDefault(); }
       if ((e.metaKey || e.ctrlKey) && e.key === '0')                    { Zoom.reset(); e.preventDefault(); }
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && document.activeElement.tagName !== 'TEXTAREA') this.toggleFullscreen();
+    });
+    document.addEventListener('keyup', e => {
+      if (e.code === 'Space') { this._spaceDown = false; document.body.classList.remove('pan-ready'); }
     });
     new ResizeObserver(() => this._syncCanvasSize()).observe(this._img);
     this.goToPage(currentPage);
@@ -703,13 +731,15 @@ const Board = {
 
   _onDown(e) {
     const tool = Tools.current, pos = this._getPos(e);
-    if (tool === 'pointer') {
-      if (Zoom.scale > 1.01) {                 /* سحب الصفحة المكبّرة */
-        this._panning = { x: e.clientX, y: e.clientY };
-        this._canvas.setPointerCapture?.(e.pointerId);
-      }
+    const zoomed = Zoom.scale > 1.01;
+    /* أثناء التكبير: المؤشر وأداة التركيز يحرّكان الصفحة، وكذلك زر الفأرة
+       الأوسط أو مفتاح المسافة مع أي أداة — حتى لا تُحبس داخل مركز الصفحة */
+    if (zoomed && (tool === 'pointer' || tool === 'spotlight' || e.button === 1 || this._spaceDown)) {
+      this._panning = { x: e.clientX, y: e.clientY };
+      this._canvas.setPointerCapture?.(e.pointerId);
       return;
     }
+    if (tool === 'pointer') return;
     if (tool === 'laser')     { this._isDrawing = true; this._laserPush(pos); return; }
     if (tool === 'spotlight') {
       this._isDrawing = true; this._startX = pos.x; this._startY = pos.y;
@@ -926,13 +956,18 @@ const Board = {
 const Tools = {
   current:'pointer', color:'#e74c3c', size:3,
   select(tool) {
-    if (this.current === tool && tool !== 'pointer') tool='pointer';
+    const was = this.current;
+    const toggledOff = (was === tool && tool !== 'pointer');
+    if (toggledOff) tool='pointer';
     this.current=tool; document.body.setAttribute('data-tool',tool);
     document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.classList.toggle('active', b.dataset.tool===tool));
     if (tool!=='spotlight') document.getElementById('focus-sel').classList.add('hidden');
     if (tool!=='laser')     Board._laserClear();
     if (tool!=='text')      document.getElementById('floating-text').classList.add('hidden');
     if (tool==='spotlight') showToast('اسحب مستطيلاً على الجزء الذي تريد تكبيره');
+    /* إلغاء أداة التركيز يُرجع الصفحة لحجمها الطبيعي.
+       الانتقال لأداة أخرى (قلم مثلاً) يُبقي التكبير للشرح على المنطقة نفسها. */
+    if (toggledOff && was === 'spotlight' && Zoom.fromFocus) Zoom.reset();
   },
   setColor(c){ this.color=c; document.querySelectorAll('.color-dot').forEach(d=>d.classList.toggle('active', d.dataset.color===c)); },
   setSize(v){ this.size=parseInt(v); }
