@@ -28,6 +28,19 @@
     </div>
   </div>
 
+  <!-- دعوة تثبيت التطبيق — تظهر مرة واحدة على الجوال -->
+  <div id="install-banner" class="install-banner hidden">
+    <div class="install-icon"><i class="fas fa-mobile-screen-button"></i></div>
+    <div class="install-text">
+      <strong>ثبّت منصة المعلم على جوالك</strong>
+      <span id="install-sub">افتحها من الشاشة الرئيسية مباشرة، وتعمل بلا متصفح</span>
+    </div>
+    <div class="install-actions">
+      <button class="btn btn-sm btn-primary" onclick="InstallPWA.trigger()">تثبيت</button>
+      <button class="install-close" onclick="InstallPWA.dismiss()" aria-label="إغلاق"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+
   <!-- Setup Screen -->
   <div id="setup-screen" class="setup-overlay hidden">
     <div class="setup-card">
@@ -170,6 +183,10 @@
               <i class="fas fa-upload"></i> استيراد بيانات
               <input type="file" accept=".json" style="display:none" onchange="Backup.import(this)">
             </label>
+            <button id="install-menu-btn" class="st-avatar-action" style="display:none;color:var(--primary)"
+              onclick="InstallPWA.trigger();document.getElementById('st-avatar-wrap').classList.remove('open')">
+              <i class="fas fa-mobile-screen-button"></i> تثبيت التطبيق على الجهاز
+            </button>
             <div class="st-avatar-divider" id="admin-divider" style="display:none"></div>
             <button id="admin-nav-btn" class="st-avatar-action" style="display:none;color:var(--purple)"
               onclick="Router.go('admin');document.getElementById('st-avatar-wrap').classList.remove('open')">

@@ -6411,6 +6411,103 @@ const SBAuth = {
   }
 };
 
+/* ==================== تثبيت التطبيق (PWA) ====================
+   المتصفحات الحديثة لم تعد تعرض شريط التثبيت تلقائياً — الخيار مدفون في
+   قائمة المتصفح. وسفاري على الآيفون لا يعرضه إطلاقاً، والطريق الوحيد فيه
+   زر المشاركة ← إضافة إلى الشاشة الرئيسية. لذلك نعرضه نحن. */
+const InstallPWA = {
+  _prompt: null,
+  _KEY: 'tm_install_dismissed',
+
+  isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  },
+
+  isIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);   /* آيباد */
+  },
+
+  init() {
+    if (this.isStandalone()) return;                 /* مثبَّت أصلاً */
+
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();                            /* نتحكم بالتوقيت بأنفسنا */
+      this._prompt = e;
+      this._reveal();
+    });
+
+    window.addEventListener('appinstalled', () => {
+      this._prompt = null;
+      this._hideAll();
+      Toast.show('تم تثبيت التطبيق على جهازك', 'success');
+    });
+
+    /* سفاري لا يُطلق beforeinstallprompt إطلاقاً — نعرض الإرشاد يدوياً */
+    if (this.isIOS()) {
+      const sub = document.getElementById('install-sub');
+      if (sub) sub.textContent = 'اضغط زر المشاركة ↑ ثم «إضافة إلى الشاشة الرئيسية»';
+      this._reveal();
+    }
+  },
+
+  _reveal() {
+    const btn = document.getElementById('install-menu-btn');
+    if (btn) btn.style.display = '';                 /* يبقى في القائمة دائماً */
+    if (localStorage.getItem(this._KEY) === '1') return;
+    const banner = document.getElementById('install-banner');
+    if (banner) setTimeout(() => banner.classList.remove('hidden'), 2500);
+  },
+
+  _hideAll() {
+    document.getElementById('install-banner')?.classList.add('hidden');
+    const btn = document.getElementById('install-menu-btn');
+    if (btn) btn.style.display = 'none';
+  },
+
+  dismiss() {
+    localStorage.setItem(this._KEY, '1');
+    document.getElementById('install-banner')?.classList.add('hidden');
+  },
+
+  async trigger() {
+    document.getElementById('install-banner')?.classList.add('hidden');
+    if (this._prompt) {
+      this._prompt.prompt();
+      const { outcome } = await this._prompt.userChoice;
+      this._prompt = null;
+      if (outcome !== 'accepted') localStorage.setItem(this._KEY, '1');
+      return;
+    }
+    if (this.isIOS()) {
+      Modal.open('تثبيت التطبيق على الآيفون', `
+        <ol class="install-steps">
+          <li>اضغط زر المشاركة <i class="fas fa-arrow-up-from-bracket"></i> في شريط سفاري السفلي</li>
+          <li>مرّر للأسفل واختر <strong>«إضافة إلى الشاشة الرئيسية»</strong></li>
+          <li>اضغط <strong>«إضافة»</strong> — ستجد المنصة بين تطبيقاتك</li>
+        </ol>
+        <p style="font-size:.8rem;color:var(--text-muted);line-height:1.7;margin-top:.5rem">
+          لا بد أن تفتح الرابط في <strong>سفاري</strong>؛ متصفحات الآيفون الأخرى لا تدعم هذه الخاصية.
+        </p>
+        <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+          <button class="btn btn-primary" onclick="Modal.close()">تمام</button>
+        </div>`);
+      return;
+    }
+    Modal.open('تثبيت التطبيق', `
+      <ol class="install-steps">
+        <li>افتح قائمة المتصفح <i class="fas fa-ellipsis-vertical"></i></li>
+        <li>اختر <strong>«تثبيت التطبيق»</strong> أو <strong>«إضافة إلى الشاشة الرئيسية»</strong></li>
+      </ol>
+      <p style="font-size:.8rem;color:var(--text-muted);line-height:1.7;margin-top:.5rem">
+        لو لم يظهر الخيار فالمتصفح لا يدعم التثبيت — جرّب كروم أو إيدج.
+      </p>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button class="btn btn-primary" onclick="Modal.close()">تمام</button>
+      </div>`);
+  }
+};
+
 /* ==================== APP INIT ==================== */
 const App = {
   async init() {
@@ -6575,6 +6672,7 @@ const App = {
     if (_adminDiv) _adminDiv.style.display = _isAdmin() ? '' : 'none';
     CmdPalette.init();
     TimeAware.init();
+    InstallPWA.init();
     Router.go('dashboard');
     this._startSubWatcher();
   },

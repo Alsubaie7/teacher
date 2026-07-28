@@ -410,6 +410,37 @@ textarea { resize: vertical; min-height: 80px; }
   padding: 1rem;
   overflow-y: auto;
 }
+/* ==================== دعوة تثبيت التطبيق ==================== */
+.install-banner {
+  position: fixed; z-index: 10000; inset-inline: 12px; bottom: 12px;
+  display: flex; align-items: center; gap: .8rem;
+  background: var(--surface-solid); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: .85rem 1rem;
+  box-shadow: var(--shadow-md);
+  animation: installUp .35s ease both;
+}
+.install-banner.hidden { display: none; }
+@keyframes installUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.install-icon {
+  width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--primary); color: #fff; font-size: 1.05rem;
+}
+.install-text { flex: 1; display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.install-text strong { font-size: .88rem; color: var(--text-primary); }
+.install-text span   { font-size: .76rem; color: var(--text-muted); line-height: 1.5; }
+.install-actions { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+.install-close {
+  width: 30px; height: 30px; border: none; background: transparent;
+  color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: .85rem;
+}
+.install-close:hover { background: var(--surface-hover); color: var(--text-primary); }
+@media (min-width: 720px) { .install-banner { inset-inline: auto 20px; max-width: 420px; } }
+.install-steps { margin: .25rem 0; padding-inline-start: 1.2rem; line-height: 2; color: var(--text-secondary); font-size: .88rem; }
+.install-steps li { margin-bottom: .3rem; }
+.install-steps strong { color: var(--text-primary); }
+.install-steps i { color: var(--primary); }
+
 /* ---- شاشة الإقلاع ---- */
 .boot-splash-inner {
   display: flex; flex-direction: column; align-items: center; gap: .9rem;
