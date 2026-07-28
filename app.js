@@ -822,38 +822,106 @@ const Print = {
     w.document.open(); w.document.write(markup); w.document.close();
   },
 
+  /* يجمع حقول نموذج الإحالة ويسجّلها في سجل الطالب ويرجع البيانات.
+     تشترك فيه الطباعة والإرسال بالواتساب حتى تُسجَّل الإحالة بالطريقة
+     نفسها مهما اختار المعلم طريقة الإخراج. */
+  _collectReferral(stuId) {
+    const s = DB.get('students').find(x => x.id === stuId);
+    if (!s) return null;
+    const cls        = DB.get('classes').find(c => c.id === s.classId);
+    const teacher    = DB.teacher() || {};
+    const date       = document.getElementById('ref-date')?.value || new Date().toISOString().slice(0,10);
+    const region     = document.getElementById('ref-region')?.value.trim() || '';
+    const school     = document.getElementById('ref-school')?.value.trim() || teacher.school || '—';
+    const teacherSig = document.getElementById('ref-teacher-name')?.value.trim() || teacher.name || '—';
+    const refTo      = document.getElementById('ref-to')?.value || '—';
+    const reason     = document.getElementById('ref-reason')?.value || '—';
+    const notes      = document.getElementById('ref-notes')?.value || '';
+    const subject    = teacher.subject || '—';
+    const refToName  = document.getElementById('ref-to-name')?.value.trim() || '';
+    const refToPhone = document.getElementById('ref-to-phone')?.value.trim() || '';
+
+    const _rnames = { ...(teacher.refToNames  || {}), [refTo]: refToName  };
+    const _rphones= { ...(teacher.refToPhones || {}), [refTo]: refToPhone };
+    DB.setTeacher({ ...teacher, region, refSchool: school, refTeacherName: teacherSig,
+                    refToNames: _rnames, refToPhones: _rphones });
+
+    const students    = DB.get('students');
+    const newCount    = (s.referralCount || 0) + 1;
+    const clearedBehs = { ...(s.behaviors || {}) };
+    BEH_TYPES.filter(b => !b.pos).forEach(b => { clearedBehs[b.key] = 0; });
+    const today       = new Date().toISOString().slice(0,10);
+    const histEntry   = { date: today, refTo, reason, notes, teacherName: teacherSig };
+    const prevHistory = s.referralHistory || [];
+    DB.set('students', students.map(x => x.id === stuId
+      ? { ...x, referralCount: newCount, behaviors: clearedBehs, lastReferralDate: today,
+          referralHistory: [...prevHistory, histEntry] }
+      : x));
+
+    Modal.close();
+    const cur = Router.current;
+    if (cur === 'behavior' || cur === 'students' || cur === 'referrals') Pages[cur]();
+
+    return { s, cls, teacher, date, region, school, teacherSig, refTo, refToName,
+             refToPhone, reason, notes, subject, newCount, prevCount: s.referralCount || 0 };
+  },
+
+  /* يحوّل الرقم لصيغة واتساب الدولية: 0501234567 ← 966501234567 */
+  _waPhone(raw) {
+    let n = (raw || '').replace(/\D/g, '');
+    if (!n) return '';
+    if (n.startsWith('00')) n = n.slice(2);
+    if (n.startsWith('966')) return n;
+    if (n.startsWith('0'))   return '966' + n.slice(1);
+    if (n.length === 9 && n.startsWith('5')) return '966' + n;
+    return n;                                  /* رقم دولي كُتب كاملاً */
+  },
+
+  referralWhatsApp(stuId) {
+    const reasonEl = document.getElementById('ref-reason');
+    if (!reasonEl?.value) { Toast.show('اختر سبب الإحالة أولاً', 'error'); reasonEl?.focus(); return; }
+
+    const d = this._collectReferral(stuId);
+    if (!d) return;
+    const { s, cls, date, school, teacherSig, refTo, refToName, refToPhone,
+            reason, notes, subject, newCount, prevCount } = d;
+
+    const to = refToName ? `${refTo} / ${refToName}` : refTo;
+    const lines = [
+      `*نموذج إحالة ${_T.stu}*`,
+      `المدرسة: ${school}`,
+      '',
+      `*${_T.theStu}:* ${s.name}`,
+      `*الصف:* ${cls?.name || '—'}`,
+      `*التاريخ:* ${date}`,
+      '',
+      `*الإحالة إلى:* ${to}`,
+      `*السبب:* ${reason}`,
+      ...(notes.trim() ? ['', `*ملاحظات ${_T.theTch}:*`, notes.trim()] : []),
+      '',
+      `*رقم الإحالة:* ${newCount}${prevCount ? ` (سبقتها ${prevCount})` : ''}`,
+      '',
+      `${_T.theTch}: ${teacherSig} — ${subject}`
+    ];
+
+    const phone = this._waPhone(refToPhone);
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`;
+    /* فتح مباشر بلا window.open حتى لا يحجبه المتصفح على الجوال */
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    Toast.show(phone ? 'فُتح واتساب على محادثة المستلم' : 'فُتح واتساب — اختر المستلم', 'success');
+  },
+
   referral(stuId) {
-    const s       = DB.get('students').find(x => x.id === stuId);
-    if (!s) return;
-    const cls     = DB.get('classes').find(c => c.id === s.classId);
-    const teacher     = DB.teacher() || {};
-    const date        = document.getElementById('ref-date')?.value || new Date().toISOString().slice(0,10);
-    const region      = document.getElementById('ref-region')?.value.trim() || '';
-    const school      = document.getElementById('ref-school')?.value.trim() || teacher.school || '—';
-    const teacherSig  = document.getElementById('ref-teacher-name')?.value.trim() || teacher.name || '—';
-    const refTo       = document.getElementById('ref-to')?.value || '—';
-    const reason      = document.getElementById('ref-reason')?.value || '—';
-    const notes       = document.getElementById('ref-notes')?.value || '';
+    const d = this._collectReferral(stuId);
+    if (!d) return;
+    const { s, cls, date, region, school, teacherSig, refTo, refToName, reason, notes, subject, newCount } = d;
     const _allReasons = ['ضعف تحصيل دراسي','كثرة الغياب','سلوك سلبي متكرر','مشكلة صحية','مشكلة اجتماعية أو أسرية','تأخر مستمر','أخرى (تُحدد في الملاحظات)'];
     const reasonsHtml = _allReasons.map(r => r===reason
       ? `<div class="r-item r-selected">☑&nbsp;<strong>${r}</strong></div>`
       : `<div class="r-item">☐&nbsp;${r}</div>`
     ).join('\n          ');
-    const subject      = teacher.subject || '—';
-    const refToName    = document.getElementById('ref-to-name')?.value.trim() || '';
-    const _rnames = { ...(teacher.refToNames||{}), [refTo]: refToName };
-    DB.setTeacher({ ...teacher, region, refSchool: school, refTeacherName: teacherSig, refToNames: _rnames });
-    const students    = DB.get('students');
-    const newCount    = (s.referralCount || 0) + 1;
-    const clearedBehs = { ...(s.behaviors || {}) };
-    BEH_TYPES.filter(b => !b.pos).forEach(b => { clearedBehs[b.key] = 0; });
-    const today = new Date().toISOString().slice(0,10);
-    const histEntry = { date: today, refTo, reason, notes, teacherName: teacherSig };
-    const prevHistory = s.referralHistory || [];
-    DB.set('students', students.map(x => x.id === stuId ? { ...x, referralCount: newCount, behaviors: clearedBehs, lastReferralDate: today, referralHistory: [...prevHistory, histEntry] } : x));
-    Modal.close();
-    const cur = Router.current;
-    if (cur === 'behavior' || cur === 'students' || cur === 'referrals') Pages[cur]();
 
     const markup = `<!DOCTYPE html><html dir="rtl" lang="ar"><head>
       <meta charset="UTF-8"><title>نموذج إحالة ${_T.stu}</title>
@@ -5810,21 +5878,22 @@ const Pages = {
       [_T.doc]:  _T.docLbl,
       [_T.spec]: _T.specLbl,
     };
-    // Save previous role's name
+    const tel = document.getElementById('ref-to-phone');
+    // Save previous role's name + phone
     if (prevRole && inp) {
       const t = DB.teacher() || {};
-      const names = t.refToNames || {};
+      const names  = t.refToNames  || {};
+      const phones = t.refToPhones || {};
       names[prevRole] = inp.value.trim();
-      DB.setTeacher({ ...t, refToNames: names });
+      if (tel) phones[prevRole] = tel.value.trim();
+      DB.setTeacher({ ...t, refToNames: names, refToPhones: phones });
     }
     const show = !!labels[val];
     if (wrap) wrap.style.display = show ? '' : 'none';
     if (lbl && labels[val]) lbl.textContent = labels[val];
-    // Load saved name for new role
-    if (inp && show) {
-      const saved = (DB.teacher()?.refToNames || {})[val] || '';
-      inp.value = saved;
-    }
+    // Load saved name + phone for new role
+    if (inp && show) inp.value = (DB.teacher()?.refToNames || {})[val] || '';
+    if (tel) tel.value = (DB.teacher()?.refToPhones || {})[val] || '';
   },
   _refReasonChange() {
     const r = document.getElementById('ref-reason')?.value || '';
@@ -5891,6 +5960,10 @@ const Pages = {
         <input type="text" id="ref-to-name" value="" placeholder="اكتب الاسم...">
       </div>
       <div class="form-group">
+        <label><i class="fab fa-whatsapp" style="color:#25D366"></i> جوال المستلم (اختياري — للإرسال بالواتساب)</label>
+        <input type="tel" id="ref-to-phone" value="" placeholder="05xxxxxxxx" dir="ltr" style="text-align:right">
+      </div>
+      <div class="form-group">
         <label><i class="fas fa-list-ul"></i> سبب الإحالة / Reason</label>
         <select id="ref-reason" onchange="Pages._refReasonChange()">
           <option value="" disabled selected>— اختر سبب الإحالة —</option>
@@ -5909,15 +5982,18 @@ const Pages = {
       </div>
       <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="Modal.close()">إلغاء</button>
+        <button class="btn btn-wa" onclick="Print.referralWhatsApp('${stuId}')"><i class="fab fa-whatsapp"></i> إرسال بالواتساب</button>
         <button class="btn btn-primary" onclick="Print.referral('${stuId}')"><i class="fas fa-print"></i> طباعة الإحالة</button>
       </div>
     `);
     const refToSel = document.getElementById('ref-to');
     if (refToSel) { refToSel.dataset.prev = refToSel.value; }
     Pages._refToChange();
-    // Load saved name for default role
+    // Load saved name + phone for default role
     const _inp = document.getElementById('ref-to-name');
-    if (_inp && refToSel) { _inp.value = (DB.teacher()?.refToNames||{})[refToSel.value] || ''; }
+    const _tel = document.getElementById('ref-to-phone');
+    if (_inp && refToSel) { _inp.value = (DB.teacher()?.refToNames ||{})[refToSel.value] || ''; }
+    if (_tel && refToSel) { _tel.value = (DB.teacher()?.refToPhones||{})[refToSel.value] || ''; }
   },
 
   /* ---- PREVIEW MODE ----

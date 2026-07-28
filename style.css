@@ -663,6 +663,8 @@ textarea { resize: vertical; min-height: 80px; }
   background: var(--red-light); color: var(--red); border-color: rgba(239,68,68,.25);
 }
 .btn-danger:hover { background: var(--red); color: #fff; }
+.btn-wa { background: #25D366; color: #fff; border: 1px solid #1eb457; }
+.btn-wa:hover { background: #1eb457; color: #fff; }
 
 .btn-outline-danger {
   background: transparent; color: var(--red); border-color: rgba(239,68,68,.35);
