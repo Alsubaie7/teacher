@@ -5289,7 +5289,7 @@ const Pages = {
         ${histItems}
       </td></tr>` : ''}`;
     }).join('') :
-      `<tr><td colspan="4" style="text-align:center;color:var(--gray-400);padding:32px">لا توجد إحالات مسجّلة بعد</td></tr>`;
+      `<tr class="ref-empty-row"><td colspan="5" style="text-align:center;color:var(--gray-400);padding:32px">لا توجد إحالات مسجّلة بعد</td></tr>`;
 
     document.getElementById('content').innerHTML = `
       <div class="page-header">
@@ -5306,7 +5306,7 @@ const Pages = {
         <div style="font-weight:700;color:#dc2626;margin-bottom:.75rem;font-size:1rem">
           <i class="fas fa-triangle-exclamation"></i> ${_T.theStus} يحتاجون تحويل — تجاوزوا حد التحذير السلوكي
         </div>
-        <table class="data-table" style="background:#fff;border-radius:8px;overflow:hidden">
+        <table class="data-table ref-warn-table" style="background:#fff;border-radius:8px;overflow:hidden">
           <thead><tr><th>${_T.theStu}</th><th>الفصل</th><th>السبب</th><th></th></tr></thead>
           <tbody>${warnRows}</tbody>
         </table>
@@ -5315,7 +5315,7 @@ const Pages = {
         <div style="font-weight:700;padding:.75rem 1rem .25rem;color:var(--gray-600)">
           <i class="fas fa-history"></i> سجل الإحالات السابقة
         </div>
-        <table class="data-table">
+        <table class="data-table ref-hist-table">
           <thead><tr>
             <th>اسم ${_T.theStu}</th><th>الفصل</th><th style="text-align:center">عدد الإحالات</th><th style="text-align:center">السجل</th><th></th>
           </tr></thead>

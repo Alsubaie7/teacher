@@ -457,6 +457,48 @@ textarea { resize: vertical; min-height: 80px; }
   padding: 1rem;
   overflow-y: auto;
 }
+/* ---- جداول الإحالات على الجوال ----
+   خمسة أعمدة على شاشة 375px تعني اسماً يلتف ثلاثة أسطر وزر «إحالة جديدة»
+   مقطوعاً خارج الشاشة. كل صف يصير بطاقة: الاسم والعدد سطر، والفصل سطر،
+   والأزرار سطر بعرض كامل. */
+@media (max-width: 860px) {
+  /* ‏table.‎ ترفع التخصيص فوق قواعد .data-table المعرَّفة لاحقاً في الملف */
+  table.ref-hist-table, table.ref-warn-table { display: block; }
+  table.ref-hist-table thead, table.ref-warn-table thead { display: none; }
+  table.ref-hist-table tbody, table.ref-warn-table tbody { display: block; }
+  table.ref-hist-table td, table.ref-warn-table td {
+    display: block; padding: 0; border: none; text-align: start !important; background: none !important;
+  }
+
+  table.ref-hist-table tbody tr {
+    display: grid; grid-template-columns: 1fr auto;
+    grid-template-areas: "name count" "class count" "log new";
+    gap: .5rem; align-items: center;
+    padding: .85rem .9rem; border-bottom: 1px solid var(--border);
+  }
+  table.ref-hist-table tbody tr > td:nth-child(1) { grid-area: name; font-weight: 800; line-height: 1.5; }
+  table.ref-hist-table tbody tr > td:nth-child(2) { grid-area: class; color: var(--text-muted); font-size: .8rem; }
+  table.ref-hist-table tbody tr > td:nth-child(3) { grid-area: count; justify-self: end; }
+  table.ref-hist-table tbody tr > td:nth-child(4) { grid-area: log; }
+  table.ref-hist-table tbody tr > td:nth-child(5) { grid-area: new; justify-self: end; }
+  table.ref-hist-table tbody tr > td:nth-child(4) .btn,
+  table.ref-hist-table tbody tr > td:nth-child(5) .btn { width: 100%; justify-content: center; }
+
+  table.ref-warn-table tbody tr {
+    display: grid; grid-template-areas: "name" "class" "reason" "act";
+    gap: .45rem; padding: .85rem .9rem; border-bottom: 1px solid var(--border);
+  }
+  table.ref-warn-table tbody tr > td:nth-child(1) { grid-area: name; font-weight: 800; }
+  table.ref-warn-table tbody tr > td:nth-child(2) { grid-area: class; color: var(--text-muted); font-size: .8rem; }
+  table.ref-warn-table tbody tr > td:nth-child(3) { grid-area: reason; line-height: 2; }
+  table.ref-warn-table tbody tr > td:nth-child(4) { grid-area: act; }
+  table.ref-warn-table tbody tr > td:nth-child(4) .btn { width: 100%; justify-content: center; }
+
+  /* صف سجل الطالب المنسدل وصف الحالة الفارغة يبقيان بلا شبكة */
+  table.ref-hist-table tbody tr[id^="rh_"], table.ref-hist-table tbody tr.ref-empty-row { display: block; padding: 0; }
+  table.ref-hist-table tbody tr[id^="rh_"] > td { padding: 0 .9rem .8rem !important; }
+}
+
 /* ==================== قائمة «المزيد» على الجوال ==================== */
 .more-head { display: flex; align-items: center; gap: .7rem; padding-bottom: .9rem; border-bottom: 1px solid var(--border); margin-bottom: .5rem; }
 .more-avatar { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--primary-light); color: var(--primary); }
