@@ -6428,13 +6428,30 @@ const InstallPWA = {
         || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);   /* آيباد */
   },
 
+  /* أي متصفح ونظام؟ التثبيت يختلف بينها اختلافاً جوهرياً */
+  env() {
+    const ua = navigator.userAgent;
+    const ios      = this.isIOS();
+    const firefox  = /Firefox\/|FxiOS/.test(ua);
+    const edge     = /Edg\/|EdgiOS|EdgA\//.test(ua);
+    const chromium = /Chrome\/|CriOS|Chromium/.test(ua) && !edge;
+    const safari   = /Safari\//.test(ua) && !chromium && !edge && !firefox;
+    return {
+      ios, firefox, edge, chromium, safari,
+      mac: /Macintosh/.test(ua) && !ios,
+      mobile: ios || /Android/i.test(ua),
+      /* على iOS كل المتصفحات تعمل بمحرك سفاري بقواعد آبل */
+      iosThirdParty: ios && !safari
+    };
+  },
+
   init() {
     if (this.isStandalone()) return;                 /* مثبَّت أصلاً */
 
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();                            /* نتحكم بالتوقيت بأنفسنا */
       this._prompt = e;
-      this._reveal();
+      this._showBanner();
     });
 
     window.addEventListener('appinstalled', () => {
@@ -6443,17 +6460,23 @@ const InstallPWA = {
       Toast.show('تم تثبيت التطبيق على جهازك', 'success');
     });
 
-    /* سفاري لا يُطلق beforeinstallprompt إطلاقاً — نعرض الإرشاد يدوياً */
-    if (this.isIOS()) {
+    /* البند في القائمة يظهر دائماً: كروم لا يُطلق beforeinstallprompt إلا بعد
+       تفاعل كافٍ مع الموقع، وسفاري لا يُطلقه أبداً — فلو انتظرناه لَما رآه
+       أكثر المستخدمين. الضغط عليه يعرض الطريقة المناسبة لمتصفحه. */
+    const btn = document.getElementById('install-menu-btn');
+    if (btn) btn.style.display = '';
+
+    const e = this.env();
+    if (e.ios) {
       const sub = document.getElementById('install-sub');
-      if (sub) sub.textContent = 'اضغط زر المشاركة ↑ ثم «إضافة إلى الشاشة الرئيسية»';
-      this._reveal();
+      if (sub) sub.textContent = e.iosThirdParty
+        ? 'من قائمة المشاركة ← «إضافة إلى الشاشة الرئيسية»'
+        : 'اضغط زر المشاركة ↑ ثم «إضافة إلى الشاشة الرئيسية»';
+      this._showBanner();
     }
   },
 
-  _reveal() {
-    const btn = document.getElementById('install-menu-btn');
-    if (btn) btn.style.display = '';                 /* يبقى في القائمة دائماً */
+  _showBanner() {
     if (localStorage.getItem(this._KEY) === '1') return;
     const banner = document.getElementById('install-banner');
     if (banner) setTimeout(() => banner.classList.remove('hidden'), 2500);
@@ -6479,32 +6502,60 @@ const InstallPWA = {
       if (outcome !== 'accepted') localStorage.setItem(this._KEY, '1');
       return;
     }
-    if (this.isIOS()) {
+    const e = this.env();
+    const note = t => `<p class="install-note">${t}</p>`;
+    const done = `<div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button class="btn btn-primary" onclick="Modal.close()">تمام</button></div>`;
+
+    /* --- آيفون وآيباد: كل المتصفحات هنا تعمل بمحرك سفاري بقواعد آبل --- */
+    if (e.ios) {
+      const share = e.iosThirdParty
+        ? 'زر المشاركة <i class="fas fa-arrow-up-from-bracket"></i> في شريط المتصفح'
+        : 'زر المشاركة <i class="fas fa-arrow-up-from-bracket"></i> في شريط سفاري السفلي';
       Modal.open('تثبيت التطبيق على الآيفون', `
         <ol class="install-steps">
-          <li>اضغط زر المشاركة <i class="fas fa-arrow-up-from-bracket"></i> في شريط سفاري السفلي</li>
+          <li>اضغط ${share}</li>
           <li>مرّر للأسفل واختر <strong>«إضافة إلى الشاشة الرئيسية»</strong></li>
           <li>اضغط <strong>«إضافة»</strong> — ستجد المنصة بين تطبيقاتك</li>
         </ol>
-        <p style="font-size:.8rem;color:var(--text-muted);line-height:1.7;margin-top:.5rem">
-          لا بد أن تفتح الرابط في <strong>سفاري</strong>؛ متصفحات الآيفون الأخرى لا تدعم هذه الخاصية.
-        </p>
-        <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-          <button class="btn btn-primary" onclick="Modal.close()">تمام</button>
-        </div>`);
+        ${note(e.iosThirdParty
+          ? 'آبل تمنع أي متصفح على الآيفون من عرض نافذة تثبيت تلقائية، لذلك الإضافة يدوية في كل المتصفحات. لو لم تجد الخيار في متصفحك فافتح الرابط في <strong>سفاري</strong>.'
+          : 'هذه هي الطريقة الوحيدة على الآيفون — آبل لا تتيح نافذة تثبيت تلقائية لأي متصفح.')}
+        ${done}`);
       return;
     }
+
+    /* --- سفاري على الماك --- */
+    if (e.safari && e.mac) {
+      Modal.open('تثبيت التطبيق على الماك', `
+        <ol class="install-steps">
+          <li>من شريط القوائم افتح <strong>File</strong> (ملف)</li>
+          <li>اختر <strong>«Add to Dock»</strong> — إضافة إلى الشريط</li>
+        </ol>
+        ${note('تحتاج macOS Sonoma أو أحدث. على الإصدارات الأقدم استخدم كروم أو إيدج.')}
+        ${done}`);
+      return;
+    }
+
+    /* --- فايرفوكس: لا يدعم تثبيت تطبيقات الويب على الحاسب --- */
+    if (e.firefox) {
+      Modal.open('التثبيت غير مدعوم في فايرفوكس', `
+        ${note('فايرفوكس أزال دعم تثبيت تطبيقات الويب على الحاسب، ولا خطة لإعادته. لتثبيت المنصة كتطبيق افتح الرابط في <strong>كروم</strong> أو <strong>إيدج</strong>، وستجد الخيار مباشرة.')}
+        ${note('يمكنك دائماً استخدام المنصة من داخل فايرفوكس عادياً — كل الميزات تعمل.')}
+        ${done}`);
+      return;
+    }
+
+    /* --- كروم وإيدج على الحاسب أو أندرويد، قبل أن يجهز الحدث --- */
+    const menu = e.mobile ? 'قائمة المتصفح <i class="fas fa-ellipsis-vertical"></i> أعلى الشاشة'
+                          : 'أيقونة التثبيت <i class="fas fa-desktop"></i> في شريط العنوان، أو قائمة المتصفح <i class="fas fa-ellipsis-vertical"></i>';
     Modal.open('تثبيت التطبيق', `
       <ol class="install-steps">
-        <li>افتح قائمة المتصفح <i class="fas fa-ellipsis-vertical"></i></li>
-        <li>اختر <strong>«تثبيت التطبيق»</strong> أو <strong>«إضافة إلى الشاشة الرئيسية»</strong></li>
+        <li>افتح ${menu}</li>
+        <li>اختر <strong>«تثبيت منصة المعلم»</strong> أو <strong>«إضافة إلى الشاشة الرئيسية»</strong></li>
       </ol>
-      <p style="font-size:.8rem;color:var(--text-muted);line-height:1.7;margin-top:.5rem">
-        لو لم يظهر الخيار فالمتصفح لا يدعم التثبيت — جرّب كروم أو إيدج.
-      </p>
-      <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-        <button class="btn btn-primary" onclick="Modal.close()">تمام</button>
-      </div>`);
+      ${note('كروم لا يعرض زر التثبيت إلا بعد استخدامك للموقع دقائق قليلة. لو لم يظهر الآن، تصفّح المنصة قليلاً ثم أعد المحاولة — أو أعد تحميل الصفحة.')}
+      ${done}`);
   }
 };
 

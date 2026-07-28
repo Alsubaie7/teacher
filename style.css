@@ -440,6 +440,8 @@ textarea { resize: vertical; min-height: 80px; }
 .install-steps li { margin-bottom: .3rem; }
 .install-steps strong { color: var(--text-primary); }
 .install-steps i { color: var(--primary); }
+.install-note { font-size: .8rem; color: var(--text-muted); line-height: 1.8; margin: .5rem 0 0; }
+.install-note strong { color: var(--text-primary); }
 
 /* ---- شاشة الإقلاع ---- */
 .boot-splash-inner {
