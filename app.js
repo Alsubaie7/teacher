@@ -936,23 +936,31 @@ const Print = {
       return;
     }
 
-    const fileName = `إحالة-${d.s.name}-${d.date}.png`;
+    /* اسم عربي للحفظ، واسم لاتيني للمشاركة: بعض أهداف المشاركة ترفض
+       أسماء الملفات غير اللاتينية أو التي فيها مسافات */
     this._shareBlob = blob;
-    this._shareName = fileName;
+    this._shareName = `إحالة-${d.s.name.replace(/\s+/g, '-')}-${d.date}.png`;
+    this._shareAscii = `referral-${d.date}.png`;
     const url = URL.createObjectURL(blob);
-    const canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'image/png' })] }));
+
+    /* مشاركة الملفات موثوقة على الجوال فقط. على الحاسب يفتح كروم قائمة
+       مشاركة أهدافها (ومنها واتساب ويب) لا تقبل الصور فترفض العملية —
+       وهو ما ظهر كرسالة «تعذّرت المشاركة». لذلك المسار هناك: تنزيل ثم إرفاق. */
+    const touch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+    const canShare = touch && !!(navigator.canShare &&
+      navigator.canShare({ files: [new File([blob], this._shareAscii, { type: 'image/png' })] }));
 
     Modal.open('نموذج الإحالة جاهز', `
       <div class="ref-preview"><img src="${url}" alt="نموذج الإحالة"></div>
       <p class="install-note">${canShare
         ? 'اضغط «إرسال» ثم اختر واتساب من قائمة المشاركة — يُرسل النموذج كصورة.'
-        : 'المشاركة المباشرة غير متاحة في هذا المتصفح. نزّل الصورة ثم أرفقها في واتساب.'}</p>
+        : 'على الحاسب لا يقبل واتساب الصور من قائمة المشاركة. انسخ الصورة والصقها في المحادثة بـ Ctrl/⌘ + V — أو أرسلها من جوالك مباشرة حيث الإرسال بضغطة واحدة.'}</p>
       <div class="install-actions-row">
         <button class="btn btn-outline" onclick="Modal.close()">إغلاق</button>
         <button class="btn btn-outline" onclick="Print.downloadReferralPng()"><i class="fas fa-download"></i> تنزيل الصورة</button>
         ${canShare
           ? `<button class="btn btn-wa" onclick="Print.shareReferralPng()"><i class="fab fa-whatsapp"></i> إرسال</button>`
-          : `<button class="btn btn-wa" onclick="Print.downloadReferralPng();window.open('https://web.whatsapp.com','_blank')"><i class="fab fa-whatsapp"></i> تنزيل وفتح واتساب</button>`}
+          : `<button class="btn btn-wa" onclick="Print.copyReferralPng()"><i class="fas fa-copy"></i> نسخ الصورة ثم لصقها في واتساب</button>`}
       </div>`);
   },
 
@@ -966,14 +974,33 @@ const Print = {
     Toast.show('نُزّلت صورة النموذج', 'success');
   },
 
+  /* على الحاسب اللصق المباشر أسرع من التنزيل ثم السحب:
+     تُنسخ الصورة للحافظة فيلصقها المعلم في محادثة واتساب بـ ⌘V */
+  async copyReferralPng() {
+    if (!this._shareBlob) return;
+    try {
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('unsupported');
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': this._shareBlob })]);
+      Toast.show('نُسخت الصورة — افتح واتساب والصقها بـ Ctrl/⌘ + V', 'success');
+      window.open('https://web.whatsapp.com', '_blank', 'noopener');
+    } catch {
+      this.downloadReferralPng();
+      Toast.show('تعذّر النسخ — نُزّلت الصورة، اسحبها إلى محادثة واتساب', 'error');
+      window.open('https://web.whatsapp.com', '_blank', 'noopener');
+    }
+  },
+
   async shareReferralPng() {
     if (!this._shareBlob) return;
-    const file = new File([this._shareBlob], this._shareName, { type: 'image/png' });
+    const file = new File([this._shareBlob], this._shareAscii, { type: 'image/png' });
     try {
       await navigator.share({ files: [file], title: 'نموذج إحالة طالب' });
       Modal.close();
     } catch (err) {
-      if (err?.name !== 'AbortError') Toast.show('تعذّرت المشاركة — جرّب تنزيل الصورة', 'error');
+      if (err?.name === 'AbortError') return;             /* ألغى المستخدم — لا شيء */
+      /* لا نترك المعلم بلا نتيجة: نُنزّل الصورة تلقائياً ونذكر سبب الرفض */
+      this.downloadReferralPng();
+      Toast.show(`تعذّرت المشاركة (${err?.name || 'خطأ'}) — نُزّلت الصورة، أرفقها في واتساب`, 'error');
     }
   },
 
