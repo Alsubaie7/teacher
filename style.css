@@ -364,6 +364,53 @@ textarea { resize: vertical; min-height: 80px; }
 .att2-foot { padding: .6rem 1rem; color: var(--text-muted); font-size: .78rem; font-weight: 700; background: var(--surface-2); border-top: 1px solid var(--border); display: flex; align-items: center; gap: .4rem; }
 .att2-foot i { color: var(--green); }
 
+/* ---- الحضور والسلوك على الجوال ----
+   الجدول عرضه الأدنى 640px داخل تمرير أفقي، فعلى شاشة الجوال يخرج زر «غائب»
+   وأيقونات السلوك خارج الشاشة، وتلتف خلايا السلوك فيتضخم ارتفاع الصف.
+   الحل: يتحول كل صف إلى بطاقة — الاسم سطر، وأزرار الحضور سطر بعرض كامل،
+   والسلوك سطر يُمرَّر أفقياً وحده. */
+@media (max-width: 860px) {
+  .att2-scroll { overflow-x: visible; }
+  .att2-table { min-width: 0; display: block; }
+  .att2-table thead { display: none; }
+  .att2-table tbody { display: block; }
+
+  .att2-row {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    grid-template-areas: "num name" "seg seg" "beh beh";
+    gap: .55rem .5rem;
+    padding: .8rem .85rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .att2-table tbody tr:last-child { border-bottom: 0; }
+  .att2-table td { display: block; padding: 0; border: none; }
+  .att2-row > td:nth-child(1) { grid-area: num; align-self: center; }
+  .att2-row > td:nth-child(2) { grid-area: name; }
+  .att2-row > td:nth-child(3) { grid-area: seg; }
+  .att2-row > td:nth-child(4) { grid-area: beh; }
+
+  /* الاسم الطويل يلتف بدل أن يمدّ الجدول */
+  .att2-name { white-space: normal; line-height: 1.45; font-size: .86rem; }
+  .att2-ini  { width: 30px; height: 30px; font-size: .75rem; }
+
+  /* أزرار الحضور الثلاثة بعرض الشاشة وبمساحة لمس مريحة */
+  .att2-seg-wrap { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; }
+  .att2-seg { padding: .6rem .3rem; text-align: center; font-size: .8rem; }
+
+  /* السلوك في سطر واحد يُمرَّر أفقياً بدل أن يلتف ويطيل الصف */
+  .att2-behs {
+    flex-wrap: nowrap; overflow-x: auto; padding-bottom: 3px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .att2-behs::-webkit-scrollbar { display: none; }
+  .att2-beh { flex-shrink: 0; padding: .3rem .55rem; }
+
+  .att2-toolbar { gap: .5rem; }
+  .att2-chips { margin-inline-start: 0; width: 100%; }
+  .att2-chip { flex: 1; text-align: center; padding: .4rem .5rem; }
+}
+
 /* ============================================================
    ANALYTICS (clean, replaces excel)
    ============================================================ */
@@ -410,6 +457,26 @@ textarea { resize: vertical; min-height: 80px; }
   padding: 1rem;
   overflow-y: auto;
 }
+/* ==================== قائمة «المزيد» على الجوال ==================== */
+.more-head { display: flex; align-items: center; gap: .7rem; padding-bottom: .9rem; border-bottom: 1px solid var(--border); margin-bottom: .5rem; }
+.more-avatar { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--primary-light); color: var(--primary); }
+.more-head-txt { display: flex; flex-direction: column; min-width: 0; }
+.more-head-txt strong { font-size: .92rem; color: var(--text-primary); }
+.more-head-txt span { font-size: .76rem; color: var(--text-muted); }
+.more-list { display: flex; flex-direction: column; }
+.more-item {
+  display: flex; align-items: center; gap: .7rem; width: 100%;
+  background: none; border: none; font: inherit; cursor: pointer;
+  padding: .7rem .2rem; color: var(--text-primary); text-align: start;
+  border-radius: var(--radius-sm);
+}
+.more-item:hover { background: var(--surface-hover); }
+.more-item.danger { color: var(--red); }
+.more-icon { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center; font-size: .82rem; }
+.more-label { flex: 1; font-weight: 700; font-size: .88rem; }
+.more-chev { color: var(--text-dim); font-size: .72rem; }
+.more-sep { height: 1px; background: var(--border); margin: .45rem 0; }
+
 /* ==================== دعوة تثبيت التطبيق ==================== */
 .install-banner {
   position: fixed; z-index: 10000; inset-inline: 12px; bottom: 12px;

@@ -6411,6 +6411,55 @@ const SBAuth = {
   }
 };
 
+/* ==================== قائمة «المزيد» على الجوال ====================
+   الشريط الجانبي مخفي تحت 860px، ومعه كانت تختفي الإحالات والإعدادات
+   وتصدير البيانات وتسجيل الخروج ولوحة الإدارة — لا يصلها المستخدم إلا
+   بالبحث. هذه القائمة تجمعها في مكان واحد ظاهر. */
+const MoreMenu = {
+  _items() {
+    return [
+      { label: 'الإحالات',        icon: 'fa-file-medical-alt', color: '#dc2626', page: 'referrals' },
+      { label: 'الدرجات',         icon: 'fa-star-half-alt',    color: '#d97706', page: 'grades'    },
+      { label: 'المجموعات',       icon: 'fa-object-group',     color: '#2563eb', page: 'groups'    },
+      { label: _T.theStus,        icon: 'fa-users',            color: '#059669', page: 'students'  },
+      { label: 'الإعدادات',       icon: 'fa-cog',              color: '#4b5563', page: 'settings'  },
+      ...(_isAdmin() ? [{ label: 'لوحة الإدارة', icon: 'fa-shield-alt', color: '#7c3aed', page: 'admin' }] : []),
+      { sep: true },
+      { label: 'تثبيت التطبيق',   icon: 'fa-mobile-screen-button', color: '#4f46e5', action: () => InstallPWA.trigger() },
+      { label: 'تصدير البيانات',  icon: 'fa-download',         color: '#059669', action: () => Backup.export() },
+      { label: 'استيراد بيانات',  icon: 'fa-upload',           color: '#d97706',
+        action: () => document.querySelector('#st-avatar-wrap input[type=file]')?.click() },
+      { label: 'تسجيل الخروج',    icon: 'fa-sign-out-alt',     color: '#dc2626', danger: true, action: () => App.logout() },
+    ];
+  },
+
+  open() {
+    const t = DB.teacher() || {};
+    const rows = this._items().map((it, i) => {
+      if (it.sep) return '<div class="more-sep"></div>';
+      const go = it.page ? `MoreMenu._go('${it.page}')` : `MoreMenu._run(${i})`;
+      return `<button class="more-item ${it.danger ? 'danger' : ''}" onclick="${go}">
+        <span class="more-icon" style="background:${it.color}1a;color:${it.color}"><i class="fas ${it.icon}"></i></span>
+        <span class="more-label">${_esc(it.label)}</span>
+        <i class="fas fa-chevron-left more-chev"></i>
+      </button>`;
+    }).join('');
+
+    Modal.open('المزيد', `
+      <div class="more-head">
+        <span class="more-avatar"><i class="fas fa-user-tie"></i></span>
+        <div class="more-head-txt">
+          <strong>${_esc(t.name) || '—'}</strong>
+          <span>${_esc(t.school) || '—'}</span>
+        </div>
+      </div>
+      <div class="more-list">${rows}</div>`);
+  },
+
+  _go(page) { Modal.close(); Router.go(page); },
+  _run(i)   { const it = this._items()[i]; Modal.close(); it?.action?.(); }
+};
+
 /* ==================== تثبيت التطبيق (PWA) ====================
    المتصفحات الحديثة لم تعد تعرض شريط التثبيت تلقائياً — الخيار مدفون في
    قائمة المتصفح. وسفاري على الآيفون لا يعرضه إطلاقاً، والطريق الوحيد فيه
