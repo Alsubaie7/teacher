@@ -71,9 +71,11 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);ove
 .page-spinner.hidden{display:none}
 #page-image{max-height:calc(100vh - var(--topbar-h) - var(--toolbar-h) - 20px);max-width:calc(100vw - 120px);object-fit:contain;border-radius:4px;box-shadow:0 4px 24px rgba(0,0,0,.6);display:block;pointer-events:none;background:#fff}
 #draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
-.laser-dot{position:absolute;width:14px;height:14px;background:radial-gradient(circle,#ff0000 30%,rgba(255,0,0,.5) 60%,transparent 100%);border-radius:50%;pointer-events:none;z-index:50;box-shadow:0 0 20px rgba(255,0,0,.8),0 0 60px rgba(255,0,0,.3);animation:laserPulse .8s ease-in-out infinite alternate;transform:translate(-50%,-50%)}
-@keyframes laserPulse{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(-50%,-50%) scale(1.3);opacity:.8}}
-.spotlight-overlay{position:absolute;inset:0;z-index:40;pointer-events:none;background:rgba(0,0,0,.85);-webkit-mask-image:radial-gradient(circle 120px at var(--sx,50%) var(--sy,50%),transparent 0%,transparent 99%,black 100%);mask-image:radial-gradient(circle 120px at var(--sx,50%) var(--sy,50%),transparent 0%,transparent 99%,black 100%);transition:opacity .3s}
+/* أثر الليزر: يُرسم على طبقة خاصة ويتلاشى تدريجياً بدل نقطة ثابتة */
+.laser-canvas{position:absolute;top:0;left:0;pointer-events:none;z-index:50}
+/* مستطيل التركيز أثناء السحب — الظل الخارجي يعتّم بقية الصفحة */
+.focus-sel{position:absolute;z-index:45;pointer-events:none;border:2px dashed rgba(255,255,255,.95);border-radius:3px;box-shadow:0 0 0 9999px rgba(8,10,24,.55),0 0 18px rgba(0,0,0,.4);background:rgba(255,255,255,.06)}
+.focus-sel.hidden{display:none}
 .floating-text{position:absolute;min-width:120px;min-height:36px;padding:6px 10px;font-family:'Tajawal',sans-serif;font-size:18px;font-weight:700;color:#e74c3c;background:rgba(255,255,255,.05);border:2px dashed rgba(255,255,255,.2);border-radius:6px;outline:none;resize:both;z-index:55;direction:rtl;backdrop-filter:blur(4px)}
 .nav-arrow{position:fixed;top:50%;transform:translateY(-50%);width:44px;height:80px;background:var(--glass);backdrop-filter:blur(10px);border:1px solid var(--border);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s;z-index:60}
 .nav-next{left:10px;border-radius:0 12px 12px 0}
@@ -81,7 +83,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);ove
 .nav-arrow:hover{background:var(--primary);color:#fff;width:52px}
 .nav-arrow:disabled{opacity:.2;pointer-events:none}
 
-#toolbar{position:fixed;bottom:0;left:0;right:0;height:var(--toolbar-h);background:var(--glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;z-index:100;overflow-x:auto}
+#toolbar{position:fixed;bottom:0;left:0;right:0;height:var(--toolbar-h);background:var(--glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;z-index:100;overflow-x:auto;justify-content:safe center}
 #toolbar::-webkit-scrollbar{display:none}
 .tool-group{display:flex;align-items:center;gap:3px}
 .tool-separator{width:1px;height:32px;background:var(--border);margin:0 6px;flex-shrink:0}
@@ -136,7 +138,18 @@ body.fullscreen:hover #toolbar,body.fullscreen #toolbar:focus-within{bottom:0}
 body.fullscreen #board-area{top:0;bottom:0}
 body.fullscreen #page-image{max-height:calc(100vh - 20px);max-width:calc(100vw - 100px)}
 body[data-tool="eraser"] #draw-canvas{cursor:cell}
-body[data-tool="laser"] #draw-canvas,body[data-tool="spotlight"] #draw-canvas{cursor:none}
+body[data-tool="laser"] #draw-canvas,body[data-tool="spotlight"] #draw-canvas{cursor:crosshair}
+/* التنقّل داخل الصفحة المكبّرة بأداة المؤشر */
+body.zoomed[data-tool="pointer"] #draw-canvas{cursor:grab}
+body.zoomed[data-tool="pointer"] #draw-canvas:active{cursor:grabbing}
+#page-container{transform-origin:center center;will-change:transform}
+.zoom-ctl{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:999px;padding:2px}
+.zoom-level{min-width:46px;text-align:center;font-size:12px;font-weight:800;color:#cbd5e1;cursor:pointer;user-select:none;font-variant-numeric:tabular-nums;padding:4px 2px;border-radius:999px}
+.zoom-level:hover{background:rgba(255,255,255,.1);color:#fff}
+.zoom-exit{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:.5rem;background:rgba(15,17,34,.9);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:.5rem .95rem;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;backdrop-filter:blur(6px);box-shadow:0 6px 22px rgba(0,0,0,.45)}
+.zoom-exit:hover{background:rgba(30,34,64,.95)}
+.zoom-exit kbd{background:rgba(255,255,255,.14);border-radius:4px;padding:.08rem .35rem;font-size:.7rem}
+.zoom-exit.hidden{display:none}
 body[data-tool="pointer"] #draw-canvas{cursor:default}
 body[data-tool="text"] #draw-canvas{cursor:text}
 #page-image.slide-out-left{animation:slideOutLeft .25s ease-out forwards}
@@ -169,6 +182,11 @@ body[data-tool="text"] #draw-canvas{cursor:text}
       </div>
     </div>
     <div class="top-bar-left">
+      <div class="zoom-ctl">
+        <button class="top-btn" onclick="Zoom.out()" title="تصغير (⌘−)"><i class="fas fa-magnifying-glass-minus"></i></button>
+        <span id="zoom-level" class="zoom-level" onclick="Zoom.reset()" title="اضغط للإرجاع 100% (⌘0)">100%</span>
+        <button class="top-btn" onclick="Zoom.in()" title="تكبير (⌘+)"><i class="fas fa-magnifying-glass-plus"></i></button>
+      </div>
       <span class="page-indicator" id="page-indicator">1 / 311</span>
       <button class="top-btn" id="pres-btn" onclick="openPresentation()" title="العرض التفاعلي" style="background:var(--accent);color:#fff;width:auto;padding:0 12px;font-weight:700;font-size:12px;gap:6px">
         <i class="fas fa-play"></i> العرض التفاعلي
@@ -196,11 +214,12 @@ body[data-tool="text"] #draw-canvas{cursor:text}
     <div id="page-container">
       <img id="page-image" src="" alt="صفحة الكتاب" draggable="false">
       <canvas id="draw-canvas"></canvas>
-      <div id="laser-dot" class="laser-dot hidden"></div>
-      <div id="spotlight-overlay" class="spotlight-overlay hidden"></div>
+      <canvas id="laser-canvas" class="laser-canvas"></canvas>
+      <div id="focus-sel" class="focus-sel hidden"></div>
       <textarea id="floating-text" class="floating-text hidden" placeholder="اكتب هنا..."></textarea>
       <div id="page-spinner" class="page-spinner hidden"><i class="fas fa-spinner fa-spin"></i></div>
     </div>
+    <button id="zoom-exit" class="zoom-exit hidden" onclick="Zoom.reset()"><i class="fas fa-compress"></i> خروج من التركيز <kbd>Esc</kbd></button>
     <button class="nav-arrow nav-next" onclick="Board.nextPage()" title="التالية" id="nav-next"><i class="fas fa-chevron-left"></i></button>
     <button class="nav-arrow nav-prev" onclick="Board.prevPage()" title="السابقة" id="nav-prev"><i class="fas fa-chevron-right"></i></button>
   </main>
@@ -241,7 +260,7 @@ body[data-tool="text"] #draw-canvas{cursor:text}
     </div>
     <div class="tool-separator"></div>
     <div class="tool-group special-tools">
-      <button class="tool-btn" data-tool="spotlight" onclick="Tools.select('spotlight')" title="تركيز"><i class="fas fa-lightbulb"></i><span class="tool-label">تركيز</span></button>
+      <button class="tool-btn" data-tool="spotlight" onclick="Tools.select('spotlight')" title="تركيز — حدّد مستطيلاً على الكتاب ليكبر"><i class="fas fa-crop-simple"></i><span class="tool-label">تركيز</span></button>
       <button class="tool-btn" onclick="Timer.show()" title="مؤقت"><i class="fas fa-stopwatch"></i><span class="tool-label">مؤقت</span></button>
       <button class="tool-btn" onclick="RandomStudent.show()" title="طالب عشوائي"><i class="fas fa-dice"></i><span class="tool-label">عشوائي</span></button>
     </div>
@@ -458,6 +477,59 @@ function lessonForPage(p) {
   return null;
 }
 
+/* ==================== تكبير الصفحة ====================
+   يُطبَّق على page-container كاملاً فتتحرك معه طبقة الرسم بنفس النسبة،
+   وتبقى التعليقات مثبّتة على مواضعها من الصورة. */
+const Zoom = {
+  scale: 1, tx: 0, ty: 0, MIN: 1, MAX: 5, STEP: 0.25,
+
+  _el() { return document.getElementById('page-container'); },
+
+  apply(animate = true) {
+    const el = this._el();
+    el.style.transition = animate ? 'transform .28s ease' : 'none';
+    el.style.transform  = `translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`;
+    const zoomed = this.scale > 1.01;
+    document.getElementById('zoom-level').textContent = Math.round(this.scale * 100) + '%';
+    document.getElementById('zoom-exit').classList.toggle('hidden', !zoomed);
+    document.body.classList.toggle('zoomed', zoomed);
+  },
+
+  set(s, animate = true) {
+    this.scale = Math.min(this.MAX, Math.max(this.MIN, s));
+    if (this.scale <= 1.001) { this.tx = this.ty = 0; }
+    this._clamp();
+    this.apply(animate);
+  },
+
+  in()    { this.set(this.scale + this.STEP); },
+  out()   { this.set(this.scale - this.STEP); },
+  reset() { this.scale = 1; this.tx = this.ty = 0; this.apply(); },
+
+  /* يملأ المستطيل المحدَّد مساحة العرض ويوسّطه */
+  focusRect(x, y, w, h) {
+    if (w < 8 || h < 8) return;
+    const el = this._el(), W = el.offsetWidth, H = el.offsetHeight;
+    const s  = Math.min(this.MAX, Math.max(1, Math.min(W / w, H / h)));
+    this.scale = s;
+    this.tx = s * (W / 2 - (x + w / 2));
+    this.ty = s * (H / 2 - (y + h / 2));
+    this._clamp();
+    this.apply();
+  },
+
+  /* يمنع ظهور فراغ حول الصفحة عند السحب */
+  _clamp() {
+    const el = this._el();
+    const maxX = Math.max(0, (el.offsetWidth  * this.scale - el.offsetWidth)  / 2);
+    const maxY = Math.max(0, (el.offsetHeight * this.scale - el.offsetHeight) / 2);
+    this.tx = Math.min(maxX, Math.max(-maxX, this.tx));
+    this.ty = Math.min(maxY, Math.max(-maxY, this.ty));
+  },
+
+  panBy(dx, dy) { this.tx += dx; this.ty += dy; this._clamp(); this.apply(false); }
+};
+
 /* ==================== السبورة ==================== */
 const Board = {
   _canvas:null,_ctx:null,_img:null,_isDrawing:false,_startX:0,_startY:0,_tempCanvas:null,
@@ -466,6 +538,13 @@ const Board = {
     this._canvas = document.getElementById('draw-canvas');
     this._ctx = this._canvas.getContext('2d');
     this._img = document.getElementById('page-image');
+    this._laserCanvas = document.getElementById('laser-canvas');
+    /* Ctrl/⌘ + عجلة الفأرة = تكبير وتصغير */
+    document.getElementById('board-area').addEventListener('wheel', e => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      Zoom.set(Zoom.scale + (e.deltaY < 0 ? Zoom.STEP : -Zoom.STEP), false);
+    }, { passive: false });
     this._canvas.addEventListener('pointerdown', e => this._onDown(e));
     this._canvas.addEventListener('pointermove', e => this._onMove(e));
     this._canvas.addEventListener('pointerup', e => this._onUp(e));
@@ -476,12 +555,17 @@ const Board = {
       if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { this.prevPage(); e.preventDefault(); }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.shiftKey ? this.redo() : this.undo(); e.preventDefault(); }
       if (e.key === 'Escape') {
+        /* الأولوية للخروج من التكبير قبل الخروج من ملء الشاشة */
+        if (Zoom.scale > 1.01) { Zoom.reset(); return; }
         if (document.fullscreenElement) document.exitFullscreen();
         document.getElementById('floating-text').classList.add('hidden');
-        document.getElementById('spotlight-overlay').classList.add('hidden');
-        document.getElementById('laser-dot').classList.add('hidden');
+        document.getElementById('focus-sel').classList.add('hidden');
+        this._laserClear();
         if (Tools.current === 'spotlight' || Tools.current === 'laser') Tools.select('pointer');
       }
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) { Zoom.in();  e.preventDefault(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === '-')                    { Zoom.out(); e.preventDefault(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === '0')                    { Zoom.reset(); e.preventDefault(); }
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && document.activeElement.tagName !== 'TEXTAREA') this.toggleFullscreen();
     });
     new ResizeObserver(() => this._syncCanvasSize()).observe(this._img);
@@ -489,12 +573,14 @@ const Board = {
   },
 
   _syncCanvasSize() {
-    const rect = this._img.getBoundingClientRect();
+    /* offsetWidth لا يتأثر بتحويل التكبير، بخلاف getBoundingClientRect */
+    const w = this._img.offsetWidth, h = this._img.offsetHeight;
+    if (!w || !h) return;
     const container = document.getElementById('page-container');
-    this._canvas.width = rect.width;
-    this._canvas.height = rect.height;
-    container.style.width = rect.width + 'px';
-    container.style.height = rect.height + 'px';
+    this._canvas.width  = w;  this._canvas.height  = h;
+    this._laserCanvas.width = w; this._laserCanvas.height = h;
+    container.style.width = w + 'px';
+    container.style.height = h + 'px';
     this._redrawFromHistory();
   },
 
@@ -562,6 +648,9 @@ const Board = {
       if (token !== this._token) return;   /* تجاوزتها نقرة أحدث */
       spinner.classList.add('hidden');
       this._target = null;
+      /* تبديل الصفحة يُنهي التكبير وأثر الليزر */
+      Zoom.reset();
+      this._laserClear();
       currentPage = p;
       this._loadCurrentPage(direction);
       this._warmNeighbors();
@@ -605,13 +694,28 @@ const Board = {
   nextPage() { this.goToPage((this._target ?? currentPage) + 1); },
   prevPage() { this.goToPage((this._target ?? currentPage) - 1); },
 
-  _getPos(e) { const r = this._canvas.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; },
+  /* يقسم على نسبة التكبير حتى تبقى الرسوم مضبوطة على مواضعها والصفحة مكبّرة */
+  _getPos(e) {
+    const r = this._canvas.getBoundingClientRect();
+    const k = r.width ? this._canvas.width / r.width : 1;
+    return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k };
+  },
 
   _onDown(e) {
     const tool = Tools.current, pos = this._getPos(e);
-    if (tool === 'pointer') return;
-    if (tool === 'laser')     { this._isDrawing = true; this._showLaser(e); return; }
-    if (tool === 'spotlight') { this._isDrawing = true; this._showSpotlight(e); return; }
+    if (tool === 'pointer') {
+      if (Zoom.scale > 1.01) {                 /* سحب الصفحة المكبّرة */
+        this._panning = { x: e.clientX, y: e.clientY };
+        this._canvas.setPointerCapture?.(e.pointerId);
+      }
+      return;
+    }
+    if (tool === 'laser')     { this._isDrawing = true; this._laserPush(pos); return; }
+    if (tool === 'spotlight') {
+      this._isDrawing = true; this._startX = pos.x; this._startY = pos.y;
+      this._drawFocusSel(pos.x, pos.y, 0, 0);
+      return;
+    }
     if (tool === 'text')      { this._placeText(pos); return; }
     this._isDrawing = true; this._startX = pos.x; this._startY = pos.y;
     if (tool === 'pen' || tool === 'highlighter' || tool === 'eraser') {
@@ -629,9 +733,20 @@ const Board = {
   },
 
   _onMove(e) {
+    if (this._panning) {
+      Zoom.panBy(e.clientX - this._panning.x, e.clientY - this._panning.y);
+      this._panning = { x: e.clientX, y: e.clientY };
+      return;
+    }
     const tool = Tools.current, pos = this._getPos(e);
-    if (tool === 'laser') { this._showLaser(e); return; }
-    if (tool === 'spotlight') { this._showSpotlight(e); return; }
+    /* الليزر يعمل أثناء الضغط فقط — كان يتبع المؤشر دائماً ويبقى ثابتاً */
+    if (tool === 'laser') { if (this._isDrawing) this._laserPush(pos); return; }
+    if (tool === 'spotlight') {
+      if (this._isDrawing)
+        this._drawFocusSel(Math.min(this._startX,pos.x), Math.min(this._startY,pos.y),
+                           Math.abs(pos.x-this._startX), Math.abs(pos.y-this._startY));
+      return;
+    }
     if (!this._isDrawing) return;
     if (tool === 'pen' || tool === 'highlighter' || tool === 'eraser') { this._ctx.lineTo(pos.x, pos.y); this._ctx.stroke(); }
     if (tool === 'arrow' || tool === 'rect' || tool === 'circle') {
@@ -648,12 +763,21 @@ const Board = {
     }
   },
 
-  _onUp() {
+  _onUp(e) {
+    if (this._panning) { this._panning = null; return; }
     if (!this._isDrawing) return;
     this._isDrawing = false;
     const tool = Tools.current;
     this._ctx.globalCompositeOperation='source-over'; this._ctx.globalAlpha=1;
-    if (tool === 'laser' || tool === 'spotlight') return;
+    if (tool === 'laser') return;               /* الأثر يتلاشى وحده */
+    if (tool === 'spotlight') {
+      const sel = this._focusSelRect;
+      document.getElementById('focus-sel').classList.add('hidden');
+      this._focusSelRect = null;
+      if (sel && sel.w >= 24 && sel.h >= 24) Zoom.focusRect(sel.x, sel.y, sel.w, sel.h);
+      else showToast('اسحب مستطيلاً على الجزء الذي تريد تكبيره');
+      return;
+    }
     if (['pen','highlighter','eraser','arrow','rect','circle'].includes(tool)) this._saveToHistory();
     this._tempCanvas = null;
   },
@@ -668,17 +792,65 @@ const Board = {
     this._ctx.stroke();
   },
 
-  _showLaser(e) {
-    const dot=document.getElementById('laser-dot'), r=document.getElementById('page-container').getBoundingClientRect();
-    dot.classList.remove('hidden'); dot.style.left=(e.clientX-r.left)+'px'; dot.style.top=(e.clientY-r.top)+'px';
-    clearTimeout(this._laserTimer); this._laserTimer=setTimeout(()=>dot.classList.add('hidden'),2000);
+  /* ---- الليزر: خط يتبع اليد ويتلاشى خلف المؤشر ---- */
+  _laser: { pts: [], raf: null, LIFE: 620 },
+
+  _laserPush(pos) {
+    this._laser.pts.push({ x: pos.x, y: pos.y, t: performance.now() });
+    if (this._laser.pts.length > 140) this._laser.pts.shift();
+    this._laserRun();
   },
 
-  _showSpotlight(e) {
-    const overlay=document.getElementById('spotlight-overlay'), r=document.getElementById('page-container').getBoundingClientRect();
-    overlay.classList.remove('hidden');
-    overlay.style.setProperty('--sx', ((e.clientX-r.left)/r.width*100)+'%');
-    overlay.style.setProperty('--sy', ((e.clientY-r.top)/r.height*100)+'%');
+  _laserRun() {
+    if (this._laser.raf) return;
+    const c = this._laserCanvas, ctx = c.getContext('2d');
+    const step = () => {
+      const L = this._laser, now = performance.now();
+      L.pts = L.pts.filter(p => now - p.t < L.LIFE);
+      ctx.clearRect(0, 0, c.width, c.height);
+      if (!L.pts.length) { L.raf = null; return; }
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.shadowColor = 'rgba(255,0,0,.85)';
+      for (let i = 1; i < L.pts.length; i++) {
+        const a = L.pts[i-1], b = L.pts[i];
+        const life = 1 - (now - b.t) / L.LIFE;        /* 1 = طازج، 0 = تلاشى */
+        if (life <= 0) continue;
+        ctx.strokeStyle = `rgba(255,45,45,${life * .9})`;
+        ctx.lineWidth   = 2 + 7 * life;
+        ctx.shadowBlur  = 16 * life;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      const head = L.pts[L.pts.length - 1];
+      const hLife = 1 - (now - head.t) / 260;
+      if (hLife > 0) {                                 /* رأس مضيء أثناء الحركة */
+        ctx.shadowBlur = 26 * hLife;
+        ctx.fillStyle = `rgba(255,60,60,${hLife})`;
+        ctx.beginPath(); ctx.arc(head.x, head.y, 7, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = `rgba(255,235,235,${hLife * .95})`;
+        ctx.beginPath(); ctx.arc(head.x, head.y, 2.6, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      L.raf = requestAnimationFrame(step);
+    };
+    this._laser.raf = requestAnimationFrame(step);
+  },
+
+  _laserClear() {
+    this._laser.pts = [];
+    if (this._laser.raf) { cancelAnimationFrame(this._laser.raf); this._laser.raf = null; }
+    const c = this._laserCanvas;
+    c.getContext('2d').clearRect(0, 0, c.width, c.height);
+  },
+
+  /* ---- تحديد مستطيل التركيز ---- */
+  _focusSelRect: null,
+
+  _drawFocusSel(x, y, w, h) {
+    this._focusSelRect = { x, y, w, h };
+    const el = document.getElementById('focus-sel');
+    el.classList.remove('hidden');
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    el.style.width = w + 'px'; el.style.height = h + 'px';
   },
 
   _placeText(pos) {
@@ -757,9 +929,10 @@ const Tools = {
     if (this.current === tool && tool !== 'pointer') tool='pointer';
     this.current=tool; document.body.setAttribute('data-tool',tool);
     document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.classList.toggle('active', b.dataset.tool===tool));
-    if (tool!=='spotlight') document.getElementById('spotlight-overlay').classList.add('hidden');
-    if (tool!=='laser')     document.getElementById('laser-dot').classList.add('hidden');
+    if (tool!=='spotlight') document.getElementById('focus-sel').classList.add('hidden');
+    if (tool!=='laser')     Board._laserClear();
     if (tool!=='text')      document.getElementById('floating-text').classList.add('hidden');
+    if (tool==='spotlight') showToast('اسحب مستطيلاً على الجزء الذي تريد تكبيره');
   },
   setColor(c){ this.color=c; document.querySelectorAll('.color-dot').forEach(d=>d.classList.toggle('active', d.dataset.color===c)); },
   setSize(v){ this.size=parseInt(v); }
