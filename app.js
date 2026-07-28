@@ -6436,13 +6436,48 @@ const InstallPWA = {
     const edge     = /Edg\/|EdgiOS|EdgA\//.test(ua);
     const chromium = /Chrome\/|CriOS|Chromium/.test(ua) && !edge;
     const safari   = /Safari\//.test(ua) && !chromium && !edge && !firefox;
+    const android = /Android/i.test(ua);
     return {
-      ios, firefox, edge, chromium, safari,
+      ios, android, firefox, edge, chromium, safari,
       mac: /Macintosh/.test(ua) && !ios,
-      mobile: ios || /Android/i.test(ua),
+      win: /Windows/i.test(ua),
+      mobile: ios || android,
       /* على iOS كل المتصفحات تعمل بمحرك سفاري بقواعد آبل */
       iosThirdParty: ios && !safari
     };
+  },
+
+  /* الحل المضمون على الحاسب مهما كان المتصفح: ملف اختصار يُفتح بنقرة
+     مزدوجة ويشغّل المنصة مباشرة — يعمل حتى في فايرفوكس الذي أزال
+     دعم تثبيت تطبيقات الويب نهائياً. */
+  downloadShortcut() {
+    const url = new URL('.', location.href).href;
+    const e = this.env();
+    let name, mime, body;
+    if (e.mac) {
+      name = 'منصة المعلم.webloc';
+      mime = 'application/xml';
+      body = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+\t<key>URL</key>
+\t<string>${url}</string>
+</dict>
+</plist>`;
+    } else {
+      name = 'منصة المعلم.url';
+      mime = 'application/internet-shortcut';
+      body = `[InternetShortcut]\r\nURL=${url}\r\nIconIndex=0\r\n`;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([body], { type: mime }));
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    Toast.show('نُزّل الاختصار — انقله لسطح المكتب وافتحه بنقرة مزدوجة', 'success');
+    Modal.close();
   },
 
   init() {
@@ -6504,24 +6539,34 @@ const InstallPWA = {
     }
     const e = this.env();
     const note = t => `<p class="install-note">${t}</p>`;
-    const done = `<div style="display:flex;justify-content:flex-end;margin-top:1rem">
-        <button class="btn btn-primary" onclick="Modal.close()">تمام</button></div>`;
+    const close = `<button class="btn btn-outline" onclick="Modal.close()">تمام</button>`;
+    /* الاختصار المُنزَّل هو ضمانة أن يخرج المستخدم بشيء يعمل مهما كان متصفحه */
+    const shortcut = `<button class="btn btn-primary" onclick="InstallPWA.downloadShortcut()">
+        <i class="fas fa-download"></i> نزّل اختصاراً لسطح المكتب</button>`;
+    const actions = btns => `<div class="install-actions-row">${btns}</div>`;
 
     /* --- آيفون وآيباد: كل المتصفحات هنا تعمل بمحرك سفاري بقواعد آبل --- */
     if (e.ios) {
-      const share = e.iosThirdParty
-        ? 'زر المشاركة <i class="fas fa-arrow-up-from-bracket"></i> في شريط المتصفح'
-        : 'زر المشاركة <i class="fas fa-arrow-up-from-bracket"></i> في شريط سفاري السفلي';
       Modal.open('تثبيت التطبيق على الآيفون', `
         <ol class="install-steps">
-          <li>اضغط ${share}</li>
+          <li>اضغط زر المشاركة <i class="fas fa-arrow-up-from-bracket"></i> في شريط المتصفح</li>
           <li>مرّر للأسفل واختر <strong>«إضافة إلى الشاشة الرئيسية»</strong></li>
           <li>اضغط <strong>«إضافة»</strong> — ستجد المنصة بين تطبيقاتك</li>
         </ol>
-        ${note(e.iosThirdParty
-          ? 'آبل تمنع أي متصفح على الآيفون من عرض نافذة تثبيت تلقائية، لذلك الإضافة يدوية في كل المتصفحات. لو لم تجد الخيار في متصفحك فافتح الرابط في <strong>سفاري</strong>.'
-          : 'هذه هي الطريقة الوحيدة على الآيفون — آبل لا تتيح نافذة تثبيت تلقائية لأي متصفح.')}
-        ${done}`);
+        ${note('تعمل في سفاري وكروم وإيدج وكل متصفحات الآيفون، لأنها جميعاً تستخدم محرك سفاري. آبل هي التي تمنع نافذة التثبيت التلقائية، لا المنصة.')}
+        ${actions(close)}`);
+      return;
+    }
+
+    /* --- أندرويد: كل متصفحاته تدعم الإضافة للشاشة الرئيسية --- */
+    if (e.android) {
+      Modal.open('تثبيت التطبيق على الجوال', `
+        <ol class="install-steps">
+          <li>افتح قائمة المتصفح <i class="fas fa-ellipsis-vertical"></i> أعلى الشاشة</li>
+          <li>اختر <strong>«تثبيت التطبيق»</strong> أو <strong>«إضافة إلى الشاشة الرئيسية»</strong></li>
+        </ol>
+        ${note('تعمل في كروم وسامسونج وفايرفوكس وإيدج وأوبرا على أندرويد.')}
+        ${actions(close)}`);
       return;
     }
 
@@ -6532,30 +6577,28 @@ const InstallPWA = {
           <li>من شريط القوائم افتح <strong>File</strong> (ملف)</li>
           <li>اختر <strong>«Add to Dock»</strong> — إضافة إلى الشريط</li>
         </ol>
-        ${note('تحتاج macOS Sonoma أو أحدث. على الإصدارات الأقدم استخدم كروم أو إيدج.')}
-        ${done}`);
+        ${note('تحتاج macOS Sonoma أو أحدث. وعلى الإصدارات الأقدم نزّل الاختصار أدناه — يفتح المنصة بنقرة مزدوجة.')}
+        ${actions(shortcut + close)}`);
       return;
     }
 
-    /* --- فايرفوكس: لا يدعم تثبيت تطبيقات الويب على الحاسب --- */
+    /* --- فايرفوكس على الحاسب: أزال دعم التثبيت، فالاختصار هو الحل --- */
     if (e.firefox) {
-      Modal.open('التثبيت غير مدعوم في فايرفوكس', `
-        ${note('فايرفوكس أزال دعم تثبيت تطبيقات الويب على الحاسب، ولا خطة لإعادته. لتثبيت المنصة كتطبيق افتح الرابط في <strong>كروم</strong> أو <strong>إيدج</strong>، وستجد الخيار مباشرة.')}
-        ${note('يمكنك دائماً استخدام المنصة من داخل فايرفوكس عادياً — كل الميزات تعمل.')}
-        ${done}`);
+      Modal.open('تثبيت التطبيق', `
+        ${note('فايرفوكس أزال دعم تثبيت تطبيقات الويب على الحاسب. نزّل الاختصار أدناه وانقله لسطح المكتب — يفتح المنصة بنقرة مزدوجة كأي تطبيق.')}
+        ${note('ولو أردت نافذة مستقلة بلا شريط عنوان، افتح الرابط في <strong>كروم</strong> أو <strong>إيدج</strong> واضغط زر التثبيت.')}
+        ${actions(shortcut + close)}`);
       return;
     }
 
-    /* --- كروم وإيدج على الحاسب أو أندرويد، قبل أن يجهز الحدث --- */
-    const menu = e.mobile ? 'قائمة المتصفح <i class="fas fa-ellipsis-vertical"></i> أعلى الشاشة'
-                          : 'أيقونة التثبيت <i class="fas fa-desktop"></i> في شريط العنوان، أو قائمة المتصفح <i class="fas fa-ellipsis-vertical"></i>';
+    /* --- كروم وإيدج على الحاسب، قبل أن يجهز حدث التثبيت --- */
     Modal.open('تثبيت التطبيق', `
       <ol class="install-steps">
-        <li>افتح ${menu}</li>
-        <li>اختر <strong>«تثبيت منصة المعلم»</strong> أو <strong>«إضافة إلى الشاشة الرئيسية»</strong></li>
+        <li>افتح أيقونة التثبيت <i class="fas fa-desktop"></i> في شريط العنوان، أو قائمة المتصفح <i class="fas fa-ellipsis-vertical"></i></li>
+        <li>اختر <strong>«تثبيت منصة المعلم»</strong></li>
       </ol>
-      ${note('كروم لا يعرض زر التثبيت إلا بعد استخدامك للموقع دقائق قليلة. لو لم يظهر الآن، تصفّح المنصة قليلاً ثم أعد المحاولة — أو أعد تحميل الصفحة.')}
-      ${done}`);
+      ${note('كروم لا يُظهر زر التثبيت إلا بعد استخدامك للموقع قليلاً. لو لم يظهر الآن فنزّل الاختصار أدناه — يعمل فوراً بلا انتظار.')}
+      ${actions(shortcut + close)}`);
   }
 };
 
