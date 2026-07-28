@@ -877,45 +877,108 @@ const Print = {
     return n;                                  /* رقم دولي كُتب كاملاً */
   },
 
-  referralWhatsApp(stuId) {
+  /* تُحمَّل أداة التحويل لصورة عند الطلب فقط، لا مع كل فتح للمنصة */
+  _loadH2C() {
+    if (window.html2canvas) return Promise.resolve();
+    if (this._h2c) return this._h2c;
+    this._h2c = new Promise((res, rej) => {
+      const sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      sc.onload = res;
+      sc.onerror = () => { this._h2c = null; rej(new Error('تعذّر تحميل أداة تحويل النموذج إلى صورة — تحقق من الإنترنت')); };
+      document.head.appendChild(sc);
+    });
+    return this._h2c;
+  },
+
+  /* يرسم النموذج داخل إطار مخفي ثم يصوّره — الإطار يعزل أنماط الطباعة
+     عن أنماط المنصة فلا تتداخل الأسماء المتشابهة للأصناف */
+  async _referralPng(markup) {
+    await this._loadH2C();
+    const fr = document.createElement('iframe');
+    fr.setAttribute('aria-hidden', 'true');
+    fr.style.cssText = 'position:fixed;left:-10000px;top:0;width:820px;height:1180px;border:0;visibility:hidden';
+    document.body.appendChild(fr);
+    try {
+      await new Promise(done => { fr.onload = done; fr.srcdoc = markup; });
+      const doc = fr.contentDocument;
+      doc.querySelector('.no-print')?.remove();
+      if (doc.fonts?.ready) { try { await doc.fonts.ready; } catch {} }
+      await new Promise(r => setTimeout(r, 350));          /* مهلة لرسم الخط العربي */
+      const target = doc.querySelector('.page') || doc.body;
+      const canvas = await window.html2canvas(target, {
+        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+        width: target.scrollWidth, height: target.scrollHeight,
+        windowWidth: 820, windowHeight: target.scrollHeight
+      });
+      return await new Promise(res => canvas.toBlob(res, 'image/png'));
+    } finally {
+      fr.remove();
+    }
+  },
+
+  async referralShare(stuId) {
     const reasonEl = document.getElementById('ref-reason');
     if (!reasonEl?.value) { Toast.show('اختر سبب الإحالة أولاً', 'error'); reasonEl?.focus(); return; }
 
-    const d = this._collectReferral(stuId);
+    const btn = document.getElementById('ref-wa-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جارِ تجهيز النموذج...'; }
+
+    const d = this._collectReferral(stuId);      /* يغلق النافذة ويسجّل الإحالة */
     if (!d) return;
-    const { s, cls, date, school, teacherSig, refTo, refToName, refToPhone,
-            reason, notes, subject, newCount, prevCount } = d;
 
-    const to = refToName ? `${refTo} / ${refToName}` : refTo;
-    const lines = [
-      `*نموذج إحالة ${_T.stu}*`,
-      `المدرسة: ${school}`,
-      '',
-      `*${_T.theStu}:* ${s.name}`,
-      `*الصف:* ${cls?.name || '—'}`,
-      `*التاريخ:* ${date}`,
-      '',
-      `*الإحالة إلى:* ${to}`,
-      `*السبب:* ${reason}`,
-      ...(notes.trim() ? ['', `*ملاحظات ${_T.theTch}:*`, notes.trim()] : []),
-      '',
-      `*رقم الإحالة:* ${newCount}${prevCount ? ` (سبقتها ${prevCount})` : ''}`,
-      '',
-      `${_T.theTch}: ${teacherSig} — ${subject}`
-    ];
+    let blob;
+    try {
+      blob = await this._referralPng(this._referralMarkup(d));
+      if (!blob) throw new Error('تعذّر إنشاء صورة النموذج');
+    } catch (err) {
+      Toast.show(err.message || 'تعذّر تجهيز النموذج', 'error');
+      return;
+    }
 
-    const phone = this._waPhone(refToPhone);
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`;
-    /* فتح مباشر بلا window.open حتى لا يحجبه المتصفح على الجوال */
-    const a = document.createElement('a');
-    a.href = url; a.target = '_blank'; a.rel = 'noopener';
-    document.body.appendChild(a); a.click(); a.remove();
-    Toast.show(phone ? 'فُتح واتساب على محادثة المستلم' : 'فُتح واتساب — اختر المستلم', 'success');
+    const fileName = `إحالة-${d.s.name}-${d.date}.png`;
+    this._shareBlob = blob;
+    this._shareName = fileName;
+    const url = URL.createObjectURL(blob);
+    const canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'image/png' })] }));
+
+    Modal.open('نموذج الإحالة جاهز', `
+      <div class="ref-preview"><img src="${url}" alt="نموذج الإحالة"></div>
+      <p class="install-note">${canShare
+        ? 'اضغط «إرسال» ثم اختر واتساب من قائمة المشاركة — يُرسل النموذج كصورة.'
+        : 'المشاركة المباشرة غير متاحة في هذا المتصفح. نزّل الصورة ثم أرفقها في واتساب.'}</p>
+      <div class="install-actions-row">
+        <button class="btn btn-outline" onclick="Modal.close()">إغلاق</button>
+        <button class="btn btn-outline" onclick="Print.downloadReferralPng()"><i class="fas fa-download"></i> تنزيل الصورة</button>
+        ${canShare
+          ? `<button class="btn btn-wa" onclick="Print.shareReferralPng()"><i class="fab fa-whatsapp"></i> إرسال</button>`
+          : `<button class="btn btn-wa" onclick="Print.downloadReferralPng();window.open('https://web.whatsapp.com','_blank')"><i class="fab fa-whatsapp"></i> تنزيل وفتح واتساب</button>`}
+      </div>`);
   },
 
-  referral(stuId) {
-    const d = this._collectReferral(stuId);
-    if (!d) return;
+  downloadReferralPng() {
+    if (!this._shareBlob) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(this._shareBlob);
+    a.download = this._shareName;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    Toast.show('نُزّلت صورة النموذج', 'success');
+  },
+
+  async shareReferralPng() {
+    if (!this._shareBlob) return;
+    const file = new File([this._shareBlob], this._shareName, { type: 'image/png' });
+    try {
+      await navigator.share({ files: [file], title: 'نموذج إحالة طالب' });
+      Modal.close();
+    } catch (err) {
+      if (err?.name !== 'AbortError') Toast.show('تعذّرت المشاركة — جرّب تنزيل الصورة', 'error');
+    }
+  },
+
+  /* تصميم النموذج المطبوع — يُستعمل للطباعة ولتحويله صورة تُرسل بالواتساب */
+  _referralMarkup(d) {
     const { s, cls, date, region, school, teacherSig, refTo, refToName, reason, notes, subject, newCount } = d;
     const _allReasons = ['ضعف تحصيل دراسي','كثرة الغياب','سلوك سلبي متكرر','مشكلة صحية','مشكلة اجتماعية أو أسرية','تأخر مستمر','أخرى (تُحدد في الملاحظات)'];
     const reasonsHtml = _allReasons.map(r => r===reason
@@ -1063,9 +1126,13 @@ const Print = {
     </div>
     <div class="no-print"><button onclick="window.print()">🖨 طباعة النموذج</button></div>
     </body></html>`;
+    return markup;
+  },
 
-        Modal.close();
-    const url = URL.createObjectURL(new Blob([markup], { type: 'text/html;charset=utf-8' }));
+  referral(stuId) {
+    const d = this._collectReferral(stuId);
+    if (!d) return;
+    const markup = this._referralMarkup(d);
     const w = window.open('', '_blank', 'width=860,height=800');
     w.document.open(); w.document.write(markup); w.document.close();
   },
@@ -5982,7 +6049,7 @@ const Pages = {
       </div>
       <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="Modal.close()">إلغاء</button>
-        <button class="btn btn-wa" onclick="Print.referralWhatsApp('${stuId}')"><i class="fab fa-whatsapp"></i> إرسال بالواتساب</button>
+        <button class="btn btn-wa" id="ref-wa-btn" onclick="Print.referralShare('${stuId}')"><i class="fab fa-whatsapp"></i> إرسال النموذج</button>
         <button class="btn btn-primary" onclick="Print.referral('${stuId}')"><i class="fas fa-print"></i> طباعة الإحالة</button>
       </div>
     `);

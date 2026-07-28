@@ -511,6 +511,13 @@ textarea { resize: vertical; min-height: 80px; }
 .install-note strong { color: var(--text-primary); }
 .install-actions-row { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; margin-top: 1.1rem; }
 
+/* معاينة نموذج الإحالة قبل إرساله */
+.ref-preview {
+  max-height: 46vh; overflow: auto; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--gray-100); padding: .5rem;
+}
+.ref-preview img { width: 100%; display: block; border-radius: 4px; box-shadow: var(--shadow); background: #fff; }
+
 /* ---- شاشة الإقلاع ---- */
 .boot-splash-inner {
   display: flex; flex-direction: column; align-items: center; gap: .9rem;
