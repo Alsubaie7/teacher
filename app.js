@@ -939,8 +939,8 @@ const Print = {
     /* اسم عربي للحفظ، واسم لاتيني للمشاركة: بعض أهداف المشاركة ترفض
        أسماء الملفات غير اللاتينية أو التي فيها مسافات */
     this._shareBlob = blob;
-    this._shareName = `إحالة-${d.s.name.replace(/\s+/g, '-')}-${d.date}.png`;
-    this._shareAscii = `referral-${d.date}.png`;
+    this._shareName  = `إحالة-${d.s.name.replace(/\s+/g, '-')}-${d.date}.png`;
+    this._shareTitle = `إحالة: ${d.s.name}${d.cls?.name ? ' — ' + d.cls.name : ''}`;
     const url = URL.createObjectURL(blob);
 
     /* مشاركة الملفات موثوقة على الجوال فقط. على الحاسب يفتح كروم قائمة
@@ -948,7 +948,7 @@ const Print = {
        وهو ما ظهر كرسالة «تعذّرت المشاركة». لذلك المسار هناك: تنزيل ثم إرفاق. */
     const touch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
     const canShare = touch && !!(navigator.canShare &&
-      navigator.canShare({ files: [new File([blob], this._shareAscii, { type: 'image/png' })] }));
+      navigator.canShare({ files: [new File([blob], this._shareName, { type: 'image/png' })] }));
 
     Modal.open('نموذج الإحالة جاهز', `
       <div class="ref-preview"><img src="${url}" alt="نموذج الإحالة"></div>
@@ -992,9 +992,11 @@ const Print = {
 
   async shareReferralPng() {
     if (!this._shareBlob) return;
-    const file = new File([this._shareBlob], this._shareAscii, { type: 'image/png' });
+    const file = new File([this._shareBlob], this._shareName, { type: 'image/png' });
     try {
-      await navigator.share({ files: [file], title: 'نموذج إحالة طالب' });
+      /* العنوان يحمل اسم الطالب وفصله ليظهر في قائمة المشاركة
+         بدل عبارة عامة لا تميّز إحالة عن أخرى */
+      await navigator.share({ files: [file], title: this._shareTitle });
       Modal.close();
     } catch (err) {
       if (err?.name === 'AbortError') return;             /* ألغى المستخدم — لا شيء */
