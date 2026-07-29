@@ -175,6 +175,19 @@ const _esc = s => String(s ?? '')
    يُهرَّب لـ JS أولاً ثم لـ HTML: المحلل يفكّ كيانات HTML قبل تنفيذ JS،
    فلو هرّبنا لـ HTML وحده لعاد ' كما هو وكسر السلسلة. */
 const _jsq = s => _esc(String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'));
+/* يحوّل الرقم لصيغة واتساب الدولية: 0501234567 ← 966501234567
+   مساعد عام: يستدعيه التسجيل والإعدادات ولوحة الإدارة. نسخة واحدة لا نسختان. */
+const _waPhone = raw => {
+  let n = (raw || '').replace(/\D/g, '');
+  if (!n) return '';
+  if (n.startsWith('00')) n = n.slice(2);
+  if (n.startsWith('966')) return n;
+  if (n.startsWith('0'))   return '966' + n.slice(1);
+  if (n.length === 9 && n.startsWith('5')) return '966' + n;
+  return n;                                  /* رقم دولي كُتب كاملاً */
+};
+/* يقبل الرقم فقط إذا كان بصيغة دولية معقولة — نفس قيد profiles_phone_format */
+const _isValidPhone = raw => /^[0-9]{9,15}$/.test(_waPhone(raw));
 const _ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 /* تاريخ اليوم بتقويم الجهاز لا بـ UTC. toISOString يحوّل للتوقيت العالمي،
    فبين منتصف الليل والثالثة فجراً بتوقيت السعودية كان يرجع تاريخ أمس
@@ -942,16 +955,8 @@ const Print = {
              refToPhone, reason, notes, subject, newCount, prevCount: s.referralCount || 0 };
   },
 
-  /* يحوّل الرقم لصيغة واتساب الدولية: 0501234567 ← 966501234567 */
-  _waPhone(raw) {
-    let n = (raw || '').replace(/\D/g, '');
-    if (!n) return '';
-    if (n.startsWith('00')) n = n.slice(2);
-    if (n.startsWith('966')) return n;
-    if (n.startsWith('0'))   return '966' + n.slice(1);
-    if (n.length === 9 && n.startsWith('5')) return '966' + n;
-    return n;                                  /* رقم دولي كُتب كاملاً */
-  },
+  /* يحوّل الرقم لصيغة واتساب الدولية — المنطق في المساعد العام _waPhone */
+  _waPhone(raw) { return _waPhone(raw); },
 
   /* تُحمَّل أداة التحويل لصورة عند الطلب فقط، لا مع كل فتح للمنصة */
   _loadH2C() {
@@ -2522,6 +2527,297 @@ const TimeAware = {
   }
 };
 
+/* ==================== استكمال بيانات التواصل ====================
+   المسجّلون قبل إضافة حقل الجوال لا يملكون رقماً. بطاقة غير حاجبة:
+   «لاحقاً» تؤجلها أسبوعاً، والتأجيل محلي لا في الخادم. */
+const WAConsent = {
+  _SNOOZE: 'tm_wa_prompt_snooze',
+
+  async maybeShow() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return;
+    const until = Number(localStorage.getItem(this._SNOOZE) || 0);
+    if (until > Date.now()) return;
+
+    const { data } = await _sb.from('profiles').select('phone, wa_optin, wa_optout_at').eq('id', uid).maybeSingle();
+    if (!data) return;
+    /* من انسحب صراحةً لا يُسأل ثانية، ومن أعطى رقمه اكتفينا */
+    if (data.phone || data.wa_optout_at) return;
+    this._render();
+  },
+
+  _render() {
+    if (document.getElementById('wa-consent-card')) return;
+    const host = document.getElementById('content');
+    if (!host) return;
+    const card = document.createElement('div');
+    card.id = 'wa-consent-card';
+    card.className = 'wa-prompt';
+    card.innerHTML = `
+      <div class="wa-prompt-icon"><i class="fab fa-whatsapp"></i></div>
+      <div class="wa-prompt-body">
+        <h4>أكمل بيانات التواصل</h4>
+        <p>نحتاج رقم جوالك للدعم واسترجاع الحساب.</p>
+        <input type="tel" id="wa-prompt-phone" inputmode="numeric" placeholder="05xxxxxxxx" dir="ltr">
+        <label class="wa-consent" style="margin:.6rem 0 .8rem">
+          <input type="checkbox" id="wa-prompt-optin">
+          <span>أوافق على استلام تنبيهات المنصة على واتساب (تجديد الاشتراك والتحديثات المهمة). يمكنك الإيقاف في أي وقت من الإعدادات.</span>
+        </label>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="WAConsent.save()"><i class="fas fa-check"></i> حفظ</button>
+          <button class="btn btn-sm" onclick="WAConsent.snooze()">لاحقاً</button>
+        </div>
+      </div>`;
+    host.prepend(card);
+  },
+
+  snooze() {
+    localStorage.setItem(this._SNOOZE, String(Date.now() + 7 * 86400000));
+    document.getElementById('wa-consent-card')?.remove();
+  },
+
+  async save() {
+    const raw = document.getElementById('wa-prompt-phone')?.value.trim() || '';
+    if (!_isValidPhone(raw)) { Toast.show('أدخل رقم جوال صحيح — مثال: 0501234567', 'error'); return; }
+    const optin = document.getElementById('wa-prompt-optin')?.checked || false;
+    const uid   = localStorage.getItem('tm_current_user');
+    const { error } = await _sb.from('profiles').update({
+      phone: _waPhone(raw), wa_optin: optin, wa_optin_src: optin ? 'settings' : null
+    }).eq('id', uid);
+    if (error) { Toast.show('تعذّر الحفظ — حاول لاحقاً', 'error'); return; }
+    document.getElementById('wa-consent-card')?.remove();
+    Toast.show('شكراً — حُفظت بياناتك', 'success');
+  },
+
+  /* حالة الموافقة للعرض في الإعدادات */
+  async state() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return { phone: '', wa_optin: false };
+    const { data } = await _sb.from('profiles').select('phone, wa_optin').eq('id', uid).maybeSingle();
+    return data || { phone: '', wa_optin: false };
+  },
+
+  async toggle(on) {
+    const uid = localStorage.getItem('tm_current_user');
+    const { data } = await _sb.from('profiles').select('phone').eq('id', uid).maybeSingle();
+    if (on && !data?.phone) {
+      Toast.show('أضف رقم جوالك أولاً', 'error');
+      document.getElementById('wa-settings-toggle').checked = false;
+      return;
+    }
+    const { error } = await _sb.from('profiles').update({ wa_optin: on, wa_optin_src: on ? 'settings' : null }).eq('id', uid);
+    if (error) {
+      Toast.show('تعذّر الحفظ', 'error');
+      document.getElementById('wa-settings-toggle').checked = !on;
+      return;
+    }
+    Toast.show(on ? 'ستصلك تنبيهات المنصة على واتساب' : 'أُوقفت تنبيهات واتساب', 'success');
+  },
+
+  async savePhoneFromSettings() {
+    const raw = document.getElementById('wa-settings-phone')?.value.trim() || '';
+    if (!_isValidPhone(raw)) { Toast.show('أدخل رقم جوال صحيح — مثال: 0501234567', 'error'); return; }
+    const uid = localStorage.getItem('tm_current_user');
+    const { error } = await _sb.from('profiles').update({ phone: _waPhone(raw) }).eq('id', uid);
+    Toast.show(error ? 'تعذّر الحفظ' : 'حُفظ الرقم', error ? 'error' : 'success');
+  }
+};
+
+/* ==================== إعلانات المنصة ====================
+   الفلترة بالجمهور تتم في الخادم عبر get_my_announcements.
+   حالة القراءة عمود واحد (profiles.ann_seen_at) لا جدول ربط:
+   الشارة = عدد المنشور بعد هذا الطابع. */
+const Ann = {
+  _items: [],
+  _seenAt: null,
+  _open: false,
+
+  _META: {
+    feature: { i:'fa-wand-magic-sparkles', c:'#7c3aed', b:'#ede9fe', t:'جديد' },
+    offer:   { i:'fa-tags',                c:'#d97706', b:'#fef3c7', t:'عرض' },
+    notice:  { i:'fa-circle-info',         c:'#2563eb', b:'#dbeafe', t:'تنبيه' }
+  },
+
+  /* قائمة بيضاء للمسارات — نسخة الواجهة من الحارس الموجود في admin_publish_announcement */
+  _ROUTES: ['dashboard','classes','lessons','analytics','referrals','settings'],
+
+  async load() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return;
+    const [annRes, profRes] = await Promise.all([
+      _sb.rpc('get_my_announcements'),
+      _sb.from('profiles').select('ann_seen_at').eq('id', uid).maybeSingle()
+    ]);
+    if (annRes.error) return;          /* الجرس ميزة ثانوية — لا يُزعج المستخدم بخطأ */
+    this._items  = annRes.data || [];
+    this._seenAt = profRes.data?.ann_seen_at ? new Date(profRes.data.ann_seen_at).getTime() : 0;
+    this._paintBadge();
+    Banner.maybeShow(this._items);
+  },
+
+  _unread() {
+    return this._items.filter(a => new Date(a.published_at).getTime() > (this._seenAt || 0)).length;
+  },
+
+  _paintBadge() {
+    const el = document.getElementById('ann-badge');
+    if (!el) return;
+    const n = this._unread();
+    el.textContent = n > 9 ? '+9' : String(n);
+    el.classList.toggle('hidden', n === 0);
+  },
+
+  toggle() {
+    this._open = !this._open;
+    const p = document.getElementById('ann-panel');
+    if (!p) return;
+    p.classList.toggle('hidden', !this._open);
+    if (this._open) { this._render(); this._markSeen(); }
+  },
+
+  _render() {
+    const p = document.getElementById('ann-panel');
+    if (!p) return;
+    if (!this._items.length) {
+      p.innerHTML = `<div class="ann-empty"><i class="fas fa-bell-slash"></i><p>لا توجد إعلانات</p></div>`;
+      return;
+    }
+    p.innerHTML = `<div class="ann-head">الإعلانات</div>` + this._items.map(a => {
+      const m     = this._META[a.kind] || this._META.notice;
+      const isNew = new Date(a.published_at).getTime() > (this._seenAt || 0);
+      const cta   = (a.cta_label && this._ROUTES.includes(a.cta_route))
+        ? `<button class="ann-cta" onclick="Ann.go('${_jsq(a.cta_route)}')">${_esc(a.cta_label)} <i class="fas fa-arrow-left"></i></button>`
+        : '';
+      return `<div class="ann-item${isNew ? ' is-new' : ''}">
+        <div class="ann-item-icon" style="background:${m.b};color:${m.c}"><i class="fas ${m.i}"></i></div>
+        <div class="ann-item-body">
+          <div class="ann-item-top">
+            <strong>${_esc(a.title)}</strong>
+            <span class="ann-kind" style="background:${m.b};color:${m.c}">${m.t}</span>
+          </div>
+          <p>${_esc(a.body)}</p>
+          <div class="ann-date">${_esc(new Date(a.published_at).toLocaleDateString('ar-SA'))}</div>
+          ${cta}
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  go(route) {
+    if (!this._ROUTES.includes(route)) return;   /* حارس ثانٍ في الواجهة */
+    this.toggle();
+    Router.go(route);
+  },
+
+  async _markSeen() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return;
+    const now = new Date().toISOString();
+    this._seenAt = Date.now();
+    this._paintBadge();
+    await _sb.from('profiles').update({ ann_seen_at: now }).eq('id', uid);
+  }
+};
+
+/* إغلاق لوحة الإعلانات عند الضغط خارجها */
+document.addEventListener('click', e => {
+  if (!Ann._open) return;
+  if (e.target.closest('.ann-wrap')) return;
+  Ann.toggle();
+});
+
+/* ==================== بانر التجديد ====================
+   يعرض إعلاناً واحداً فقط — الأحدث ممن جمهوره expiring — أعلى المحتوى.
+   الإخفاء محلي ولا يُخزَّن في الخادم: البانر يجب أن يعود إن نُشر إعلان أحدث. */
+const Banner = {
+  _KEY: 'tm_banner_dismissed',
+
+  maybeShow(items) {
+    const a = (items || []).find(x => x.audience === 'expiring');
+    const host = document.getElementById('content');
+    document.getElementById('renew-banner')?.remove();
+    if (!a || !host) return;
+    if (localStorage.getItem(this._KEY) === a.id) return;
+
+    const cta = (a.cta_label && Ann._ROUTES.includes(a.cta_route))
+      ? `<button class="renew-banner-cta" onclick="Ann.go('${_jsq(a.cta_route)}')">${_esc(a.cta_label)}</button>` : '';
+    const el = document.createElement('div');
+    el.id = 'renew-banner';
+    el.className = 'renew-banner';
+    el.innerHTML = `
+      <i class="fas fa-triangle-exclamation"></i>
+      <div class="renew-banner-txt"><strong>${_esc(a.title)}</strong><span>${_esc(a.body)}</span></div>
+      ${cta}
+      <button class="renew-banner-x" onclick="Banner.dismiss('${_jsq(a.id)}')" title="إخفاء"><i class="fas fa-xmark"></i></button>`;
+    host.prepend(el);
+  },
+
+  dismiss(id) {
+    localStorage.setItem(this._KEY, id);
+    document.getElementById('renew-banner')?.remove();
+  }
+};
+
+/* ==================== تذكير التجديد عبر واتساب ====================
+   ⚠️ هذا هو المكان الوحيد في المنصة الذي يُبنى فيه رابط واتساب للتجديد.
+   يوم الترقية لـ WhatsApp Cloud API يتغيّر جسم send() وحده — لا شيء آخر.
+   لا تبنِ روابط wa.me في أي دالة أخرى. */
+const Renewals = {
+  _templates: null,
+
+  async _loadTemplates() {
+    if (this._templates) return this._templates;
+    const { data } = await _sb.from('app_settings').select('value').eq('key', 'wa_templates').maybeSingle();
+    try { this._templates = JSON.parse(data?.value || '{}'); }
+    catch { this._templates = {}; }
+    return this._templates;
+  },
+
+  /* يختار القالب المناسب حسب أيام الاشتراك المتبقية (سالب = منتهٍ) */
+  pickTemplate(days) {
+    if (days < 0)  return 'after3';
+    if (days <= 1) return 'before1';
+    return 'before7';
+  },
+
+  _fill(tpl, user, days) {
+    const date = user.expires_at ? new Date(user.expires_at).toLocaleDateString('ar-SA') : '—';
+    return String(tpl)
+      .replace(/\{name\}/g,  user.name || '')
+      .replace(/\{days\}/g,  String(Math.abs(days)))
+      .replace(/\{date\}/g,  date)
+      .replace(/\{link\}/g,  location.origin + location.pathname);
+  },
+
+  /* هل يجوز التواصل مع هذا المعلم؟ سبب المنع يُعرض للأدمن كما هو. */
+  blockedReason(user) {
+    if (!user.phone)       return 'لا يوجد رقم جوال';
+    if (user.wa_optout_at) return 'انسحب من التنبيهات';
+    if (!user.wa_optin)    return 'لم يوافق على التنبيهات';
+    return null;
+  },
+
+  /* الفاصل المعماري — اليوم: يفتح واتساب. غداً: يستدعي دالة wa-send. */
+  async send(user, templateKey) {
+    const reason = this.blockedReason(user);
+    if (reason) { Toast.show(`لا يمكن الإرسال — ${reason}`, 'error'); return false; }
+
+    const tpls = await this._loadTemplates();
+    const tpl  = tpls[templateKey];
+    if (!tpl) { Toast.show('القالب غير موجود', 'error'); return false; }
+
+    const days = user.expires_at
+      ? Math.ceil((new Date(user.expires_at).getTime() - Date.now()) / 86400000) : 0;
+    const text = this._fill(tpl, user, days);
+
+    window.open(`https://wa.me/${_waPhone(user.phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+
+    const { error } = await _sb.rpc('admin_log_contact', { p_user: user.id, p_template: templateKey });
+    if (error) Toast.show('فُتح واتساب لكن تعذّر تسجيل المحاولة', 'error');
+    return true;
+  }
+};
+
 /* ==================== PAGES ==================== */
 const Pages = {
 
@@ -2702,6 +2998,8 @@ const Pages = {
           <p>أضف فصلاً دراسياً لتتمكن من إدارة ${_T.theStus} والحضور والدرجات</p>
           <button class="btn btn-primary" onclick="Pages.addClassModal()"><i class="fas fa-plus"></i> إضافة فصل</button>
         </div>`;
+      WAConsent.maybeShow();     /* المعلم الجديد بلا فصول يمر من هنا لا من نهاية الدالة */
+      Ann.load();
       return;
     }
 
@@ -2749,6 +3047,10 @@ const Pages = {
           ${alertsHtml}
         </div>
       </div>`;
+
+    /* تُنادى من هنا لا من الإقلاع: تُلحَق ببطاقة أعلى #content بعد امتلائه */
+    WAConsent.maybeShow();
+    Ann.load();
   },
 
   /* ---- CLASS DETAIL ---- */
@@ -6033,6 +6335,9 @@ const Pages = {
     const t = DB.teacher() || {};
     const fsIdx = FontSize._sizes.indexOf(FontSize.current());
     const sett = DB.settings();
+    const waState = await WAConsent.state();
+    /* يُعرض محلياً (05…) ويُخزَّن دولياً (9665…) */
+    const waPhoneLocal = waState.phone ? '0' + String(waState.phone).replace(/^966/, '') : '';
 
     const _students   = DB.get('students');
     const _classes    = DB.get('classes');
@@ -6062,6 +6367,27 @@ const Pages = {
       </div>
       <div class="settings-grid">
         ${subHtml}
+
+        <div class="settings-card">
+          <div class="settings-card-hdr"><i class="fab fa-whatsapp" style="color:#25D366"></i> تنبيهات واتساب</div>
+          <div class="settings-row">
+            <div><div style="font-weight:600">استلام تنبيهات المنصة</div>
+              <div style="font-size:.82rem;color:var(--gray-500)">تجديد الاشتراك والتحديثات المهمة فقط</div></div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="wa-settings-toggle" ${waState.wa_optin ? 'checked' : ''} onchange="WAConsent.toggle(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div style="flex:1"><div style="font-weight:600">رقم الجوال</div>
+              <div style="font-size:.82rem;color:var(--gray-500)">للدعم واسترجاع الحساب</div></div>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input type="tel" id="wa-settings-phone" inputmode="numeric" dir="ltr" placeholder="05xxxxxxxx"
+                     value="${_esc(waPhoneLocal)}" style="width:150px;text-align:right;padding:.45rem .6rem;border:1px solid var(--border);border-radius:9px;font-family:inherit">
+              <button class="btn btn-sm btn-primary" onclick="WAConsent.savePhoneFromSettings()"><i class="fas fa-save"></i></button>
+            </div>
+          </div>
+        </div>
 
         <div class="settings-card">
           <div class="settings-card-hdr"><i class="fas fa-bell"></i> إشعارات الحصص</div>
@@ -6402,7 +6728,9 @@ const Pages = {
     subscription_set:     { i:'fa-credit-card',  c:'#2563eb', b:'#dbeafe', t:'حدّث اشتراك' },
     subscription_cleared: { i:'fa-ban',          c:'#d97706', b:'#fef3c7', t:'ألغى اشتراك' },
     role_changed:         { i:'fa-user-shield',  c:'#7c3aed', b:'#ede9fe', t:'غيّر دور' },
-    setting_changed:      { i:'fa-sliders',      c:'#475569', b:'#e2e8f0', t:'غيّر إعداد' }
+    setting_changed:      { i:'fa-sliders',      c:'#475569', b:'#e2e8f0', t:'غيّر إعداد' },
+    announcement_published:{ i:'fa-bullhorn',    c:'#7c3aed', b:'#ede9fe', t:'نشر إعلاناً' },
+    announcement_deleted: { i:'fa-trash',        c:'#dc2626', b:'#fee2e2', t:'حذف إعلاناً' }
   },
 
   _fmtDT(v, withTime = false) {
@@ -6440,10 +6768,12 @@ const Pages = {
     el.innerHTML = `<div class="admin-banner"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2><p>جارِ تحميل البيانات...</p></div>
       <div style="text-align:center;padding:3rem"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--purple)"></i></div>`;
 
-    const [usersRes, platRes, logRes] = await Promise.all([
+    const [usersRes, platRes, logRes, annRes, cntRes] = await Promise.all([
       _sb.rpc('get_all_users'),
       _sb.from('app_settings').select('value').eq('key', 'platform_open').maybeSingle(),
-      _sb.rpc('get_audit_log', { p_limit: 12 })
+      _sb.rpc('get_audit_log', { p_limit: 12 }),
+      _sb.rpc('admin_list_announcements'),
+      _sb.rpc('admin_contacts_today')
     ]);
 
     if (usersRes.error) {
@@ -6531,6 +6861,104 @@ const Pages = {
       </tr>`;
     }).join('');
 
+    const annList = (annRes.data || []).map(a => {
+      const m = Ann._META[a.kind] || Ann._META.notice;
+      return `<div class="ann-admin-row">
+        <span class="ann-kind" style="background:${m.b};color:${m.c}">${m.t}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.88rem">${_esc(a.title)}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">${_esc(this._fmtDT(a.published_at))} · ${_esc(this._ANN_AUD[a.audience] || a.audience)}</div>
+        </div>
+        <button class="admin-act danger" title="حذف" onclick="Pages._annDelete('${_jsq(a.id)}')"><i class="fas fa-trash"></i></button>
+      </div>`;
+    }).join('');
+
+    const annHtml = `
+      <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-bullhorn"></i> الإعلانات</h3></div>
+        <div class="ann-admin-grid">
+          <div>
+            <div class="form-group"><label>العنوان</label>
+              <input type="text" id="ann-f-title" oninput="Pages._annPreview()" placeholder="مثال: ميزة جديدة في السبورة"></div>
+            <div class="form-group"><label>النص</label>
+              <textarea id="ann-f-body" rows="4" oninput="Pages._annPreview()" placeholder="اشرح الميزة أو العرض بإيجاز..."></textarea></div>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:130px"><label>النوع</label>
+                <select id="ann-f-kind" onchange="Pages._annPreview()">
+                  <option value="feature">ميزة جديدة</option>
+                  <option value="offer">عرض</option>
+                  <option value="notice" selected>تنبيه</option>
+                </select></div>
+              <div class="form-group" style="flex:1;min-width:150px"><label>الجمهور</label>
+                <select id="ann-f-audience" onchange="Pages._annPreview()">
+                  <option value="all">الجميع</option>
+                  <option value="subscribers">اشتراك ساري</option>
+                  <option value="expiring">يقارب الانتهاء (≤١٤ يوم)</option>
+                  <option value="expired">منتهي أو بلا اشتراك</option>
+                </select></div>
+            </div>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:130px"><label>نص زر الإجراء (اختياري)</label>
+                <input type="text" id="ann-f-cta-label" placeholder="مثال: جرّبها الآن"></div>
+              <div class="form-group" style="flex:1;min-width:130px"><label>وجهة الزر</label>
+                <select id="ann-f-cta-route">
+                  <option value="">بلا زر</option>
+                  <option value="dashboard">لوحة التحكم</option>
+                  <option value="classes">الفصول</option>
+                  <option value="lessons">الدروس</option>
+                  <option value="analytics">التحليلات</option>
+                  <option value="referrals">الإحالات</option>
+                  <option value="settings">الإعدادات</option>
+                </select></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:.4rem">
+              <button class="btn btn-primary" onclick="Pages._annPublish()"><i class="fas fa-paper-plane"></i> نشر</button>
+              <span id="ann-reach" style="font-size:.82rem;color:var(--text-muted)">سيصل إلى ${this._annAudienceCount('all')} معلماً</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem">كما يراه المعلم</div>
+            <div id="ann-preview" class="ann-preview-box"></div>
+            <div style="font-size:.8rem;color:var(--text-muted);margin:.9rem 0 .4rem">المنشورة (${(annRes.data || []).length})</div>
+            <div class="ann-admin-list">${annList || '<p style="color:var(--text-muted);font-size:.82rem">لا توجد إعلانات</p>'}</div>
+          </div>
+        </div>
+      </div>`;
+
+    const sentToday = cntRes.data ?? 0;
+    const renewals  = this._renewalRows();
+    const renewRows = renewals.map(({ u, days }) => {
+      const reason  = Renewals.blockedReason(u);
+      const recent  = this._recentContact(u);
+      const urgency = days < 0 ? 'red' : days <= 3 ? 'gold' : days <= 7 ? 'blue' : 'gray';
+      const label   = days < 0    ? `منتهٍ منذ ${Math.abs(days)} يوم`
+                    : days === 0  ? 'ينتهي اليوم' : `باقي ${days} يوم`;
+      const btn = reason
+        ? `<button class="btn btn-sm" disabled title="${_esc(reason)}"><i class="fab fa-whatsapp"></i> ${_esc(reason)}</button>`
+        : `<button class="btn btn-sm ${recent !== null ? '' : 'btn-wa'}" onclick="Pages._renewalSend('${_jsq(u.id)}')"
+             title="${recent !== null ? `تواصلت قبل ${recent} يوم` : 'إرسال تذكير'}">
+             <i class="fab fa-whatsapp"></i> ${recent !== null ? `تواصلت قبل ${recent} يوم` : 'تذكير'}</button>`;
+      return `<tr>
+        <td><div style="font-weight:600">${_esc(u.name) || '—'}</div>
+            <div style="font-size:.72rem;color:var(--text-muted)" dir="ltr">${_esc(u.phone) || 'بلا رقم'}</div></td>
+        <td><span class="badge badge-${urgency}">${_esc(label)}</span>
+            <div class="admin-sub-date">${_esc(this._fmtDT(u.expires_at))}</div></td>
+        <td style="font-size:.76rem;color:var(--text-muted)">${u.last_contact_at ? _esc(this._relTime(u.last_contact_at)) : 'لم يُذكَّر'}</td>
+        <td>${btn}</td>
+      </tr>`;
+    }).join('');
+
+    const renewHtml = `
+      <div class="card"><div class="card-header">
+        <h3 class="card-title"><i class="fas fa-rotate"></i> التجديدات (${renewals.length})</h3>
+        <span class="renew-counter ${sentToday >= 25 ? 'is-high' : ''}">أرسلت ${sentToday} اليوم</span>
+      </div>
+      ${renewals.length ? `<div style="overflow-x:auto"><table class="admin-table">
+          <thead><tr><th>المعلم</th><th>الاشتراك</th><th>آخر تذكير</th><th></th></tr></thead>
+          <tbody>${renewRows}</tbody></table></div>
+        ${sentToday >= 25 ? `<p class="renew-warn"><i class="fas fa-triangle-exclamation"></i> تجاوزت ٢٥ رسالة اليوم — الإكثار من الرسائل الجديدة من رقم عادي يرفع احتمال تصنيفه سبام. أكمل غداً.</p>` : ''}`
+        : `<div class="empty-state"><i class="fas fa-check-circle fa-2x" style="color:#10b981"></i><p>لا توجد اشتراكات تحتاج تذكيراً</p></div>`}
+      </div>`;
+
     el.innerHTML = `
       <div class="admin-banner">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;position:relative;z-index:1">
@@ -6567,6 +6995,8 @@ const Pages = {
           <div class="admin-log">${logHtml || `<p style="text-align:center;color:var(--text-muted);padding:1rem">${logRes.error ? 'سجل التدقيق غير مُهيّأ بعد — نفّذ ملف SQL أولاً' : 'لا توجد إجراءات مسجّلة بعد'}</p>`}</div>
         </div>
       </div>
+      ${renewHtml}
+      ${annHtml}
       <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chalkboard-teacher"></i> قائمة المعلمين (${T.length})</h3></div>
         <div class="admin-toolbar">
           <input class="admin-search" type="text" placeholder="🔍 ابحث بالاسم أو البريد أو المدرسة..." oninput="Pages._filterAdminRows(this.value)">
@@ -6579,6 +7009,95 @@ const Pages = {
           <tbody id="admin-tbody">${rows}</tbody></table></div>`
         : `<div class="empty-state"><i class="fas fa-users fa-2x"></i><p>لا يوجد معلمون</p></div>`}
       </div>`;
+
+    this._annPreview();
+  },
+
+  /* ---- التجديدات ---- */
+  _renewalRows() {
+    const now = Date.now();
+    return (this._adminCache || [])
+      .filter(u => u.role !== 'admin' && u.expires_at)
+      .map(u => ({ u, days: Math.ceil((new Date(u.expires_at).getTime() - now) / 86400000) }))
+      .filter(r => r.days <= 14)          /* من انتهى، ومن باقٍ له ١٤ يوماً فأقل */
+      .sort((a, b) => a.days - b.days);
+  },
+
+  /* منع الإلحاح: من تواصلنا معه خلال ٧ أيام يظهر زره ثانوياً */
+  _recentContact(u) {
+    if (!u.last_contact_at) return null;
+    const d = Math.floor((Date.now() - new Date(u.last_contact_at).getTime()) / 86400000);
+    return d <= 7 ? d : null;
+  },
+
+  async _renewalSend(userId) {
+    const u = this._adminUser(userId);
+    if (!u) return;
+    const days = Math.ceil((new Date(u.expires_at).getTime() - Date.now()) / 86400000);
+    const ok = await Renewals.send(u, Renewals.pickTemplate(days));
+    if (ok) this.admin();               /* يعيد الرسم ليحدّث العدّاد وحالة الزر */
+  },
+
+  /* ---- إعلانات المنصة (لوحة الإدارة) ---- */
+  _ANN_AUD: { all:'الجميع', subscribers:'اشتراك ساري', expiring:'يقارب الانتهاء', expired:'منتهي أو بلا اشتراك' },
+
+  /* نفس تعريفات الجمهور في get_my_announcements — للعرض قبل النشر فقط */
+  _annAudienceCount(audience) {
+    const T = this._adminCache || [];
+    const now = Date.now();
+    const exp = u => u.expires_at ? new Date(u.expires_at).getTime() : null;
+    if (audience === 'all')         return T.length;
+    if (audience === 'subscribers') return T.filter(u => exp(u) && exp(u) >  now).length;
+    if (audience === 'expiring')    return T.filter(u => exp(u) && exp(u) >  now && exp(u) <= now + 14*86400000).length;
+    if (audience === 'expired')     return T.filter(u => !exp(u) || exp(u) <= now).length;
+    return 0;
+  },
+
+  _annPreview() {
+    const box = document.getElementById('ann-preview');
+    if (!box) return;
+    const t = document.getElementById('ann-f-title')?.value || '';
+    const b = document.getElementById('ann-f-body')?.value  || '';
+    const a = document.getElementById('ann-f-audience')?.value || 'all';
+    const k = document.getElementById('ann-f-kind')?.value || 'notice';
+    const m = Ann._META[k] || Ann._META.notice;
+    box.innerHTML = `
+      <div class="ann-item">
+        <div class="ann-item-icon" style="background:${m.b};color:${m.c}"><i class="fas ${m.i}"></i></div>
+        <div class="ann-item-body">
+          <div class="ann-item-top"><strong>${_esc(t) || 'العنوان'}</strong>
+            <span class="ann-kind" style="background:${m.b};color:${m.c}">${m.t}</span></div>
+          <p>${_esc(b) || 'نص الإعلان...'}</p>
+        </div>
+      </div>`;
+    document.getElementById('ann-reach').textContent = `سيصل إلى ${this._annAudienceCount(a)} معلماً`;
+  },
+
+  async _annPublish() {
+    const title    = document.getElementById('ann-f-title').value.trim();
+    const body     = document.getElementById('ann-f-body').value.trim();
+    const kind     = document.getElementById('ann-f-kind').value;
+    const audience = document.getElementById('ann-f-audience').value;
+    const ctaLabel = document.getElementById('ann-f-cta-label').value.trim();
+    const ctaRoute = document.getElementById('ann-f-cta-route').value || null;
+    if (!title || !body) { Toast.show('العنوان والنص مطلوبان', 'error'); return; }
+    if (!confirm(`نشر الإعلان لـ ${this._annAudienceCount(audience)} معلماً؟`)) return;
+
+    const { error } = await _sb.rpc('admin_publish_announcement', {
+      p_title: title, p_body: body, p_kind: kind, p_audience: audience,
+      p_cta_label: ctaLabel || null, p_cta_route: ctaRoute, p_expires_at: null
+    });
+    if (error) { Toast.show(`تعذّر النشر — ${error.message}`, 'error'); return; }
+    Toast.show('نُشر الإعلان', 'success');
+    this.admin();
+  },
+
+  async _annDelete(id) {
+    if (!confirm('حذف هذا الإعلان نهائياً؟')) return;
+    const { error } = await _sb.rpc('admin_delete_announcement', { p_id: id });
+    if (error) { Toast.show('تعذّر الحذف', 'error'); return; }
+    Toast.show('حُذف الإعلان', 'success');
+    this.admin();
   },
 
   _filterAdminRows(q) {
@@ -6773,7 +7292,7 @@ const SBAuth = {
     return (data?.value ?? '1') !== '0';
   },
 
-  async signUp(email, password, name, school, subject, gender, region, stage) {
+  async signUp(email, password, name, school, subject, gender, region, stage, phone, waOptin) {
     if (!await this.isPlatformOpen()) throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
     const { data, error } = await _sb.auth.signUp({ email, password });
     if (error) throw error;
@@ -6783,7 +7302,15 @@ const SBAuth = {
         Object.values(DB._k).forEach(k => localStorage.removeItem(k));
       }
       localStorage.setItem('tm_current_user', data.user.id);
-      await _sb.from('profiles').upsert({ id: data.user.id, name, school, subject, stage, gender, email: email.toLowerCase(), approved: false });
+      /* wa_optin_at لا يُرسل من هنا — المُشغّل trg_stamp_wa_optin هو من يختمه،
+         حتى يصلح دليل موافقة يوم التقدّم لـ Meta */
+      await _sb.from('profiles').upsert({
+        id: data.user.id, name, school, subject, stage, gender,
+        email: email.toLowerCase(), approved: false,
+        phone: _waPhone(phone),
+        wa_optin: !!waOptin,
+        wa_optin_src: waOptin ? 'signup' : null
+      });
       localStorage.setItem(DB._k.teacher, JSON.stringify({ name, school, subject, stage, gender, region }));
       localStorage.setItem('tm_user_email', email.toLowerCase());
       _adminFlag = false;
@@ -7231,8 +7758,11 @@ const App = {
           const subject    = document.getElementById('setup-subject').value;
           const gender     = document.querySelector('input[name="setup-gender"]:checked')?.value || 'male';
           const region     = document.getElementById('setup-region')?.value.trim() || '';
+          const phone      = document.getElementById('setup-phone')?.value.trim() || '';
+          const waOptin    = document.getElementById('setup-wa-optin')?.checked || false;
           if (!name || !school || !Subjects.isValid(stage, subject)) throw new Error('يرجى تعبئة جميع الحقول واختيار المرحلة والمادة');
-          await SBAuth.signUp(email, pwd, name, school, subject, gender, region, stage);
+          if (!_isValidPhone(phone)) throw new Error('أدخل رقم جوال صحيح — مثال: 0501234567');
+          await SBAuth.signUp(email, pwd, name, school, subject, gender, region, stage, phone, waOptin);
           await _sb.auth.signOut();
           Object.values(DB._k).forEach(k => localStorage.removeItem(k));
           localStorage.removeItem('tm_current_user');
