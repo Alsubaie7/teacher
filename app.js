@@ -2527,6 +2527,102 @@ const TimeAware = {
   }
 };
 
+/* ==================== استكمال بيانات التواصل ====================
+   المسجّلون قبل إضافة حقل الجوال لا يملكون رقماً. بطاقة غير حاجبة:
+   «لاحقاً» تؤجلها أسبوعاً، والتأجيل محلي لا في الخادم. */
+const WAConsent = {
+  _SNOOZE: 'tm_wa_prompt_snooze',
+
+  async maybeShow() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return;
+    const until = Number(localStorage.getItem(this._SNOOZE) || 0);
+    if (until > Date.now()) return;
+
+    const { data } = await _sb.from('profiles').select('phone, wa_optin, wa_optout_at').eq('id', uid).maybeSingle();
+    if (!data) return;
+    /* من انسحب صراحةً لا يُسأل ثانية، ومن أعطى رقمه اكتفينا */
+    if (data.phone || data.wa_optout_at) return;
+    this._render();
+  },
+
+  _render() {
+    if (document.getElementById('wa-consent-card')) return;
+    const host = document.getElementById('content');
+    if (!host) return;
+    const card = document.createElement('div');
+    card.id = 'wa-consent-card';
+    card.className = 'wa-prompt';
+    card.innerHTML = `
+      <div class="wa-prompt-icon"><i class="fab fa-whatsapp"></i></div>
+      <div class="wa-prompt-body">
+        <h4>أكمل بيانات التواصل</h4>
+        <p>نحتاج رقم جوالك للدعم واسترجاع الحساب.</p>
+        <input type="tel" id="wa-prompt-phone" inputmode="numeric" placeholder="05xxxxxxxx" dir="ltr">
+        <label class="wa-consent" style="margin:.6rem 0 .8rem">
+          <input type="checkbox" id="wa-prompt-optin">
+          <span>أوافق على استلام تنبيهات المنصة على واتساب (تجديد الاشتراك والتحديثات المهمة). يمكنك الإيقاف في أي وقت من الإعدادات.</span>
+        </label>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="WAConsent.save()"><i class="fas fa-check"></i> حفظ</button>
+          <button class="btn btn-sm" onclick="WAConsent.snooze()">لاحقاً</button>
+        </div>
+      </div>`;
+    host.prepend(card);
+  },
+
+  snooze() {
+    localStorage.setItem(this._SNOOZE, String(Date.now() + 7 * 86400000));
+    document.getElementById('wa-consent-card')?.remove();
+  },
+
+  async save() {
+    const raw = document.getElementById('wa-prompt-phone')?.value.trim() || '';
+    if (!_isValidPhone(raw)) { Toast.show('أدخل رقم جوال صحيح — مثال: 0501234567', 'error'); return; }
+    const optin = document.getElementById('wa-prompt-optin')?.checked || false;
+    const uid   = localStorage.getItem('tm_current_user');
+    const { error } = await _sb.from('profiles').update({
+      phone: _waPhone(raw), wa_optin: optin, wa_optin_src: optin ? 'settings' : null
+    }).eq('id', uid);
+    if (error) { Toast.show('تعذّر الحفظ — حاول لاحقاً', 'error'); return; }
+    document.getElementById('wa-consent-card')?.remove();
+    Toast.show('شكراً — حُفظت بياناتك', 'success');
+  },
+
+  /* حالة الموافقة للعرض في الإعدادات */
+  async state() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return { phone: '', wa_optin: false };
+    const { data } = await _sb.from('profiles').select('phone, wa_optin').eq('id', uid).maybeSingle();
+    return data || { phone: '', wa_optin: false };
+  },
+
+  async toggle(on) {
+    const uid = localStorage.getItem('tm_current_user');
+    const { data } = await _sb.from('profiles').select('phone').eq('id', uid).maybeSingle();
+    if (on && !data?.phone) {
+      Toast.show('أضف رقم جوالك أولاً', 'error');
+      document.getElementById('wa-settings-toggle').checked = false;
+      return;
+    }
+    const { error } = await _sb.from('profiles').update({ wa_optin: on, wa_optin_src: on ? 'settings' : null }).eq('id', uid);
+    if (error) {
+      Toast.show('تعذّر الحفظ', 'error');
+      document.getElementById('wa-settings-toggle').checked = !on;
+      return;
+    }
+    Toast.show(on ? 'ستصلك تنبيهات المنصة على واتساب' : 'أُوقفت تنبيهات واتساب', 'success');
+  },
+
+  async savePhoneFromSettings() {
+    const raw = document.getElementById('wa-settings-phone')?.value.trim() || '';
+    if (!_isValidPhone(raw)) { Toast.show('أدخل رقم جوال صحيح — مثال: 0501234567', 'error'); return; }
+    const uid = localStorage.getItem('tm_current_user');
+    const { error } = await _sb.from('profiles').update({ phone: _waPhone(raw) }).eq('id', uid);
+    Toast.show(error ? 'تعذّر الحفظ' : 'حُفظ الرقم', error ? 'error' : 'success');
+  }
+};
+
 /* ==================== PAGES ==================== */
 const Pages = {
 
@@ -2707,6 +2803,7 @@ const Pages = {
           <p>أضف فصلاً دراسياً لتتمكن من إدارة ${_T.theStus} والحضور والدرجات</p>
           <button class="btn btn-primary" onclick="Pages.addClassModal()"><i class="fas fa-plus"></i> إضافة فصل</button>
         </div>`;
+      WAConsent.maybeShow();     /* المعلم الجديد بلا فصول يمر من هنا لا من نهاية الدالة */
       return;
     }
 
@@ -2754,6 +2851,9 @@ const Pages = {
           ${alertsHtml}
         </div>
       </div>`;
+
+    /* تُنادى من هنا لا من الإقلاع: تُلحَق ببطاقة أعلى #content بعد امتلائه */
+    WAConsent.maybeShow();
   },
 
   /* ---- CLASS DETAIL ---- */
