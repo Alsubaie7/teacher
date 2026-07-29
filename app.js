@@ -175,6 +175,19 @@ const _esc = s => String(s ?? '')
    يُهرَّب لـ JS أولاً ثم لـ HTML: المحلل يفكّ كيانات HTML قبل تنفيذ JS،
    فلو هرّبنا لـ HTML وحده لعاد ' كما هو وكسر السلسلة. */
 const _jsq = s => _esc(String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'));
+/* يحوّل الرقم لصيغة واتساب الدولية: 0501234567 ← 966501234567
+   مساعد عام: يستدعيه التسجيل والإعدادات ولوحة الإدارة. نسخة واحدة لا نسختان. */
+const _waPhone = raw => {
+  let n = (raw || '').replace(/\D/g, '');
+  if (!n) return '';
+  if (n.startsWith('00')) n = n.slice(2);
+  if (n.startsWith('966')) return n;
+  if (n.startsWith('0'))   return '966' + n.slice(1);
+  if (n.length === 9 && n.startsWith('5')) return '966' + n;
+  return n;                                  /* رقم دولي كُتب كاملاً */
+};
+/* يقبل الرقم فقط إذا كان بصيغة دولية معقولة — نفس قيد profiles_phone_format */
+const _isValidPhone = raw => /^[0-9]{9,15}$/.test(_waPhone(raw));
 const _ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 /* تاريخ اليوم بتقويم الجهاز لا بـ UTC. toISOString يحوّل للتوقيت العالمي،
    فبين منتصف الليل والثالثة فجراً بتوقيت السعودية كان يرجع تاريخ أمس
@@ -942,16 +955,8 @@ const Print = {
              refToPhone, reason, notes, subject, newCount, prevCount: s.referralCount || 0 };
   },
 
-  /* يحوّل الرقم لصيغة واتساب الدولية: 0501234567 ← 966501234567 */
-  _waPhone(raw) {
-    let n = (raw || '').replace(/\D/g, '');
-    if (!n) return '';
-    if (n.startsWith('00')) n = n.slice(2);
-    if (n.startsWith('966')) return n;
-    if (n.startsWith('0'))   return '966' + n.slice(1);
-    if (n.length === 9 && n.startsWith('5')) return '966' + n;
-    return n;                                  /* رقم دولي كُتب كاملاً */
-  },
+  /* يحوّل الرقم لصيغة واتساب الدولية — المنطق في المساعد العام _waPhone */
+  _waPhone(raw) { return _waPhone(raw); },
 
   /* تُحمَّل أداة التحويل لصورة عند الطلب فقط، لا مع كل فتح للمنصة */
   _loadH2C() {
