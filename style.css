@@ -3338,3 +3338,14 @@ select option { background: #fff; color: var(--text-primary); }
   margin:.75rem 1rem 1rem; padding:.7rem .85rem; border-radius:10px;
   background:#fef3c7; color:#78350f; font-size:.82rem; line-height:1.7;
 }
+
+/* ===== بانر وضع القراءة فقط ===== */
+.lock-banner{
+  display:flex; align-items:center; gap:.8rem; flex-wrap:wrap;
+  background:linear-gradient(135deg,#fee2e2,#fecaca); color:#7f1d1d;
+  border:1px solid #ef4444; border-radius:14px;
+  padding:.85rem 1rem; margin-bottom:1rem; font-size:.88rem;
+}
+.lock-banner > i{ font-size:1.15rem; flex-shrink:0 }
+.lock-banner-txt{ flex:1; min-width:200px; display:flex; flex-direction:column; gap:.15rem }
+.lock-banner-txt strong{ font-size:.95rem }

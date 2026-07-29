@@ -226,6 +226,9 @@ const DB = {
     return data;
   },
   set(key, val) {
+    /* نقطة العنق لكل كتابة بيانات (فصول، طلاب، حضور، درجات، جدول…).
+       الحجب هنا لا عند كل زر: زرٌّ منسي يعني ثغرة، وهذي الدالة لا تُتجاوَز. */
+    if (Subscription.blocksWrite(key)) { Subscription.warnBlocked(); return false; }
     localStorage.setItem(this._k[key], JSON.stringify(val));
     _sb.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) _sb.from('user_data').upsert(
@@ -2764,13 +2767,78 @@ const Banner = {
    الإعدادان في app_settings لا في الكود: يوم يُفتح حساب تاجر يُلصق
    pay_link من لوحة الإدارة فيظهر زره بلا نشر ولا تعديل سطر. */
 const Subscription = {
+  /* حالة الحجب تُحسب مرة عند الدخول وتُخزَّن هنا.
+     الافتراضي false — أي «مفتوح». كل خطأ في الفحص يُفشل مفتوحاً لا مغلقاً:
+     عطل شبكة أو إعداد ناقص يجب ألا يقفل المنصة على معلم دافع. */
+  _locked: false,
+
   /* يُقرأ مرة واحدة لكل تحميل صفحة */
   async _config() {
     if (this._cfg) return this._cfg;
-    const { data } = await _sb.from('app_settings').select('key, value').in('key', ['pay_link', 'support_wa']);
+    const { data } = await _sb.from('app_settings').select('key, value')
+      .in('key', ['pay_link', 'support_wa', 'enforce_subscription', 'grace_days']);
     const m = Object.fromEntries((data || []).map(r => [r.key, r.value || '']));
-    this._cfg = { payLink: m.pay_link || '', supportWa: m.support_wa || '' };
+    this._cfg = {
+      payLink:   m.pay_link   || '',
+      supportWa: m.support_wa || '',
+      enforce:   m.enforce_subscription === '1',
+      graceDays: Number.isFinite(+m.grace_days) ? Math.max(0, +m.grace_days) : 3
+    };
     return this._cfg;
+  },
+
+  /* المصدر الوحيد لقرار الحجب. يُنادى من App._reveal قبل عرض المنصة. */
+  async resolve() {
+    this._locked = false;
+    try {
+      if (_isAdmin()) return { locked: false, days: null };   /* الأدمن لا يُحجب أبداً */
+      const [st, cfg] = await Promise.all([this.state(), this._config()]);
+      if (!cfg.enforce) return { locked: false, days: st.days };
+      /* بلا اشتراك = لم يُفعّل بعد؛ الحجب للمنتهي بعد مهلة السماح وحده */
+      if (st.days === null) return { locked: false, days: null };
+      this._locked = st.days < -cfg.graceDays;
+      return { locked: this._locked, days: st.days };
+    } catch {
+      return { locked: false, days: null };                   /* فشل مفتوح */
+    }
+  },
+
+  isLocked() { return this._locked === true; },
+
+  /* المفاتيح المسموح كتابتها وهو محجوب: إخفاء تنبيهات واجهة لا بيانات عمل */
+  _WRITE_ALLOWED: ['dismissedWarnings'],
+
+  blocksWrite(key) {
+    return this.isLocked() && !this._WRITE_ALLOWED.includes(key);
+  },
+
+  /* تنبيه واحد كل ٦ ثوانٍ فقط — بعض الشاشات تكتب عدة مفاتيح بضغطة واحدة */
+  _lastWarn: 0,
+  warnBlocked() {
+    if (Date.now() - this._lastWarn < 6000) return;
+    this._lastWarn = Date.now();
+    Toast.show('اشتراكك منتهي — العرض متاح والتعديل موقوف حتى التجديد', 'error');
+  },
+
+  async paintLock() {
+    const el = document.getElementById('lock-banner');
+    if (!el) return;
+    if (!this.isLocked()) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+
+    const [st, cfg] = await Promise.all([this.state(), this._config()]);
+    const pay = cfg.payLink
+      ? `<a class="btn btn-sm btn-primary" href="${_esc(cfg.payLink)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-credit-card"></i> تجديد</a>` : '';
+    const wa = cfg.supportWa
+      ? `<a class="btn btn-sm btn-wa" target="_blank" rel="noopener noreferrer"
+           href="https://wa.me/${_esc(_waPhone(cfg.supportWa))}?text=${encodeURIComponent(this._waText(st))}"><i class="fab fa-whatsapp"></i> تواصل</a>` : '';
+    el.innerHTML = `
+      <i class="fas fa-lock"></i>
+      <div class="lock-banner-txt">
+        <strong>وضع القراءة فقط — اشتراكك منتهي</strong>
+        <span>بياناتك كلها محفوظة وتظهر أمامك، لكن التحضير والحضور والرصد موقوفة حتى التجديد.</span>
+      </div>
+      ${pay}${wa}`;
+    el.classList.remove('hidden');
   },
 
   async state() {
@@ -6849,7 +6917,7 @@ const Pages = {
       _sb.rpc('get_audit_log', { p_limit: 12 }),
       _sb.rpc('admin_list_announcements'),
       _sb.rpc('admin_contacts_today'),
-      _sb.from('app_settings').select('key, value').in('key', ['pay_link', 'support_wa'])
+      _sb.from('app_settings').select('key, value').in('key', ['pay_link', 'support_wa', 'enforce_subscription', 'grace_days'])
     ]);
 
     if (usersRes.error) {
@@ -7024,6 +7092,10 @@ const Pages = {
     }).join('');
 
     const cfg = Object.fromEntries((cfgRes.data || []).map(r => [r.key, r.value || '']));
+    /* تحذير صريح قبل تشغيل المفتاح: كم معلماً يُحجب في نفس اللحظة */
+    const graceMs = (Number(cfg.grace_days) || 0) * 86400000;
+    const enfBlockers = T.filter(u => u.role !== 'admin' && u.expires_at &&
+      new Date(u.expires_at).getTime() < Date.now() - graceMs).length;
     const payCfgHtml = `
       <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-credit-card"></i> إعدادات التجديد</h3></div>
         <div style="padding:1rem;display:grid;gap:.9rem">
@@ -7040,6 +7112,25 @@ const Pages = {
                    value="${_esc(cfg.support_wa ? '0' + String(cfg.support_wa).replace(/^966/, '') : '')}">
             <small style="display:block;margin-top:.3rem;font-size:.78rem;color:var(--text-muted)">
               يفتحه زر «تواصل للتجديد» برسالة جاهزة تحمل اسم المعلم وتاريخ انتهاء اشتراكه.</small>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:.9rem">
+            <div class="settings-row" style="padding:0">
+              <div style="flex:1">
+                <div style="font-weight:600">حجب المشترك المنتهي (قراءة فقط)</div>
+                <div style="font-size:.82rem;color:var(--gray-500)">
+                  يرى بياناته ولا يحضّر ولا يرصد. الأدمن مستثنى دائماً.
+                  ${enfBlockers ? `<span style="color:#b91c1c;font-weight:700"> — سيُحجب ${enfBlockers} معلماً فوراً</span>` : ''}
+                </div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="cfg-enforce" ${cfg.enforce_subscription === '1' ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group" style="margin:.8rem 0 0;max-width:200px">
+              <label>مهلة السماح (أيام)</label>
+              <input type="number" id="cfg-grace" min="0" max="60" value="${_esc(cfg.grace_days || '3')}">
+            </div>
           </div>
           <div><button class="btn btn-primary" onclick="Pages._savePayConfig()"><i class="fas fa-save"></i> حفظ</button></div>
         </div>
@@ -7138,14 +7229,27 @@ const Pages = {
     }
     if (wa && !_isValidPhone(wa)) { Toast.show('رقم واتساب غير صحيح', 'error'); return; }
 
+    const enforce = document.getElementById('cfg-enforce').checked;
+    const grace   = Math.max(0, Math.min(60, parseInt(document.getElementById('cfg-grace').value, 10) || 0));
+
+    /* تشغيل الحجب يقفل على معلمين فعليين — تأكيد صريح بعددهم قبل التنفيذ */
+    if (enforce) {
+      const T = this._adminCache || [];
+      const n = T.filter(u => u.role !== 'admin' && u.expires_at &&
+        new Date(u.expires_at).getTime() < Date.now() - grace * 86400000).length;
+      if (!confirm(`تشغيل الحجب سيضع ${n} معلماً في وضع القراءة فقط فوراً.\nمتأكد؟`)) return;
+    }
+
     const res = await Promise.all([
       _sb.rpc('admin_set_setting', { p_key: 'pay_link',   p_value: link }),
-      _sb.rpc('admin_set_setting', { p_key: 'support_wa', p_value: wa ? _waPhone(wa) : '' })
+      _sb.rpc('admin_set_setting', { p_key: 'support_wa', p_value: wa ? _waPhone(wa) : '' }),
+      _sb.rpc('admin_set_setting', { p_key: 'enforce_subscription', p_value: enforce ? '1' : '0' }),
+      _sb.rpc('admin_set_setting', { p_key: 'grace_days', p_value: String(grace) })
     ]);
     const err = res.find(r => r.error);
     if (err) { Toast.show(`تعذّر الحفظ — ${err.error.message}`, 'error'); return; }
     Subscription._cfg = null;                /* يُبطل التخزين المؤقت ليقرأ الجديد */
-    Toast.show(link ? 'حُفظ — زر الدفع الإلكتروني ظاهر للمعلمين الآن' : 'حُفظ — زر الدفع مخفي', 'success');
+    Toast.show('حُفظت إعدادات التجديد', 'success');
     this.admin();
   },
 
@@ -7480,8 +7584,14 @@ const SBAuth = {
     return data;
   },
 
+  /* تُنادى من ثلاث نقاط: استعادة الجلسة، والدخول، والمراقب الدوري.
+     تُرجع الأيام المتبقية (أو null إن لا اشتراك) و**لا ترمي أبداً**:
+     الحجب المختار هو «قراءة فقط» لا إخراج من الحساب، فرميُ استثناء هنا
+     كان يحذف الجلسة ويرمي المعلم لشاشة الدخول. */
   async checkSubscription() {
-    return null;
+    const { days } = await Subscription.resolve();
+    Subscription.paintLock();
+    return days;
   },
 
   async signOut() {
@@ -7961,6 +8071,10 @@ const App = {
     TimeAware.init();
     BottomBar.init();
     InstallPWA.init();
+    /* الفحص الحاسم للحجب يجري هنا لا في checkSubscription: عند استعادة
+       الجلسة تُنادى تلك قبل أن يُعرف الدور، فلو اكتفينا بها لحُجب الأدمن
+       على نفسه. هنا _adminFlag مضبوط فعلاً. */
+    Subscription.resolve().then(() => Subscription.paintLock());
     Router.go('dashboard');
     this._startSubWatcher();
   },
