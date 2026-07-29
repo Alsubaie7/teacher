@@ -2758,6 +2758,66 @@ const Banner = {
   }
 };
 
+/* ==================== تذكير التجديد عبر واتساب ====================
+   ⚠️ هذا هو المكان الوحيد في المنصة الذي يُبنى فيه رابط واتساب للتجديد.
+   يوم الترقية لـ WhatsApp Cloud API يتغيّر جسم send() وحده — لا شيء آخر.
+   لا تبنِ روابط wa.me في أي دالة أخرى. */
+const Renewals = {
+  _templates: null,
+
+  async _loadTemplates() {
+    if (this._templates) return this._templates;
+    const { data } = await _sb.from('app_settings').select('value').eq('key', 'wa_templates').maybeSingle();
+    try { this._templates = JSON.parse(data?.value || '{}'); }
+    catch { this._templates = {}; }
+    return this._templates;
+  },
+
+  /* يختار القالب المناسب حسب أيام الاشتراك المتبقية (سالب = منتهٍ) */
+  pickTemplate(days) {
+    if (days < 0)  return 'after3';
+    if (days <= 1) return 'before1';
+    return 'before7';
+  },
+
+  _fill(tpl, user, days) {
+    const date = user.expires_at ? new Date(user.expires_at).toLocaleDateString('ar-SA') : '—';
+    return String(tpl)
+      .replace(/\{name\}/g,  user.name || '')
+      .replace(/\{days\}/g,  String(Math.abs(days)))
+      .replace(/\{date\}/g,  date)
+      .replace(/\{link\}/g,  location.origin + location.pathname);
+  },
+
+  /* هل يجوز التواصل مع هذا المعلم؟ سبب المنع يُعرض للأدمن كما هو. */
+  blockedReason(user) {
+    if (!user.phone)       return 'لا يوجد رقم جوال';
+    if (user.wa_optout_at) return 'انسحب من التنبيهات';
+    if (!user.wa_optin)    return 'لم يوافق على التنبيهات';
+    return null;
+  },
+
+  /* الفاصل المعماري — اليوم: يفتح واتساب. غداً: يستدعي دالة wa-send. */
+  async send(user, templateKey) {
+    const reason = this.blockedReason(user);
+    if (reason) { Toast.show(`لا يمكن الإرسال — ${reason}`, 'error'); return false; }
+
+    const tpls = await this._loadTemplates();
+    const tpl  = tpls[templateKey];
+    if (!tpl) { Toast.show('القالب غير موجود', 'error'); return false; }
+
+    const days = user.expires_at
+      ? Math.ceil((new Date(user.expires_at).getTime() - Date.now()) / 86400000) : 0;
+    const text = this._fill(tpl, user, days);
+
+    window.open(`https://wa.me/${_waPhone(user.phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+
+    const { error } = await _sb.rpc('admin_log_contact', { p_user: user.id, p_template: templateKey });
+    if (error) Toast.show('فُتح واتساب لكن تعذّر تسجيل المحاولة', 'error');
+    return true;
+  }
+};
+
 /* ==================== PAGES ==================== */
 const Pages = {
 
