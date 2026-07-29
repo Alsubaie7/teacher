@@ -6668,7 +6668,9 @@ const Pages = {
     subscription_set:     { i:'fa-credit-card',  c:'#2563eb', b:'#dbeafe', t:'حدّث اشتراك' },
     subscription_cleared: { i:'fa-ban',          c:'#d97706', b:'#fef3c7', t:'ألغى اشتراك' },
     role_changed:         { i:'fa-user-shield',  c:'#7c3aed', b:'#ede9fe', t:'غيّر دور' },
-    setting_changed:      { i:'fa-sliders',      c:'#475569', b:'#e2e8f0', t:'غيّر إعداد' }
+    setting_changed:      { i:'fa-sliders',      c:'#475569', b:'#e2e8f0', t:'غيّر إعداد' },
+    announcement_published:{ i:'fa-bullhorn',    c:'#7c3aed', b:'#ede9fe', t:'نشر إعلاناً' },
+    announcement_deleted: { i:'fa-trash',        c:'#dc2626', b:'#fee2e2', t:'حذف إعلاناً' }
   },
 
   _fmtDT(v, withTime = false) {
@@ -6706,10 +6708,11 @@ const Pages = {
     el.innerHTML = `<div class="admin-banner"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2><p>جارِ تحميل البيانات...</p></div>
       <div style="text-align:center;padding:3rem"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--purple)"></i></div>`;
 
-    const [usersRes, platRes, logRes] = await Promise.all([
+    const [usersRes, platRes, logRes, annRes] = await Promise.all([
       _sb.rpc('get_all_users'),
       _sb.from('app_settings').select('value').eq('key', 'platform_open').maybeSingle(),
-      _sb.rpc('get_audit_log', { p_limit: 12 })
+      _sb.rpc('get_audit_log', { p_limit: 12 }),
+      _sb.rpc('admin_list_announcements')
     ]);
 
     if (usersRes.error) {
@@ -6797,6 +6800,69 @@ const Pages = {
       </tr>`;
     }).join('');
 
+    const annList = (annRes.data || []).map(a => {
+      const m = Ann._META[a.kind] || Ann._META.notice;
+      return `<div class="ann-admin-row">
+        <span class="ann-kind" style="background:${m.b};color:${m.c}">${m.t}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.88rem">${_esc(a.title)}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">${_esc(this._fmtDT(a.published_at))} · ${_esc(this._ANN_AUD[a.audience] || a.audience)}</div>
+        </div>
+        <button class="admin-act danger" title="حذف" onclick="Pages._annDelete('${_jsq(a.id)}')"><i class="fas fa-trash"></i></button>
+      </div>`;
+    }).join('');
+
+    const annHtml = `
+      <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-bullhorn"></i> الإعلانات</h3></div>
+        <div class="ann-admin-grid">
+          <div>
+            <div class="form-group"><label>العنوان</label>
+              <input type="text" id="ann-f-title" oninput="Pages._annPreview()" placeholder="مثال: ميزة جديدة في السبورة"></div>
+            <div class="form-group"><label>النص</label>
+              <textarea id="ann-f-body" rows="4" oninput="Pages._annPreview()" placeholder="اشرح الميزة أو العرض بإيجاز..."></textarea></div>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:130px"><label>النوع</label>
+                <select id="ann-f-kind" onchange="Pages._annPreview()">
+                  <option value="feature">ميزة جديدة</option>
+                  <option value="offer">عرض</option>
+                  <option value="notice" selected>تنبيه</option>
+                </select></div>
+              <div class="form-group" style="flex:1;min-width:150px"><label>الجمهور</label>
+                <select id="ann-f-audience" onchange="Pages._annPreview()">
+                  <option value="all">الجميع</option>
+                  <option value="subscribers">اشتراك ساري</option>
+                  <option value="expiring">يقارب الانتهاء (≤١٤ يوم)</option>
+                  <option value="expired">منتهي أو بلا اشتراك</option>
+                </select></div>
+            </div>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:130px"><label>نص زر الإجراء (اختياري)</label>
+                <input type="text" id="ann-f-cta-label" placeholder="مثال: جرّبها الآن"></div>
+              <div class="form-group" style="flex:1;min-width:130px"><label>وجهة الزر</label>
+                <select id="ann-f-cta-route">
+                  <option value="">بلا زر</option>
+                  <option value="dashboard">لوحة التحكم</option>
+                  <option value="classes">الفصول</option>
+                  <option value="lessons">الدروس</option>
+                  <option value="analytics">التحليلات</option>
+                  <option value="referrals">الإحالات</option>
+                  <option value="settings">الإعدادات</option>
+                </select></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:.4rem">
+              <button class="btn btn-primary" onclick="Pages._annPublish()"><i class="fas fa-paper-plane"></i> نشر</button>
+              <span id="ann-reach" style="font-size:.82rem;color:var(--text-muted)">سيصل إلى ${this._annAudienceCount('all')} معلماً</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem">كما يراه المعلم</div>
+            <div id="ann-preview" class="ann-preview-box"></div>
+            <div style="font-size:.8rem;color:var(--text-muted);margin:.9rem 0 .4rem">المنشورة (${(annRes.data || []).length})</div>
+            <div class="ann-admin-list">${annList || '<p style="color:var(--text-muted);font-size:.82rem">لا توجد إعلانات</p>'}</div>
+          </div>
+        </div>
+      </div>`;
+
     el.innerHTML = `
       <div class="admin-banner">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;position:relative;z-index:1">
@@ -6833,6 +6899,7 @@ const Pages = {
           <div class="admin-log">${logHtml || `<p style="text-align:center;color:var(--text-muted);padding:1rem">${logRes.error ? 'سجل التدقيق غير مُهيّأ بعد — نفّذ ملف SQL أولاً' : 'لا توجد إجراءات مسجّلة بعد'}</p>`}</div>
         </div>
       </div>
+      ${annHtml}
       <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chalkboard-teacher"></i> قائمة المعلمين (${T.length})</h3></div>
         <div class="admin-toolbar">
           <input class="admin-search" type="text" placeholder="🔍 ابحث بالاسم أو البريد أو المدرسة..." oninput="Pages._filterAdminRows(this.value)">
@@ -6845,6 +6912,70 @@ const Pages = {
           <tbody id="admin-tbody">${rows}</tbody></table></div>`
         : `<div class="empty-state"><i class="fas fa-users fa-2x"></i><p>لا يوجد معلمون</p></div>`}
       </div>`;
+
+    this._annPreview();
+  },
+
+  /* ---- إعلانات المنصة (لوحة الإدارة) ---- */
+  _ANN_AUD: { all:'الجميع', subscribers:'اشتراك ساري', expiring:'يقارب الانتهاء', expired:'منتهي أو بلا اشتراك' },
+
+  /* نفس تعريفات الجمهور في get_my_announcements — للعرض قبل النشر فقط */
+  _annAudienceCount(audience) {
+    const T = this._adminCache || [];
+    const now = Date.now();
+    const exp = u => u.expires_at ? new Date(u.expires_at).getTime() : null;
+    if (audience === 'all')         return T.length;
+    if (audience === 'subscribers') return T.filter(u => exp(u) && exp(u) >  now).length;
+    if (audience === 'expiring')    return T.filter(u => exp(u) && exp(u) >  now && exp(u) <= now + 14*86400000).length;
+    if (audience === 'expired')     return T.filter(u => !exp(u) || exp(u) <= now).length;
+    return 0;
+  },
+
+  _annPreview() {
+    const box = document.getElementById('ann-preview');
+    if (!box) return;
+    const t = document.getElementById('ann-f-title')?.value || '';
+    const b = document.getElementById('ann-f-body')?.value  || '';
+    const a = document.getElementById('ann-f-audience')?.value || 'all';
+    const k = document.getElementById('ann-f-kind')?.value || 'notice';
+    const m = Ann._META[k] || Ann._META.notice;
+    box.innerHTML = `
+      <div class="ann-item">
+        <div class="ann-item-icon" style="background:${m.b};color:${m.c}"><i class="fas ${m.i}"></i></div>
+        <div class="ann-item-body">
+          <div class="ann-item-top"><strong>${_esc(t) || 'العنوان'}</strong>
+            <span class="ann-kind" style="background:${m.b};color:${m.c}">${m.t}</span></div>
+          <p>${_esc(b) || 'نص الإعلان...'}</p>
+        </div>
+      </div>`;
+    document.getElementById('ann-reach').textContent = `سيصل إلى ${this._annAudienceCount(a)} معلماً`;
+  },
+
+  async _annPublish() {
+    const title    = document.getElementById('ann-f-title').value.trim();
+    const body     = document.getElementById('ann-f-body').value.trim();
+    const kind     = document.getElementById('ann-f-kind').value;
+    const audience = document.getElementById('ann-f-audience').value;
+    const ctaLabel = document.getElementById('ann-f-cta-label').value.trim();
+    const ctaRoute = document.getElementById('ann-f-cta-route').value || null;
+    if (!title || !body) { Toast.show('العنوان والنص مطلوبان', 'error'); return; }
+    if (!confirm(`نشر الإعلان لـ ${this._annAudienceCount(audience)} معلماً؟`)) return;
+
+    const { error } = await _sb.rpc('admin_publish_announcement', {
+      p_title: title, p_body: body, p_kind: kind, p_audience: audience,
+      p_cta_label: ctaLabel || null, p_cta_route: ctaRoute, p_expires_at: null
+    });
+    if (error) { Toast.show(`تعذّر النشر — ${error.message}`, 'error'); return; }
+    Toast.show('نُشر الإعلان', 'success');
+    this.admin();
+  },
+
+  async _annDelete(id) {
+    if (!confirm('حذف هذا الإعلان نهائياً؟')) return;
+    const { error } = await _sb.rpc('admin_delete_announcement', { p_id: id });
+    if (error) { Toast.show('تعذّر الحذف', 'error'); return; }
+    Toast.show('حُذف الإعلان', 'success');
+    this.admin();
   },
 
   _filterAdminRows(q) {
