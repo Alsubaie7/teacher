@@ -6778,7 +6778,7 @@ const SBAuth = {
     return (data?.value ?? '1') !== '0';
   },
 
-  async signUp(email, password, name, school, subject, gender, region, stage) {
+  async signUp(email, password, name, school, subject, gender, region, stage, phone, waOptin) {
     if (!await this.isPlatformOpen()) throw new Error('المنصة مغلقة حالياً. تواصل مع الإدارة.');
     const { data, error } = await _sb.auth.signUp({ email, password });
     if (error) throw error;
@@ -6788,7 +6788,15 @@ const SBAuth = {
         Object.values(DB._k).forEach(k => localStorage.removeItem(k));
       }
       localStorage.setItem('tm_current_user', data.user.id);
-      await _sb.from('profiles').upsert({ id: data.user.id, name, school, subject, stage, gender, email: email.toLowerCase(), approved: false });
+      /* wa_optin_at لا يُرسل من هنا — المُشغّل trg_stamp_wa_optin هو من يختمه،
+         حتى يصلح دليل موافقة يوم التقدّم لـ Meta */
+      await _sb.from('profiles').upsert({
+        id: data.user.id, name, school, subject, stage, gender,
+        email: email.toLowerCase(), approved: false,
+        phone: _waPhone(phone),
+        wa_optin: !!waOptin,
+        wa_optin_src: waOptin ? 'signup' : null
+      });
       localStorage.setItem(DB._k.teacher, JSON.stringify({ name, school, subject, stage, gender, region }));
       localStorage.setItem('tm_user_email', email.toLowerCase());
       _adminFlag = false;
@@ -7236,8 +7244,11 @@ const App = {
           const subject    = document.getElementById('setup-subject').value;
           const gender     = document.querySelector('input[name="setup-gender"]:checked')?.value || 'male';
           const region     = document.getElementById('setup-region')?.value.trim() || '';
+          const phone      = document.getElementById('setup-phone')?.value.trim() || '';
+          const waOptin    = document.getElementById('setup-wa-optin')?.checked || false;
           if (!name || !school || !Subjects.isValid(stage, subject)) throw new Error('يرجى تعبئة جميع الحقول واختيار المرحلة والمادة');
-          await SBAuth.signUp(email, pwd, name, school, subject, gender, region, stage);
+          if (!_isValidPhone(phone)) throw new Error('أدخل رقم جوال صحيح — مثال: 0501234567');
+          await SBAuth.signUp(email, pwd, name, school, subject, gender, region, stage, phone, waOptin);
           await _sb.auth.signOut();
           Object.values(DB._k).forEach(k => localStorage.removeItem(k));
           localStorage.removeItem('tm_current_user');

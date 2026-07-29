@@ -3236,3 +3236,12 @@ select option { background: #fff; color: var(--text-primary); }
 .br-close:hover { background: #EF4444 !important; border-color: #EF4444 !important; }
 
 @media (max-width: 640px) { .bk-lpage { display: none; } .bk-terms { grid-template-columns: 1fr; } }
+
+/* ===== مربع الموافقة على تنبيهات واتساب ===== */
+.wa-consent{
+  display:flex; align-items:flex-start; gap:.6rem;
+  margin:.25rem 0 1rem; padding:.7rem .8rem;
+  background:rgba(37,211,102,.07); border:1px solid rgba(37,211,102,.28);
+  border-radius:12px; cursor:pointer; font-size:.82rem; line-height:1.6;
+}
+.wa-consent input{ margin-top:.25rem; flex-shrink:0; width:1.05rem; height:1.05rem; accent-color:#25D366; }
