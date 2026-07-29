@@ -2758,6 +2758,86 @@ const Banner = {
   }
 };
 
+/* ==================== اشتراك المعلم (جهة المعلم) ====================
+   يقرأ الحالة الحقيقية من subscriptions لا نصاً ثابتاً، ويعرض طريقي تجديد:
+   رابط دفع إلكتروني (Apple Pay/مدى على صفحة المزود) وواتساب.
+   الإعدادان في app_settings لا في الكود: يوم يُفتح حساب تاجر يُلصق
+   pay_link من لوحة الإدارة فيظهر زره بلا نشر ولا تعديل سطر. */
+const Subscription = {
+  /* يُقرأ مرة واحدة لكل تحميل صفحة */
+  async _config() {
+    if (this._cfg) return this._cfg;
+    const { data } = await _sb.from('app_settings').select('key, value').in('key', ['pay_link', 'support_wa']);
+    const m = Object.fromEntries((data || []).map(r => [r.key, r.value || '']));
+    this._cfg = { payLink: m.pay_link || '', supportWa: m.support_wa || '' };
+    return this._cfg;
+  },
+
+  async state() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return { expiresAt: null, days: null, status: 'none' };
+    /* سياسة subscriptions_select تسمح للمعلم بصفّه وحده */
+    const { data } = await _sb.from('subscriptions').select('expires_at').eq('user_id', uid).maybeSingle();
+    const exp = data?.expires_at || null;
+    if (!exp) return { expiresAt: null, days: null, status: 'none' };
+    const days = Math.ceil((new Date(exp).getTime() - Date.now()) / 86400000);
+    return { expiresAt: exp, days,
+             status: days < 0 ? 'expired' : days <= 14 ? 'expiring' : 'active' };
+  },
+
+  _BADGE: {
+    active:   { c:'var(--green)', i:'fa-circle-check',        t:'ساري' },
+    expiring: { c:'#d97706',      i:'fa-hourglass-half',      t:'يقارب الانتهاء' },
+    expired:  { c:'#dc2626',      i:'fa-circle-xmark',        t:'منتهي' },
+    none:     { c:'var(--gray-500)', i:'fa-circle-minus',     t:'بدون اشتراك' }
+  },
+
+  /* رسالة واتساب جاهزة — المعلم يضغط إرسال فقط، فلا يشرح نفسه من الصفر */
+  _waText(st) {
+    const t = DB.teacher() || {};
+    const who = t.name ? `أنا ${t.name}` : 'السلام عليكم';
+    const when = st.expiresAt
+      ? ` (اشتراكي ${st.status === 'expired' ? 'انتهى' : 'ينتهي'} بتاريخ ${new Date(st.expiresAt).toLocaleDateString('ar-SA')})`
+      : '';
+    return `${who} من منصة المعلم${when}.\nأرغب في تجديد اشتراكي — أرجو تزويدي ببيانات التحويل.`;
+  },
+
+  async card() {
+    const [st, cfg] = await Promise.all([this.state(), this._config()]);
+    const b = this._BADGE[st.status];
+
+    const detail = st.expiresAt
+      ? `<div style="font-size:.84rem;color:var(--gray-500);margin-top:.35rem">
+           ${st.status === 'expired'
+             ? `انتهى في ${_esc(new Date(st.expiresAt).toLocaleDateString('ar-SA'))} — بياناتك محفوظة كما هي`
+             : `ينتهي في ${_esc(new Date(st.expiresAt).toLocaleDateString('ar-SA'))} · باقي ${_esc(String(st.days))} يوم`}
+         </div>`
+      : `<div style="font-size:.84rem;color:var(--gray-500);margin-top:.35rem">تواصل معنا لتفعيل اشتراكك</div>`;
+
+    /* الزر يظهر فقط إذا لُصق رابط الدفع في لوحة الإدارة */
+    const payBtn = cfg.payLink
+      ? `<a class="btn btn-primary btn-sm" href="${_esc(cfg.payLink)}" target="_blank" rel="noopener noreferrer">
+           <i class="fas fa-credit-card"></i> تجديد بالدفع الإلكتروني</a>`
+      : '';
+
+    const waBtn = cfg.supportWa
+      ? `<a class="btn btn-wa btn-sm" target="_blank" rel="noopener noreferrer"
+           href="https://wa.me/${_esc(_waPhone(cfg.supportWa))}?text=${encodeURIComponent(this._waText(st))}">
+           <i class="fab fa-whatsapp"></i> تواصل للتجديد</a>`
+      : '';
+
+    return `<div class="settings-card">
+      <div class="settings-card-hdr"><i class="fas fa-crown"></i> الاشتراك</div>
+      <div style="padding:.5rem 0">
+        <span style="background:${b.c};color:#fff;padding:.25rem .75rem;border-radius:999px;font-size:.85rem;font-weight:700">
+          <i class="fas ${b.i}"></i> ${b.t}</span>
+        ${detail}
+        ${(payBtn || waBtn) ? `<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem">${payBtn}${waBtn}</div>` : ''}
+      </div>
+    </div>`;
+  }
+};
+
 /* ==================== تذكير التجديد عبر واتساب ====================
    ⚠️ هذا هو المكان الوحيد في المنصة الذي يُبنى فيه رابط واتساب للتجديد.
    يوم الترقية لـ WhatsApp Cloud API يتغيّر جسم send() وحده — لا شيء آخر.
@@ -6354,12 +6434,7 @@ const Pages = {
       ? `<span style="font-size:.78rem;color:var(--gray-500)">${n} ${unit}</span>`
       : `<span style="font-size:.78rem;color:#10b981">لا توجد بيانات</span>`;
 
-    const subHtml = `<div class="settings-card">
-      <div class="settings-card-hdr"><i class="fas fa-crown"></i> الاشتراك</div>
-      <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0">
-        <span style="background:var(--green);color:#fff;padding:.25rem .75rem;border-radius:999px;font-size:.85rem;font-weight:700"><i class="fas fa-infinity"></i> مجاني — بدون قيود</span>
-      </div>
-    </div>`;
+    const subHtml = await Subscription.card();
 
     document.getElementById('content').innerHTML = `
       <div class="page-header">
@@ -6768,12 +6843,13 @@ const Pages = {
     el.innerHTML = `<div class="admin-banner"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2><p>جارِ تحميل البيانات...</p></div>
       <div style="text-align:center;padding:3rem"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--purple)"></i></div>`;
 
-    const [usersRes, platRes, logRes, annRes, cntRes] = await Promise.all([
+    const [usersRes, platRes, logRes, annRes, cntRes, cfgRes] = await Promise.all([
       _sb.rpc('get_all_users'),
       _sb.from('app_settings').select('value').eq('key', 'platform_open').maybeSingle(),
       _sb.rpc('get_audit_log', { p_limit: 12 }),
       _sb.rpc('admin_list_announcements'),
-      _sb.rpc('admin_contacts_today')
+      _sb.rpc('admin_contacts_today'),
+      _sb.from('app_settings').select('key, value').in('key', ['pay_link', 'support_wa'])
     ]);
 
     if (usersRes.error) {
@@ -6947,6 +7023,28 @@ const Pages = {
       </tr>`;
     }).join('');
 
+    const cfg = Object.fromEntries((cfgRes.data || []).map(r => [r.key, r.value || '']));
+    const payCfgHtml = `
+      <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-credit-card"></i> إعدادات التجديد</h3></div>
+        <div style="padding:1rem;display:grid;gap:.9rem">
+          <div class="form-group" style="margin:0">
+            <label>رابط الدفع الإلكتروني</label>
+            <input type="url" id="cfg-pay-link" dir="ltr" placeholder="https://... (فارغ = زر الدفع مخفي عن المعلمين)"
+                   value="${_esc(cfg.pay_link || '')}">
+            <small style="display:block;margin-top:.3rem;font-size:.78rem;color:var(--text-muted)">
+              أنشئ رابط دفع من مزوّدك (Moyasar / Tap) والصقه هنا — يظهر زر «تجديد بالدفع الإلكتروني» فوراً بلا نشر كود. اتركه فارغاً حتى يجهز حساب التاجر.</small>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>رقم واتساب المنصة</label>
+            <input type="tel" id="cfg-support-wa" dir="ltr" inputmode="numeric" placeholder="05xxxxxxxx"
+                   value="${_esc(cfg.support_wa ? '0' + String(cfg.support_wa).replace(/^966/, '') : '')}">
+            <small style="display:block;margin-top:.3rem;font-size:.78rem;color:var(--text-muted)">
+              يفتحه زر «تواصل للتجديد» برسالة جاهزة تحمل اسم المعلم وتاريخ انتهاء اشتراكه.</small>
+          </div>
+          <div><button class="btn btn-primary" onclick="Pages._savePayConfig()"><i class="fas fa-save"></i> حفظ</button></div>
+        </div>
+      </div>`;
+
     const renewHtml = `
       <div class="card"><div class="card-header">
         <h3 class="card-title"><i class="fas fa-rotate"></i> التجديدات (${renewals.length})</h3>
@@ -6996,6 +7094,7 @@ const Pages = {
         </div>
       </div>
       ${renewHtml}
+      ${payCfgHtml}
       ${annHtml}
       <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chalkboard-teacher"></i> قائمة المعلمين (${T.length})</h3></div>
         <div class="admin-toolbar">
@@ -7028,6 +7127,26 @@ const Pages = {
     if (!u.last_contact_at) return null;
     const d = Math.floor((Date.now() - new Date(u.last_contact_at).getTime()) / 86400000);
     return d <= 7 ? d : null;
+  },
+
+  async _savePayConfig() {
+    const link = document.getElementById('cfg-pay-link').value.trim();
+    const wa   = document.getElementById('cfg-support-wa').value.trim();
+    /* رابط الدفع يجب أن يكون https — رابط عادي يُرسل بيانات الدفع مكشوفة */
+    if (link && !/^https:\/\/\S+$/i.test(link)) {
+      Toast.show('رابط الدفع يجب أن يبدأ بـ https://', 'error'); return;
+    }
+    if (wa && !_isValidPhone(wa)) { Toast.show('رقم واتساب غير صحيح', 'error'); return; }
+
+    const res = await Promise.all([
+      _sb.rpc('admin_set_setting', { p_key: 'pay_link',   p_value: link }),
+      _sb.rpc('admin_set_setting', { p_key: 'support_wa', p_value: wa ? _waPhone(wa) : '' })
+    ]);
+    const err = res.find(r => r.error);
+    if (err) { Toast.show(`تعذّر الحفظ — ${err.error.message}`, 'error'); return; }
+    Subscription._cfg = null;                /* يُبطل التخزين المؤقت ليقرأ الجديد */
+    Toast.show(link ? 'حُفظ — زر الدفع الإلكتروني ظاهر للمعلمين الآن' : 'حُفظ — زر الدفع مخفي', 'success');
+    this.admin();
   },
 
   async _renewalSend(userId) {
