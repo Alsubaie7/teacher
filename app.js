@@ -6138,6 +6138,9 @@ const Pages = {
     const t = DB.teacher() || {};
     const fsIdx = FontSize._sizes.indexOf(FontSize.current());
     const sett = DB.settings();
+    const waState = await WAConsent.state();
+    /* يُعرض محلياً (05…) ويُخزَّن دولياً (9665…) */
+    const waPhoneLocal = waState.phone ? '0' + String(waState.phone).replace(/^966/, '') : '';
 
     const _students   = DB.get('students');
     const _classes    = DB.get('classes');
@@ -6167,6 +6170,27 @@ const Pages = {
       </div>
       <div class="settings-grid">
         ${subHtml}
+
+        <div class="settings-card">
+          <div class="settings-card-hdr"><i class="fab fa-whatsapp" style="color:#25D366"></i> تنبيهات واتساب</div>
+          <div class="settings-row">
+            <div><div style="font-weight:600">استلام تنبيهات المنصة</div>
+              <div style="font-size:.82rem;color:var(--gray-500)">تجديد الاشتراك والتحديثات المهمة فقط</div></div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="wa-settings-toggle" ${waState.wa_optin ? 'checked' : ''} onchange="WAConsent.toggle(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div style="flex:1"><div style="font-weight:600">رقم الجوال</div>
+              <div style="font-size:.82rem;color:var(--gray-500)">للدعم واسترجاع الحساب</div></div>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input type="tel" id="wa-settings-phone" inputmode="numeric" dir="ltr" placeholder="05xxxxxxxx"
+                     value="${_esc(waPhoneLocal)}" style="width:150px;text-align:right;padding:.45rem .6rem;border:1px solid var(--border);border-radius:9px;font-family:inherit">
+              <button class="btn btn-sm btn-primary" onclick="WAConsent.savePhoneFromSettings()"><i class="fas fa-save"></i></button>
+            </div>
+          </div>
+        </div>
 
         <div class="settings-card">
           <div class="settings-card-hdr"><i class="fas fa-bell"></i> إشعارات الحصص</div>
