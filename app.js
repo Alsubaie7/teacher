@@ -6768,11 +6768,12 @@ const Pages = {
     el.innerHTML = `<div class="admin-banner"><h2><i class="fas fa-shield-alt"></i> لوحة الإدارة</h2><p>جارِ تحميل البيانات...</p></div>
       <div style="text-align:center;padding:3rem"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--purple)"></i></div>`;
 
-    const [usersRes, platRes, logRes, annRes] = await Promise.all([
+    const [usersRes, platRes, logRes, annRes, cntRes] = await Promise.all([
       _sb.rpc('get_all_users'),
       _sb.from('app_settings').select('value').eq('key', 'platform_open').maybeSingle(),
       _sb.rpc('get_audit_log', { p_limit: 12 }),
-      _sb.rpc('admin_list_announcements')
+      _sb.rpc('admin_list_announcements'),
+      _sb.rpc('admin_contacts_today')
     ]);
 
     if (usersRes.error) {
@@ -6923,6 +6924,41 @@ const Pages = {
         </div>
       </div>`;
 
+    const sentToday = cntRes.data ?? 0;
+    const renewals  = this._renewalRows();
+    const renewRows = renewals.map(({ u, days }) => {
+      const reason  = Renewals.blockedReason(u);
+      const recent  = this._recentContact(u);
+      const urgency = days < 0 ? 'red' : days <= 3 ? 'gold' : days <= 7 ? 'blue' : 'gray';
+      const label   = days < 0    ? `منتهٍ منذ ${Math.abs(days)} يوم`
+                    : days === 0  ? 'ينتهي اليوم' : `باقي ${days} يوم`;
+      const btn = reason
+        ? `<button class="btn btn-sm" disabled title="${_esc(reason)}"><i class="fab fa-whatsapp"></i> ${_esc(reason)}</button>`
+        : `<button class="btn btn-sm ${recent !== null ? '' : 'btn-wa'}" onclick="Pages._renewalSend('${_jsq(u.id)}')"
+             title="${recent !== null ? `تواصلت قبل ${recent} يوم` : 'إرسال تذكير'}">
+             <i class="fab fa-whatsapp"></i> ${recent !== null ? `تواصلت قبل ${recent} يوم` : 'تذكير'}</button>`;
+      return `<tr>
+        <td><div style="font-weight:600">${_esc(u.name) || '—'}</div>
+            <div style="font-size:.72rem;color:var(--text-muted)" dir="ltr">${_esc(u.phone) || 'بلا رقم'}</div></td>
+        <td><span class="badge badge-${urgency}">${_esc(label)}</span>
+            <div class="admin-sub-date">${_esc(this._fmtDT(u.expires_at))}</div></td>
+        <td style="font-size:.76rem;color:var(--text-muted)">${u.last_contact_at ? _esc(this._relTime(u.last_contact_at)) : 'لم يُذكَّر'}</td>
+        <td>${btn}</td>
+      </tr>`;
+    }).join('');
+
+    const renewHtml = `
+      <div class="card"><div class="card-header">
+        <h3 class="card-title"><i class="fas fa-rotate"></i> التجديدات (${renewals.length})</h3>
+        <span class="renew-counter ${sentToday >= 25 ? 'is-high' : ''}">أرسلت ${sentToday} اليوم</span>
+      </div>
+      ${renewals.length ? `<div style="overflow-x:auto"><table class="admin-table">
+          <thead><tr><th>المعلم</th><th>الاشتراك</th><th>آخر تذكير</th><th></th></tr></thead>
+          <tbody>${renewRows}</tbody></table></div>
+        ${sentToday >= 25 ? `<p class="renew-warn"><i class="fas fa-triangle-exclamation"></i> تجاوزت ٢٥ رسالة اليوم — الإكثار من الرسائل الجديدة من رقم عادي يرفع احتمال تصنيفه سبام. أكمل غداً.</p>` : ''}`
+        : `<div class="empty-state"><i class="fas fa-check-circle fa-2x" style="color:#10b981"></i><p>لا توجد اشتراكات تحتاج تذكيراً</p></div>`}
+      </div>`;
+
     el.innerHTML = `
       <div class="admin-banner">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;position:relative;z-index:1">
@@ -6959,6 +6995,7 @@ const Pages = {
           <div class="admin-log">${logHtml || `<p style="text-align:center;color:var(--text-muted);padding:1rem">${logRes.error ? 'سجل التدقيق غير مُهيّأ بعد — نفّذ ملف SQL أولاً' : 'لا توجد إجراءات مسجّلة بعد'}</p>`}</div>
         </div>
       </div>
+      ${renewHtml}
       ${annHtml}
       <div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-chalkboard-teacher"></i> قائمة المعلمين (${T.length})</h3></div>
         <div class="admin-toolbar">
@@ -6974,6 +7011,31 @@ const Pages = {
       </div>`;
 
     this._annPreview();
+  },
+
+  /* ---- التجديدات ---- */
+  _renewalRows() {
+    const now = Date.now();
+    return (this._adminCache || [])
+      .filter(u => u.role !== 'admin' && u.expires_at)
+      .map(u => ({ u, days: Math.ceil((new Date(u.expires_at).getTime() - now) / 86400000) }))
+      .filter(r => r.days <= 14)          /* من انتهى، ومن باقٍ له ١٤ يوماً فأقل */
+      .sort((a, b) => a.days - b.days);
+  },
+
+  /* منع الإلحاح: من تواصلنا معه خلال ٧ أيام يظهر زره ثانوياً */
+  _recentContact(u) {
+    if (!u.last_contact_at) return null;
+    const d = Math.floor((Date.now() - new Date(u.last_contact_at).getTime()) / 86400000);
+    return d <= 7 ? d : null;
+  },
+
+  async _renewalSend(userId) {
+    const u = this._adminUser(userId);
+    if (!u) return;
+    const days = Math.ceil((new Date(u.expires_at).getTime() - Date.now()) / 86400000);
+    const ok = await Renewals.send(u, Renewals.pickTemplate(days));
+    if (ok) this.admin();               /* يعيد الرسم ليحدّث العدّاد وحالة الزر */
   },
 
   /* ---- إعلانات المنصة (لوحة الإدارة) ---- */
