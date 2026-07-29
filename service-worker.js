@@ -1,4 +1,4 @@
-const CACHE = 'teacher-static-v5';
+const CACHE = 'teacher-static-v6';
 
 // أصول خارجية لا تتغيّر
 const CDN_ASSETS = [
@@ -64,9 +64,12 @@ self.addEventListener('fetch', e => {
      ولا تُخزَّن — مجموعها ٨٠ ميجابايت وكان حفظها التلقائي يستنفد حصة
      التخزين ويُفشل حفظ هيكل التطبيق نفسه. */
   const bulky = url.includes('/books/') || url.includes('/presentations/');
+  /* ملفات الخطوط تأتي من gstatic ومن cdnjs، أي استجابات cors لا basic.
+     استثناؤها كان يترك النص بخط النظام والأيقونات مربّعات دون اتصال. */
+  const isFont = /\.woff2?($|\?)/.test(url) || url.includes('fonts.gstatic.com');
   e.respondWith(
     caches.match(req).then(cached => cached || fetch(req).then(res => {
-      if (!bulky && res.ok && res.type === 'basic') {
+      if (!bulky && res.ok && (res.type === 'basic' || (isFont && res.type === 'cors'))) {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy));
       }

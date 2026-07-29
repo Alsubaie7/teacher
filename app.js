@@ -6820,6 +6820,9 @@ const SBAuth = {
     }
     _adminFlag = prof?.role === 'admin';
     localStorage.setItem('tm_is_admin', _adminFlag ? '1' : '0');
+    /* آخر موافقة مؤكَّدة من الخادم. تُقرأ عند الإقلاع دون اتصال حتى لا
+       يُعامَل تعذّر السؤال معاملة الرفض. */
+    localStorage.setItem('tm_approved', '1');
     const prevId = localStorage.getItem('tm_current_user');
     if (prevId && prevId !== data.user.id) {
       Object.values(DB._k).forEach(k => localStorage.removeItem(k));
@@ -7103,6 +7106,12 @@ const InstallPWA = {
 
 /* ==================== APP INIT ==================== */
 const App = {
+  /* هل يصحّ إكمال الإقلاع بلا ردّ من الخادم؟ فقط إذا سبق أن أكّد الخادم
+     الموافقة، وكانت بيانات المعلم محفوظة محلياً فعلاً. */
+  _canResumeOffline() {
+    return localStorage.getItem('tm_approved') === '1' && !!DB.teacher();
+  },
+
   async init() {
     document.getElementById('modal-backdrop').addEventListener('click', e => {
       if (e.target === e.currentTarget) Modal.close();
@@ -7120,19 +7129,41 @@ const App = {
         localStorage.setItem('tm_user_email', session.user.email.toLowerCase());
         /* لو حُدِّثت الصفحة أثناء وضع المعاينة، تُعاد بيانات الأدمن قبل أي شيء */
         if (Pages._restorePreviewData()) setTimeout(() => Toast.show('تم الخروج من وضع المعاينة واستعادة بياناتك', 'info'), 400);
+        let offline = false;
         try {
           await SBAuth.checkSubscription(session.user.id, session.user.email);
-          const { data: prof } = await _sb.from('profiles').select('approved, role').eq('id', session.user.id).maybeSingle();
-          _adminFlag = prof?.role === 'admin';
-          localStorage.setItem('tm_is_admin', _adminFlag ? '1' : '0');
-          if (!_adminFlag && (!prof || prof.approved !== true)) {
-            throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
+          const { data: prof, error: profErr } =
+            await _sb.from('profiles').select('approved, role').eq('id', session.user.id).maybeSingle();
+          if (profErr) {
+            /* لم يصل ردّ من الخادم. هذا ليس رفضاً — قد يكون الجهاز دون
+               اتصال. معاملته كرفض كانت تحذف الجلسة وترمي المعلم لشاشة
+               دخول تحتاج شبكة، فيعلق خارج المنصة بلا مخرج. */
+            if (!this._canResumeOffline()) { const e = new Error('تعذّر التحقق من الحساب — تحقق من الإنترنت وأعد المحاولة'); e.offline = true; throw e; }
+            _adminFlag = localStorage.getItem('tm_is_admin') === '1';
+            offline = true;
+          } else {
+            /* ردّ صريح من الخادم: هنا وحدها يصحّ المنع */
+            _adminFlag = prof?.role === 'admin';
+            localStorage.setItem('tm_is_admin', _adminFlag ? '1' : '0');
+            const ok = _adminFlag || prof?.approved === true;
+            localStorage.setItem('tm_approved', ok ? '1' : '0');
+            if (!ok) throw new Error('حسابك قيد المراجعة. سيتم تفعيله بعد موافقة الإدارة والدفع.');
           }
         } catch (err) {
-          await SBAuth.signOut();
+          /* الجلسة تُحذف عند الرفض المؤكَّد فقط؛ عطلُ الشبكة يُبقيها
+             حتى تنجح المحاولة التالية عند عودة الاتصال. */
+          if (!err.offline) await SBAuth.signOut();
           this._showLogin();
           setTimeout(() => Toast.show(err.message, 'error'), 300);
           return;
+        }
+        if (offline) {
+          const teacher = DB.teacher();
+          if (teacher) {
+            this.start(teacher);
+            setTimeout(() => Toast.show('أنت دون اتصال — تعمل على بياناتك المحفوظة، وستُرفع تلقائياً عند عودة الشبكة', 'info'), 400);
+            return;
+          }
         }
         await SBAuth.loadUserData(session.user.id);
         const teacher = DB.teacher();
@@ -7143,6 +7174,14 @@ const App = {
       /* أي تعثّر غير متوقع (شبكة، تخزين معطّل) يُنهي شاشة الإقلاع
          بدل ترك المستخدم أمام مؤشر تحميل لا ينتهي */
       console.error('App init failed:', err);
+      /* حتى لو تعثّر قراءة الجلسة نفسها: ما دامت الموافقة مؤكَّدة سابقاً
+         والبيانات محفوظة، الأولى إكمال العمل محلياً لا طرد المستخدم. */
+      const teacher = this._canResumeOffline() ? DB.teacher() : null;
+      if (teacher) {
+        this.start(teacher);
+        setTimeout(() => Toast.show('أنت دون اتصال — تعمل على بياناتك المحفوظة', 'info'), 400);
+        return;
+      }
       this._showLogin();
       setTimeout(() => Toast.show('تعذّر الاتصال — تحقق من الإنترنت وأعد المحاولة', 'error'), 300);
     }
@@ -7302,6 +7341,10 @@ const App = {
   async logout() {
     if (!confirm('تسجيل الخروج؟ ستبقى جميع البيانات محفوظة.')) return;
     localStorage.removeItem('tm_user_email');
+    /* الموافقة المحفوظة تخصّ جلسة انتهت — تركها يتيح إقلاعاً دون اتصال
+       لحساب خرج صاحبه عمداً. */
+    localStorage.removeItem('tm_approved');
+    localStorage.removeItem('tm_is_admin');
     await SBAuth.signOut();
     document.getElementById('app').classList.add('hidden');
     this._showLogin();
