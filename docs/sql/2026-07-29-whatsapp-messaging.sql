@@ -198,6 +198,74 @@ grant execute on function public.admin_list_announcements() to authenticated;
 
 
 /* ==========================================================================
+   القسم 3 — سجل التواصل وقوالب رسائل واتساب
+   ========================================================================== */
+
+create table if not exists public.contact_log (
+  id       bigserial primary key,
+  user_id  uuid not null references auth.users(id) on delete cascade,
+  channel  text not null default 'whatsapp',
+  template text,
+  sent_at  timestamptz not null default now(),
+  by_id    uuid references auth.users(id) on delete set null
+);
+
+create index if not exists idx_contact_log_user on public.contact_log (user_id, sent_at desc);
+
+alter table public.contact_log enable row level security;
+
+-- القراءة للأدمن فقط، والكتابة عبر الدالة حصراً (لا سياسة insert)
+drop policy if exists contact_log_read on public.contact_log;
+create policy contact_log_read on public.contact_log
+  for select to authenticated using (public.is_admin());
+
+grant select on public.contact_log to authenticated;
+
+/* تسجيل محاولة تواصل. تُنادى فور ضغط زر واتساب — لا ضغطة تأكيد ثانية،
+   لأن التأكيد اليدوي يُنسى فيصير السجل ناقصاً بلا فائدة. */
+create or replace function public.admin_log_contact(p_user uuid, p_template text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'غير مصرّح' using errcode = '42501';
+  end if;
+  insert into public.contact_log (user_id, channel, template, by_id)
+  values (p_user, 'whatsapp', p_template, auth.uid());
+end;
+$$;
+
+revoke all on function public.admin_log_contact(uuid, text) from public, anon;
+grant execute on function public.admin_log_contact(uuid, text) to authenticated;
+
+/* عدّاد اليوم — يذكّر الأدمن بحدود الرقم العادي ولا يمنعه */
+create or replace function public.admin_contacts_today()
+returns int
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select coalesce(count(*), 0)::int from public.contact_log
+  where public.is_admin() and sent_at >= date_trunc('day', now());
+$$;
+
+revoke all on function public.admin_contacts_today() from public, anon;
+grant execute on function public.admin_contacts_today() to authenticated;
+
+/* القوالب في app_settings حتى تُعدَّل من اللوحة بلا نشر كود.
+   {name} {days} {date} {link} تُستبدل في المتصفح.
+   كل قالب ينتهي باسم المنصة وجملة إيقاف — هذا ما يمنع المعلم من الضغط
+   على «حظر/بلاغ»، والبلاغات هي ما يقتل الأرقام. */
+insert into public.app_settings (key, value)
+values ('wa_templates', '{"before7":"السلام عليكم {name} 🌿\nاشتراكك في منصة المعلم ينتهي بعد {days} أيام (بتاريخ {date}).\nللتجديد: {link}\n\nمنصة المعلم\nللإيقاف اكتب: إيقاف","before1":"السلام عليكم {name} 🌿\nتذكير: اليوم آخر يوم في اشتراكك بمنصة المعلم.\nللتجديد: {link}\n\nمنصة المعلم\nللإيقاف اكتب: إيقاف","after3":"السلام عليكم {name} 🌿\nانتهى اشتراكك في منصة المعلم قبل {days} أيام، وبياناتك محفوظة كما هي.\nللعودة: {link}\n\nمنصة المعلم\nللإيقاف اكتب: إيقاف"}')
+on conflict (key) do nothing;
+
+
+/* ==========================================================================
    تحديث get_all_users
    ⚠️ يعتمد على public.contact_log المُعرَّف في القسم 3 أدناه.
       نفّذ القسم 3 قبل هذه الكتلة إن كنت تنفّذ الملف على مراحل.
