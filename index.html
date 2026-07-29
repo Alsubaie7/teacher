@@ -6,7 +6,7 @@
   <title>منصة المعلم | Teacher Platform</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=56">
+  <link rel="stylesheet" href="style.css?v=57">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -241,6 +241,8 @@
       </header>
 
       <div class="app-body">
+        <!-- بانر «قراءة فقط» — عنصر ثابت خارج #content حتى لا تمحوه إعادة رسم الصفحات -->
+        <div id="lock-banner" class="lock-banner hidden"></div>
         <div id="preview-banner" class="preview-banner hidden">
           <i class="fas fa-eye"></i>
           <span id="preview-banner-text">وضع المعاينة</span>
@@ -312,7 +314,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=56"></script>
+  <script src="app.js?v=57"></script>
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');</script>
 </body>
 </html>
