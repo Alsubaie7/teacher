@@ -3265,3 +3265,51 @@ select option { background: #fff; color: var(--text-primary); }
   width:100%; max-width:260px; padding:.55rem .7rem; text-align:right;
   border:1px solid var(--border); border-radius:10px; font-family:inherit;
 }
+
+/* ===== جرس الإعلانات ===== */
+.ann-wrap{ position:relative }
+.ann-badge{
+  position:absolute; top:2px; inset-inline-end:2px; min-width:17px; height:17px;
+  padding:0 4px; border-radius:999px; background:#ef4444; color:#fff;
+  font-size:.66rem; font-weight:800; display:grid; place-items:center; line-height:1;
+}
+.ann-panel{
+  position:absolute; top:calc(100% + .5rem); inset-inline-end:0; width:min(360px, calc(100vw - 2rem));
+  max-height:min(70vh, 520px); overflow-y:auto; z-index:60;
+  background:var(--card-bg,#fff); border:1px solid var(--border);
+  border-radius:14px; box-shadow:0 12px 34px rgba(0,0,0,.16);
+}
+.ann-head{ padding:.8rem 1rem; font-weight:800; border-bottom:1px solid var(--border) }
+.ann-empty{ padding:2.2rem 1rem; text-align:center; color:var(--text-muted) }
+.ann-empty i{ font-size:1.7rem; opacity:.45; display:block; margin-bottom:.5rem }
+.ann-empty p{ margin:0 }
+.ann-item{ display:flex; gap:.7rem; padding:.85rem 1rem; border-bottom:1px solid var(--border) }
+.ann-item:last-child{ border-bottom:0 }
+.ann-item.is-new{ background:rgba(79,70,229,.05) }
+.ann-item-icon{ width:34px; height:34px; flex-shrink:0; border-radius:10px; display:grid; place-items:center }
+.ann-item-body{ flex:1; min-width:0 }
+.ann-item-top{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.25rem }
+.ann-kind{ font-size:.68rem; font-weight:700; padding:.1rem .45rem; border-radius:999px }
+.ann-item-body p{ margin:0; font-size:.84rem; line-height:1.7; color:var(--text-secondary,#475569); white-space:pre-wrap }
+.ann-date{ margin-top:.35rem; font-size:.72rem; color:var(--text-muted) }
+.ann-cta{
+  margin-top:.5rem; background:none; border:0; padding:0; cursor:pointer;
+  color:var(--purple,#4f46e5); font-weight:700; font-size:.8rem; font-family:inherit;
+}
+
+/* ===== بانر التجديد ===== */
+.renew-banner{
+  display:flex; align-items:center; gap:.8rem; flex-wrap:wrap;
+  background:linear-gradient(135deg,#fef3c7,#fde68a); color:#78350f;
+  border:1px solid #f59e0b; border-radius:14px;
+  padding:.85rem 1rem; margin-bottom:1.25rem; font-size:.88rem;
+}
+.renew-banner > i{ font-size:1.15rem; flex-shrink:0 }
+.renew-banner-txt{ flex:1; min-width:180px; display:flex; flex-direction:column; gap:.15rem }
+.renew-banner-txt strong{ font-size:.95rem }
+.renew-banner-cta{
+  background:#78350f; color:#fff; border:0; border-radius:9px;
+  padding:.45rem .9rem; font-weight:700; cursor:pointer; font-family:inherit; font-size:.82rem;
+}
+.renew-banner-x{ background:none; border:0; color:#78350f; opacity:.6; cursor:pointer; font-size:1rem; padding:.2rem }
+.renew-banner-x:hover{ opacity:1 }

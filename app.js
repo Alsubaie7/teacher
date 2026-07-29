@@ -2623,6 +2623,141 @@ const WAConsent = {
   }
 };
 
+/* ==================== إعلانات المنصة ====================
+   الفلترة بالجمهور تتم في الخادم عبر get_my_announcements.
+   حالة القراءة عمود واحد (profiles.ann_seen_at) لا جدول ربط:
+   الشارة = عدد المنشور بعد هذا الطابع. */
+const Ann = {
+  _items: [],
+  _seenAt: null,
+  _open: false,
+
+  _META: {
+    feature: { i:'fa-wand-magic-sparkles', c:'#7c3aed', b:'#ede9fe', t:'جديد' },
+    offer:   { i:'fa-tags',                c:'#d97706', b:'#fef3c7', t:'عرض' },
+    notice:  { i:'fa-circle-info',         c:'#2563eb', b:'#dbeafe', t:'تنبيه' }
+  },
+
+  /* قائمة بيضاء للمسارات — نسخة الواجهة من الحارس الموجود في admin_publish_announcement */
+  _ROUTES: ['dashboard','classes','lessons','analytics','referrals','settings'],
+
+  async load() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return;
+    const [annRes, profRes] = await Promise.all([
+      _sb.rpc('get_my_announcements'),
+      _sb.from('profiles').select('ann_seen_at').eq('id', uid).maybeSingle()
+    ]);
+    if (annRes.error) return;          /* الجرس ميزة ثانوية — لا يُزعج المستخدم بخطأ */
+    this._items  = annRes.data || [];
+    this._seenAt = profRes.data?.ann_seen_at ? new Date(profRes.data.ann_seen_at).getTime() : 0;
+    this._paintBadge();
+    Banner.maybeShow(this._items);
+  },
+
+  _unread() {
+    return this._items.filter(a => new Date(a.published_at).getTime() > (this._seenAt || 0)).length;
+  },
+
+  _paintBadge() {
+    const el = document.getElementById('ann-badge');
+    if (!el) return;
+    const n = this._unread();
+    el.textContent = n > 9 ? '+9' : String(n);
+    el.classList.toggle('hidden', n === 0);
+  },
+
+  toggle() {
+    this._open = !this._open;
+    const p = document.getElementById('ann-panel');
+    if (!p) return;
+    p.classList.toggle('hidden', !this._open);
+    if (this._open) { this._render(); this._markSeen(); }
+  },
+
+  _render() {
+    const p = document.getElementById('ann-panel');
+    if (!p) return;
+    if (!this._items.length) {
+      p.innerHTML = `<div class="ann-empty"><i class="fas fa-bell-slash"></i><p>لا توجد إعلانات</p></div>`;
+      return;
+    }
+    p.innerHTML = `<div class="ann-head">الإعلانات</div>` + this._items.map(a => {
+      const m     = this._META[a.kind] || this._META.notice;
+      const isNew = new Date(a.published_at).getTime() > (this._seenAt || 0);
+      const cta   = (a.cta_label && this._ROUTES.includes(a.cta_route))
+        ? `<button class="ann-cta" onclick="Ann.go('${_jsq(a.cta_route)}')">${_esc(a.cta_label)} <i class="fas fa-arrow-left"></i></button>`
+        : '';
+      return `<div class="ann-item${isNew ? ' is-new' : ''}">
+        <div class="ann-item-icon" style="background:${m.b};color:${m.c}"><i class="fas ${m.i}"></i></div>
+        <div class="ann-item-body">
+          <div class="ann-item-top">
+            <strong>${_esc(a.title)}</strong>
+            <span class="ann-kind" style="background:${m.b};color:${m.c}">${m.t}</span>
+          </div>
+          <p>${_esc(a.body)}</p>
+          <div class="ann-date">${_esc(new Date(a.published_at).toLocaleDateString('ar-SA'))}</div>
+          ${cta}
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  go(route) {
+    if (!this._ROUTES.includes(route)) return;   /* حارس ثانٍ في الواجهة */
+    this.toggle();
+    Router.go(route);
+  },
+
+  async _markSeen() {
+    const uid = localStorage.getItem('tm_current_user');
+    if (!uid) return;
+    const now = new Date().toISOString();
+    this._seenAt = Date.now();
+    this._paintBadge();
+    await _sb.from('profiles').update({ ann_seen_at: now }).eq('id', uid);
+  }
+};
+
+/* إغلاق لوحة الإعلانات عند الضغط خارجها */
+document.addEventListener('click', e => {
+  if (!Ann._open) return;
+  if (e.target.closest('.ann-wrap')) return;
+  Ann.toggle();
+});
+
+/* ==================== بانر التجديد ====================
+   يعرض إعلاناً واحداً فقط — الأحدث ممن جمهوره expiring — أعلى المحتوى.
+   الإخفاء محلي ولا يُخزَّن في الخادم: البانر يجب أن يعود إن نُشر إعلان أحدث. */
+const Banner = {
+  _KEY: 'tm_banner_dismissed',
+
+  maybeShow(items) {
+    const a = (items || []).find(x => x.audience === 'expiring');
+    const host = document.getElementById('content');
+    document.getElementById('renew-banner')?.remove();
+    if (!a || !host) return;
+    if (localStorage.getItem(this._KEY) === a.id) return;
+
+    const cta = (a.cta_label && Ann._ROUTES.includes(a.cta_route))
+      ? `<button class="renew-banner-cta" onclick="Ann.go('${_jsq(a.cta_route)}')">${_esc(a.cta_label)}</button>` : '';
+    const el = document.createElement('div');
+    el.id = 'renew-banner';
+    el.className = 'renew-banner';
+    el.innerHTML = `
+      <i class="fas fa-triangle-exclamation"></i>
+      <div class="renew-banner-txt"><strong>${_esc(a.title)}</strong><span>${_esc(a.body)}</span></div>
+      ${cta}
+      <button class="renew-banner-x" onclick="Banner.dismiss('${_jsq(a.id)}')" title="إخفاء"><i class="fas fa-xmark"></i></button>`;
+    host.prepend(el);
+  },
+
+  dismiss(id) {
+    localStorage.setItem(this._KEY, id);
+    document.getElementById('renew-banner')?.remove();
+  }
+};
+
 /* ==================== PAGES ==================== */
 const Pages = {
 
@@ -2804,6 +2939,7 @@ const Pages = {
           <button class="btn btn-primary" onclick="Pages.addClassModal()"><i class="fas fa-plus"></i> إضافة فصل</button>
         </div>`;
       WAConsent.maybeShow();     /* المعلم الجديد بلا فصول يمر من هنا لا من نهاية الدالة */
+      Ann.load();
       return;
     }
 
@@ -2854,6 +2990,7 @@ const Pages = {
 
     /* تُنادى من هنا لا من الإقلاع: تُلحَق ببطاقة أعلى #content بعد امتلائه */
     WAConsent.maybeShow();
+    Ann.load();
   },
 
   /* ---- CLASS DETAIL ---- */
