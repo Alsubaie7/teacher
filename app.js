@@ -3655,7 +3655,9 @@ const Pages = {
           <div id="class-name-preview" style="font-size:1.1rem;font-weight:700;color:var(--primary);background:var(--primary-light);border-radius:8px;padding:.5rem 1rem;text-align:center">${gl} ${sec}</div>
         </div>
         <div class="form-group"><label>المادة الدراسية *</label>
-          <select name="subject" required>${_esc(Subjects.allSubjectOptionsHtml(cls?.subject || (!editId ? DB.teacher()?.subject : '') || ''))}</select></div>
+          <!-- بلا _esc: الدالة تُرجع وسوم <option> من قائمة مواد ثابتة في الكود،
+               وتهريبها يحوّلها نصاً حرفياً فتبقى القائمة فارغة ويمنع required الحفظ -->
+          <select name="subject" required>${Subjects.allSubjectOptionsHtml(cls?.subject || (!editId ? DB.teacher()?.subject : '') || '')}</select></div>
         <div class="form-group"><label>لون الفصل في الجدول</label>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="color-picker">
             ${['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899','#84CC16','#F97316','#6366F1'].map(c =>
@@ -6585,7 +6587,8 @@ const Pages = {
           <div class="form-group"><label>المرحلة الدراسية</label>
             <select id="sett-stage" onchange="Subjects.fillSubjectSelect(this.value,'sett-subject')">${Subjects.stageOptionsHtml(t.stage)}</select></div>
           <div class="form-group"><label>المادة</label>
-            <select id="sett-subject"${t.stage ? '' : ' disabled'}>${_esc(Subjects.subjectOptionsHtml(t.stage, t.subject))}</select></div>
+            <!-- بلا _esc لنفس سبب قائمة المادة في نافذة الفصل: وسوم لا نص -->
+            <select id="sett-subject"${t.stage ? '' : ' disabled'}>${Subjects.subjectOptionsHtml(t.stage, t.subject)}</select></div>
           <div class="form-actions">
             <button class="btn btn-primary" onclick="Pages._saveProfile()"><i class="fas fa-save"></i> حفظ</button>
           </div>
