@@ -3113,13 +3113,11 @@ const NoorPaste = {
    ويُبنى في الرنتايم فيحمل عنوان المنصة الحالي. كل \\ مضاعف: النص يمر
    بـ template literal قبل أن يصير كودًا. */
 const NoorTool = {
-  ORIGIN: 'https://noor.moe.gov.sa',
   build() {
-    const platform = location.origin + location.pathname.replace(/[^/]*$/, '');
-    return 'javascript:' + encodeURIComponent('(function(){' + this._src(platform, location.origin) + '})();');
+    return 'javascript:' + encodeURIComponent('(function(){' + this._src() + '})();');
   },
-  _src(PL, ORG) { return `
-var K='tm_noor_batch',TAG='|TMNOOR|',PLAT='${PL}',ORG='${ORG}',MO=null,TMR=null;
+  _src() { return `
+var K='tm_noor_batch',TAG='|TMNOOR|',MO=null,TMR=null;
 function nm(s){return (s||'').replace(/[\\u200b-\\u200f\\u202a-\\u202e]/g,'').replace(/[\\u064b-\\u0652\\u0640]/g,'').replace(/\\s+/g,' ').trim();}
 function isN(s){s=nm(s);if(s.length<5)return false;if(!/^[\\u0621-\\u064a\\s]+$/.test(s))return false;
 if(s.split(' ').length<2)return false;
@@ -3195,8 +3193,6 @@ var list=document.createElement('div');
 list.style.cssText='max-height:200px;overflow:auto;border:1px solid #E5E7EB;border-radius:9px;margin-bottom:.8rem';body.appendChild(list);
 var addB=document.createElement('button');
 addB.style.cssText='width:100%;background:#4F46E5;color:#fff;border:0;padding:.6rem;border-radius:9px;font-family:inherit;font-weight:700;cursor:pointer;font-size:14px;margin-bottom:.5rem';
-var sendB=document.createElement('button');
-sendB.style.cssText='width:100%;background:#059669;color:#fff;border:0;padding:.6rem;border-radius:9px;font-family:inherit;font-weight:700;cursor:pointer;font-size:14px;margin-bottom:.5rem';
 var copyB=document.createElement('button');
 copyB.style.cssText='width:100%;background:#fff;color:#4F46E5;border:1px solid #4F46E5;padding:.6rem;border-radius:9px;font-family:inherit;font-weight:700;cursor:pointer;font-size:14px';
 var pend=document.createElement('div');pend.style.cssText='font-size:11.5px;color:#92400E;margin-top:.5rem;line-height:1.6';
@@ -3207,12 +3203,11 @@ r.style.cssText='padding:.35rem .6rem;border-bottom:1px solid #F3F4F6;font-size:
 r.innerHTML='<span>'+(i+1)+'. '+n+'</span>'+(d?'<span style="font-size:11px;color:#059669;font-weight:700;flex:none">مُضاف</span>':'');
 list.appendChild(r);});}
 function refresh(){
-ht.innerHTML='المجموعة: '+grp.length+' اسمًا<span style="opacity:.6;font-weight:400;font-size:11px"> · v6</span>';
+ht.innerHTML='المجموعة: '+grp.length+' اسمًا<span style="opacity:.6;font-weight:400;font-size:11px"> · v7</span>';
 note.textContent='هذه الصفحة: '+page.length+' اسمًا · جديد فيها: '+fresh.length;
 addB.textContent=fresh.length?'أضف أسماء هذه الصفحة ('+fresh.length+')':(page.length?'كل أسماء هذه الصفحة مُضافة \\u2713':'لا توجد أسماء في هذه الصفحة');
 addB.disabled=!fresh.length;addB.style.background=fresh.length?'#4F46E5':'#E5E7EB';
 addB.style.color=fresh.length?'#fff':'#9CA3AF';addB.style.cursor=fresh.length?'pointer':'default';
-sendB.textContent='أرسل للمنصة ('+grp.length+')';sendB.disabled=!grp.length;sendB.style.opacity=grp.length?'1':'.5';
 copyB.textContent='انسخ المجموعة ('+grp.length+')';copyB.disabled=!grp.length;copyB.style.opacity=grp.length?'1':'.5';
 pend.textContent=(fresh.length&&grp.length)?('تنبيه: '+fresh.length+' اسمًا في هذه الصفحة لسه ما أُضيفوا — اضغط «أضف» أولًا.'):'';
 draw();}
@@ -3220,19 +3215,6 @@ addB.onclick=function(){fresh.forEach(function(n){inG[n]=1;grp.push(n);});
 var ok=save({sig:meta||st.sig,names:grp});se.style.display=ok?'none':'block';
 var n=fresh.length;fresh=[];refresh();
 addB.textContent='\\u2713 أُضيف '+n+' — انتقل للصفحة التالية والزر يتفعّل وحده';};
-sendB.onclick=function(){
-var win=window.open(PLAT+'#noor-import','tm_import');
-if(!win){sendB.textContent='المتصفح حجب النافذة — استخدم «انسخ»';return;}
-sendB.textContent='جارٍ الإرسال…';
-var sent=false;
-var onMsg=function(ev){
-if(ev.data&&ev.data.type==='tm-import-ready'&&!sent){sent=true;
-win.postMessage({type:'tm-noor-names',names:grp.slice(0,500),header:hdr()},ORG);
-sendB.textContent='\\u2713 أُرسلت '+grp.length+' — أكمل في المنصة';
-window.removeEventListener('message',onMsg);}};
-window.addEventListener('message',onMsg);
-setTimeout(function(){if(!sent){window.removeEventListener('message',onMsg);
-sendB.textContent='ما وصل رد من المنصة — استخدم «انسخ»';}},30000);};
 copyB.onclick=function(){var txt=grp.join('\\n');
 var done=function(){copyB.textContent='\\u2713 نُسخت '+grp.length+' — الصقها في المنصة';
 copyB.style.background='#059669';copyB.style.color='#fff';copyB.style.borderColor='#059669';};
@@ -3243,7 +3225,7 @@ var rst=document.createElement('button');rst.textContent='ابدأ من جديد
 rst.style.cssText='width:100%;background:none;color:#9CA3AF;border:0;padding:.5rem;font-family:inherit;cursor:pointer;font-size:12.5px;margin-top:.3rem';
 rst.onclick=function(){clr();if(MO)MO.disconnect();p.remove();panel();};
 refresh();
-body.appendChild(addB);body.appendChild(sendB);body.appendChild(copyB);body.appendChild(pend);body.appendChild(rst);
+body.appendChild(addB);body.appendChild(copyB);body.appendChild(pend);body.appendChild(rst);
 p.appendChild(head);p.appendChild(body);document.body.appendChild(p);
 /* ترقيم نور يحدّث الجدول بـ AJAX بلا إعادة تحميل — نراقب ونعيد المسح */
 try{MO=new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){
@@ -3254,37 +3236,6 @@ var h2=hdr(),m2=[h2['الصف'],h2['الفصل'],h2['المادة']].filter(Bool
 if(m2&&mb)mb.textContent=m2;},250);return;}});
 MO.observe(document.body,{childList:true,subtree:true});}catch(e){}}
 panel();`; }
-};
-
-/* استقبال التسليم المباشر من الأداة. كل ما يصل نص غير موثوق:
-   نتحقق من الأصل والشكل، ثم يمر بنفس فحص NoorPaste، ولا يُحفظ إلا بضغطة المعلم. */
-const NoorBridge = {
-  init() {
-    if (location.hash !== '#noor-import') return;
-    let done = false;
-    const onMsg = ev => {
-      if (ev.origin !== NoorTool.ORIGIN) return;
-      const d = ev.data;
-      if (!d || d.type !== 'tm-noor-names' || !Array.isArray(d.names) || done) return;
-      done = true;
-      window.removeEventListener('message', onMsg);
-      const names = d.names.slice(0, 500).map(n => NoorPaste.norm(n)).filter(n => NoorPaste.isName(n));
-      const header = (d.header && typeof d.header === 'object') ? d.header : {};
-      history.replaceState(null, '', location.pathname + location.search);
-      const cls = DB.get('classes');
-      if (!cls.length) { Toast.show('أضف فصلًا أولًا ثم أعد الإرسال', 'error'); return; }
-      Pages.bulkStudentsModal(cls[0].id);
-      Pages._npApply({ names, skipped: [], header });
-      const ta = document.getElementById('np-input');
-      if (ta) ta.value = names.join('\n');
-      Toast.show(`وصل ${names.length} اسمًا من نور — راجعها ثم أضفها`);
-    };
-    window.addEventListener('message', onMsg);
-    if (window.opener) {
-      try { window.opener.postMessage({ type: 'tm-import-ready' }, NoorTool.ORIGIN); } catch (e) {}
-    }
-    setTimeout(() => window.removeEventListener('message', onMsg), 30000);
-  }
 };
 
 /* ==================== PAGES ==================== */
@@ -8516,7 +8467,6 @@ const App = {
        على نفسه. هنا _adminFlag مضبوط فعلاً. */
     Subscription.resolve().then(() => Subscription.paintLock());
     Router.go('dashboard');
-    NoorBridge.init();   /* بعد الراوتر: النافذة تُفتح فوق الصفحة الجاهزة */
     this._startSubWatcher();
   },
 
