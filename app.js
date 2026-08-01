@@ -2966,6 +2966,327 @@ const Renewals = {
   }
 };
 
+/* ==================== NOOR IMPORT ====================
+   استخراج أسماء الطلاب مما يُلصق من نظام نور. منطق نقي بلا DOM للتطبيق
+   ولا تخزين — كل ما يدخل هنا نص غير موثوق، وكل ما يخرج أسماء مفلترة.
+   أرقام الهوية تُرمى ولا تُخزَّن: DB.set يزامن كل شيء إلى السحابة. */
+const NoorPaste = {
+  _BAD: ['رقم الهوية','الاسم الرباعي','اسم الطالب','ملاحظات','القسم','الفصل','المادة',
+         'الصف','عرض','إضافة','التنبيهات','الطلاب','المرحلة','الفترة','بيانات الطالب'],
+
+  norm(s) {
+    return (s || '')
+      .replace(/[​-‏‪-‮]/g, '')   /* محارف الاتجاه الخفية */
+      .replace(/[ً-ْـ]/g, '')          /* التشكيل والتطويل */
+      .replace(/\s+/g, ' ').trim();
+  },
+
+  isName(s) {
+    s = this.norm(s);
+    if (s.length < 5) return false;
+    if (!/^[ء-ي\s]+$/.test(s)) return false;   /* عربي خالص: يسقط الهوية و«عرض | إضافة» */
+    if (s.split(' ').length < 2) return false;
+    return !this._BAD.includes(s);
+  },
+
+  /* المسار الدقيق: عمود «الاسم» من جدول HTML في الحافظة */
+  fromDom(root) {
+    const out = [], seen = new Set();
+    const push = v => { v = this.norm(v); if (this.isName(v) && !seen.has(v)) { seen.add(v); out.push(v); } };
+
+    for (const tbl of root.querySelectorAll('table')) {
+      const rows = tbl.rows;
+      if (!rows || rows.length < 2) continue;
+      let col = -1;
+      for (let r = 0; r < Math.min(rows.length, 3) && col < 0; r++) {
+        for (let c = 0; c < rows[r].cells.length; c++) {
+          if (this.norm(rows[r].cells[c].textContent).indexOf('الاسم') === 0) { col = c; break; }
+        }
+      }
+      if (col < 0) continue;
+      for (const row of rows) if (row.cells[col]) push(row.cells[col].textContent);
+      if (out.length) return out;
+    }
+    /* بلا ترويسة «الاسم»: الصف الذي يجمع اسمًا ورقم هوية — يستبعد صفوف الترويسة */
+    for (const tr of root.querySelectorAll('tr')) {
+      let nm = '', hasId = false;
+      for (const cell of tr.children) {
+        const v = this.norm(cell.textContent);
+        if (!nm && this.isName(v)) nm = v;
+        else if (/^[0-9٠-٩]{5,}$/.test(v)) hasId = true;
+      }
+      if (nm && hasId) push(nm);
+    }
+    return out;
+  },
+
+  /* المسار الاحتياطي: نص خام — من نور، أو إكسل، أو قائمة أسماء مكتوبة */
+  fromText(text) {
+    const names = [], skipped = [], seen = new Set();
+    for (const raw of (text || '').split(/\r?\n/)) {
+      if (!this.norm(raw)) continue;
+      const cells = raw.split('\t');
+      let hit = '';
+      for (const c of cells) { const v = this.norm(c); if (this.isName(v)) { hit = v; break; } }
+      /* السطر المفكَّك بجدولة حكمه من خلاياه، وإلا صار
+         «رقم الهوية · الاسم الرباعي · ملاحظات» اسم طالب */
+      if (!hit && cells.length === 1 && this.isName(raw)) hit = this.norm(raw);
+      if (hit) { if (!seen.has(hit)) { seen.add(hit); names.push(hit); } }
+      else skipped.push(this.norm(raw));
+    }
+    return { names, skipped };
+  },
+
+  headerFromDom(root) {
+    const out = {};
+    const els = root.querySelectorAll('td,th,span,div,label');
+    for (const lab of ['الصف','القسم','الفصل','المادة']) {
+      for (const el of els) {
+        if (this.norm(el.textContent).replace(/\s*:\s*$/, '') !== lab) continue;
+        let n = el.nextElementSibling, val = '';
+        while (n && !val) {
+          const v = this.norm(n.textContent).replace(/^:\s*/, '');
+          if (v && v !== ':') val = v;
+          n = n.nextElementSibling;
+        }
+        if (val && val.length < 60) { out[lab] = val; break; }
+      }
+    }
+    return out;
+  },
+
+  headerFromText(text) {
+    const out = {};
+    for (const lab of ['الصف','القسم','الفصل','المادة']) {
+      const m = new RegExp(lab + '\\s*[\\t:：]+\\s*([^\\n\\t:]{1,50})').exec(text || '');
+      if (m) { const v = this.norm(m[1]); if (v) out[lab] = v; }
+    }
+    return out;
+  },
+
+  /* المدخل الوحيد: {html, text} من الحافظة → أسماء + متجاهَل + ترويسة */
+  parse({ html = '', text = '' } = {}) {
+    let names = [], skipped = [], header = {};
+    if (html) {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      names  = this.fromDom(doc);
+      header = this.headerFromDom(doc);
+    }
+    if (!names.length) { const r = this.fromText(text); names = r.names; skipped = r.skipped; }
+    if (!Object.keys(header).length) header = this.headerFromText(text);
+    return { names, skipped, header };
+  },
+
+  /* الترويسة → فصل. نور يكتب «الرابع الابتدائي»، والمنصة «رابع ابتدائي» */
+  _gradeOf(raw) {
+    const t = this.norm(raw).replace(/^الصف\s*/, '')
+      .split(' ').map(w => w.replace(/^ال/, '')).join(' ');
+    return GRADE_LEVELS.find(g => g === t) || '';
+  },
+  _subjectOf(raw) {
+    const key = s => this.norm(s).split(' ').map(w => w.replace(/^ال/, '')).sort().join(' ');
+    const k = key(raw);
+    return k ? (Subjects.all().find(s => key(s) === k) || '') : '';
+  },
+
+  /* يرجّح فصلًا واحدًا من فصول المعلم، أو يقترح إنشاءه */
+  matchClass(header, classes) {
+    const gradeLevel = this._gradeOf(header['الصف'] || '');
+    const section    = this.norm(header['الفصل'] || '');
+    const subject    = this._subjectOf(header['المادة'] || '');
+    const valid      = SECTIONS_LETTERS.includes(section) || SECTIONS_NUMS.includes(section);
+    let hits = classes;
+    if (gradeLevel) hits = hits.filter(c => c.gradeLevel === gradeLevel);
+    if (valid)      hits = hits.filter(c => c.section === section);
+    if (subject && hits.length > 1) hits = hits.filter(c => c.subject === subject);
+    return {
+      gradeLevel, section: valid ? section : '', subject,
+      classId: (gradeLevel && valid && hits.length === 1) ? hits[0].id : '',
+      canCreate: !!(gradeLevel && valid),
+      label: [gradeLevel, valid ? section : '', subject].filter(Boolean).join(' · ')
+    };
+  }
+};
+
+/* أداة السحب: كود يعمل داخل صفحة نور نفسها — لأن سياسة Same-Origin تمنع
+   المنصة من قراءة نطاق آخر. مكتفٍ ذاتيًا بلا جلب أي سكربت (تفاديًا لـ CSP)،
+   ويُبنى في الرنتايم فيحمل عنوان المنصة الحالي. كل \\ مضاعف: النص يمر
+   بـ template literal قبل أن يصير كودًا. */
+const NoorTool = {
+  ORIGIN: 'https://noor.moe.gov.sa',
+  build() {
+    const platform = location.origin + location.pathname.replace(/[^/]*$/, '');
+    return 'javascript:' + encodeURIComponent('(function(){' + this._src(platform, location.origin) + '})();');
+  },
+  _src(PL, ORG) { return `
+var K='tm_noor_batch',TAG='|TMNOOR|',PLAT='${PL}',ORG='${ORG}',MO=null,TMR=null;
+function nm(s){return (s||'').replace(/[\\u200b-\\u200f\\u202a-\\u202e]/g,'').replace(/[\\u064b-\\u0652\\u0640]/g,'').replace(/\\s+/g,' ').trim();}
+function isN(s){s=nm(s);if(s.length<5)return false;if(!/^[\\u0621-\\u064a\\s]+$/.test(s))return false;
+if(s.split(' ').length<2)return false;
+var B=['رقم الهوية','الاسم الرباعي','اسم الطالب','ملاحظات','القسم','الفصل','المادة','الصف','عرض','إضافة','التنبيهات','الطلاب','المرحلة','الفترة','بيانات الطالب'];
+return B.indexOf(s)<0;}
+function scan(){var out=[],seen={},push=function(v){v=nm(v);if(isN(v)&&!seen[v]){seen[v]=1;out.push(v);}};
+var T=document.querySelectorAll('table');
+for(var t=0;t<T.length;t++){var R=T[t].rows,col=-1;if(!R||R.length<2)continue;
+for(var r=0;r<Math.min(R.length,3)&&col<0;r++){for(var c=0;c<R[r].cells.length;c++){
+if(nm(R[r].cells[c].textContent).indexOf('الاسم')===0){col=c;break;}}}
+if(col<0)continue;for(var i=0;i<R.length;i++){if(R[i].cells[col])push(R[i].cells[col].textContent);}
+if(out.length)return out;}
+var A=document.querySelectorAll('tr');
+for(var k=0;k<A.length;k++){var cs=A[k].children,n2='',hid=false;
+for(var j=0;j<cs.length;j++){var v=nm(cs[j].textContent);
+if(!n2&&isN(v))n2=v;else if(/^[0-9\\u0660-\\u0669]{5,}$/.test(v))hid=true;}
+if(n2&&hid)push(n2);}return out;}
+function hdr(){var o={},L=['الصف','القسم','الفصل','المادة'],E=document.querySelectorAll('td,th,span,div,label');
+for(var k=0;k<L.length;k++){for(var i=0;i<E.length;i++){
+if(nm(E[i].textContent).replace(/\\s*:\\s*$/,'')!==L[k])continue;
+var n2=E[i].nextElementSibling,val='';
+while(n2&&!val){var v=nm(n2.textContent).replace(/^:\\s*/,'');if(v&&v!==':')val=v;n2=n2.nextElementSibling;}
+if(val&&val.length<60){o[L[k]]=val;break;}}}return o;}
+function load(){var a=null,b=null;
+try{var v=localStorage.getItem(K);if(v)a=JSON.parse(v);}catch(e){}
+try{var m=window.name.split(TAG)[1];if(m)b=JSON.parse(m);}catch(e){}
+if(a&&b)return (b.names||[]).length>(a.names||[]).length?b:a;return a||b||{};}
+function save(o){var s=JSON.stringify(o),ok=false;
+try{localStorage.setItem(K,s);ok=true;}catch(e){}
+try{window.name=window.name.split(TAG)[0]+TAG+s;}catch(e){}return ok;}
+function clr(){try{localStorage.removeItem(K);}catch(e){}
+try{window.name=window.name.split(TAG)[0];}catch(e){}}
+function psel(){var OK={'5':1,'10':1,'15':1,'20':1,'25':1,'30':1,'50':1,'100':1,'200':1,'500':1};
+var S=document.querySelectorAll('select');
+for(var i=0;i<S.length;i++){var O=S[i].options,good=O.length>=2,big=0;
+for(var j=0;j<O.length;j++){var v=nm(O[j].textContent);if(!OK[v]){good=false;break;}if(+v>big)big=+v;}
+if(good&&big>=50)return S[i];}return null;}
+function panel(){
+var old=document.getElementById('tm-noor-panel');if(old)old.remove();
+var page=scan(),H=hdr(),meta=[H['الصف'],H['الفصل'],H['المادة']].filter(Boolean).join(' · ');
+var st=load(),grp=(st.names||[]).slice(),inG={};grp.forEach(function(n){inG[n]=1;});
+var fresh=page.filter(function(n){return !inG[n];});
+var switched=!!(st.sig&&meta&&st.sig!==meta);
+var p=document.createElement('div');p.id='tm-noor-panel';p.setAttribute('dir','rtl');
+p.style.cssText='position:fixed;top:16px;left:16px;z-index:2147483647;width:330px;background:#fff;border:1px solid #E5E7EB;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.25);font-family:-apple-system,Tahoma,sans-serif;color:#1E1B4B;overflow:hidden;font-size:14px';
+var head=document.createElement('div');
+head.style.cssText='background:#4F46E5;color:#fff;padding:.7rem 1rem;font-weight:700;display:flex;justify-content:space-between;align-items:center';
+var ht=document.createElement('span');head.appendChild(ht);
+var x=document.createElement('span');x.textContent='\\u2715';
+x.style.cssText='cursor:pointer;opacity:.85;padding:0 .3rem';
+x.onclick=function(){if(MO)MO.disconnect();p.remove();};head.appendChild(x);
+var body=document.createElement('div');body.style.cssText='padding:.9rem 1rem';
+var mb=null;
+if(meta){mb=document.createElement('div');mb.textContent=meta;
+mb.style.cssText='background:#EEF2FF;color:#4F46E5;border-radius:8px;padding:.4rem .7rem;font-size:12.5px;font-weight:700;margin-bottom:.7rem';body.appendChild(mb);}
+var note=document.createElement('div');note.style.cssText='font-size:12.5px;margin-bottom:.7rem;color:#6B7280';body.appendChild(note);
+if(switched){var w=document.createElement('div');
+w.textContent='تنبيه: ترويسة الصفحة تغيّرت — الأسماء تُضاف للمجموعة نفسها. لو انتقلت لفصل آخر اضغط «ابدأ من جديد».';
+w.style.cssText='background:#FEF3C7;color:#92400E;border-radius:8px;padding:.5rem .7rem;font-size:12px;font-weight:600;line-height:1.6;margin-bottom:.7rem';body.appendChild(w);}
+var se=document.createElement('div');
+se.style.cssText='display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:.5rem .7rem;font-size:12px;font-weight:700;margin-bottom:.7rem';
+se.textContent='الحفظ المحلي محجوب — نستخدم المخزن الاحتياطي (يعمل ما دمت في نفس التبويب).';body.appendChild(se);
+var ps=psel();
+if(ps){var big=null;
+for(var q=0;q<ps.options.length;q++){var nv=parseInt(nm(ps.options[q].textContent),10);
+if(!isNaN(nv)&&(!big||nv>parseInt(nm(big.textContent),10)))big=ps.options[q];}
+if(big){var pb=document.createElement('button');
+pb.textContent='أظهر '+nm(big.textContent)+' صفًا في صفحة واحدة';
+pb.style.cssText='width:100%;background:#fff;color:#4F46E5;border:1px solid #4F46E5;padding:.5rem;border-radius:9px;font-family:inherit;font-weight:700;cursor:pointer;font-size:13px;margin-bottom:.7rem';
+pb.onclick=function(){pb.textContent='جارٍ تحديث الصفحة…';ps.value=big.value;
+ps.dispatchEvent(new Event('change',{bubbles:true}));};body.appendChild(pb);}}
+var list=document.createElement('div');
+list.style.cssText='max-height:200px;overflow:auto;border:1px solid #E5E7EB;border-radius:9px;margin-bottom:.8rem';body.appendChild(list);
+var addB=document.createElement('button');
+addB.style.cssText='width:100%;background:#4F46E5;color:#fff;border:0;padding:.6rem;border-radius:9px;font-family:inherit;font-weight:700;cursor:pointer;font-size:14px;margin-bottom:.5rem';
+var sendB=document.createElement('button');
+sendB.style.cssText='width:100%;background:#059669;color:#fff;border:0;padding:.6rem;border-radius:9px;font-family:inherit;font-weight:700;cursor:pointer;font-size:14px;margin-bottom:.5rem';
+var copyB=document.createElement('button');
+copyB.style.cssText='width:100%;background:#fff;color:#4F46E5;border:1px solid #4F46E5;padding:.6rem;border-radius:9px;font-family:inherit;font-weight:700;cursor:pointer;font-size:14px';
+var pend=document.createElement('div');pend.style.cssText='font-size:11.5px;color:#92400E;margin-top:.5rem;line-height:1.6';
+function draw(){list.innerHTML='';
+if(!page.length){list.innerHTML='<div style="padding:.8rem;color:#9CA3AF">لم أجد أسماء في هذه الصفحة</div>';return;}
+page.forEach(function(n,i){var d=!!inG[n];var r=document.createElement('div');
+r.style.cssText='padding:.35rem .6rem;border-bottom:1px solid #F3F4F6;font-size:13px;display:flex;justify-content:space-between;gap:.5rem'+(d?';color:#9CA3AF':'');
+r.innerHTML='<span>'+(i+1)+'. '+n+'</span>'+(d?'<span style="font-size:11px;color:#059669;font-weight:700;flex:none">مُضاف</span>':'');
+list.appendChild(r);});}
+function refresh(){
+ht.innerHTML='المجموعة: '+grp.length+' اسمًا<span style="opacity:.6;font-weight:400;font-size:11px"> · v6</span>';
+note.textContent='هذه الصفحة: '+page.length+' اسمًا · جديد فيها: '+fresh.length;
+addB.textContent=fresh.length?'أضف أسماء هذه الصفحة ('+fresh.length+')':(page.length?'كل أسماء هذه الصفحة مُضافة \\u2713':'لا توجد أسماء في هذه الصفحة');
+addB.disabled=!fresh.length;addB.style.background=fresh.length?'#4F46E5':'#E5E7EB';
+addB.style.color=fresh.length?'#fff':'#9CA3AF';addB.style.cursor=fresh.length?'pointer':'default';
+sendB.textContent='أرسل للمنصة ('+grp.length+')';sendB.disabled=!grp.length;sendB.style.opacity=grp.length?'1':'.5';
+copyB.textContent='انسخ المجموعة ('+grp.length+')';copyB.disabled=!grp.length;copyB.style.opacity=grp.length?'1':'.5';
+pend.textContent=(fresh.length&&grp.length)?('تنبيه: '+fresh.length+' اسمًا في هذه الصفحة لسه ما أُضيفوا — اضغط «أضف» أولًا.'):'';
+draw();}
+addB.onclick=function(){fresh.forEach(function(n){inG[n]=1;grp.push(n);});
+var ok=save({sig:meta||st.sig,names:grp});se.style.display=ok?'none':'block';
+var n=fresh.length;fresh=[];refresh();
+addB.textContent='\\u2713 أُضيف '+n+' — انتقل للصفحة التالية والزر يتفعّل وحده';};
+sendB.onclick=function(){
+var win=window.open(PLAT+'#noor-import','tm_import');
+if(!win){sendB.textContent='المتصفح حجب النافذة — استخدم «انسخ»';return;}
+sendB.textContent='جارٍ الإرسال…';
+var sent=false;
+var onMsg=function(ev){
+if(ev.data&&ev.data.type==='tm-import-ready'&&!sent){sent=true;
+win.postMessage({type:'tm-noor-names',names:grp.slice(0,500),header:hdr()},ORG);
+sendB.textContent='\\u2713 أُرسلت '+grp.length+' — أكمل في المنصة';
+window.removeEventListener('message',onMsg);}};
+window.addEventListener('message',onMsg);
+setTimeout(function(){if(!sent){window.removeEventListener('message',onMsg);
+sendB.textContent='ما وصل رد من المنصة — استخدم «انسخ»';}},30000);};
+copyB.onclick=function(){var txt=grp.join('\\n');
+var done=function(){copyB.textContent='\\u2713 نُسخت '+grp.length+' — الصقها في المنصة';
+copyB.style.background='#059669';copyB.style.color='#fff';copyB.style.borderColor='#059669';};
+function fb(){var t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();
+try{document.execCommand('copy');done();}catch(e){copyB.textContent='تعذّر النسخ';}t.remove();}
+if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,fb);else fb();};
+var rst=document.createElement('button');rst.textContent='ابدأ من جديد';
+rst.style.cssText='width:100%;background:none;color:#9CA3AF;border:0;padding:.5rem;font-family:inherit;cursor:pointer;font-size:12.5px;margin-top:.3rem';
+rst.onclick=function(){clr();if(MO)MO.disconnect();p.remove();panel();};
+refresh();
+body.appendChild(addB);body.appendChild(sendB);body.appendChild(copyB);body.appendChild(pend);body.appendChild(rst);
+p.appendChild(head);p.appendChild(body);document.body.appendChild(p);
+/* ترقيم نور يحدّث الجدول بـ AJAX بلا إعادة تحميل — نراقب ونعيد المسح */
+try{MO=new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){
+if(p.contains(ms[i].target))continue;clearTimeout(TMR);TMR=setTimeout(function(){
+var np=scan();if(np.join('|')===page.join('|'))return;page=np;
+fresh=page.filter(function(n){return !inG[n];});refresh();
+var h2=hdr(),m2=[h2['الصف'],h2['الفصل'],h2['المادة']].filter(Boolean).join(' · ');
+if(m2&&mb)mb.textContent=m2;},250);return;}});
+MO.observe(document.body,{childList:true,subtree:true});}catch(e){}}
+panel();`; }
+};
+
+/* استقبال التسليم المباشر من الأداة. كل ما يصل نص غير موثوق:
+   نتحقق من الأصل والشكل، ثم يمر بنفس فحص NoorPaste، ولا يُحفظ إلا بضغطة المعلم. */
+const NoorBridge = {
+  init() {
+    if (location.hash !== '#noor-import') return;
+    let done = false;
+    const onMsg = ev => {
+      if (ev.origin !== NoorTool.ORIGIN) return;
+      const d = ev.data;
+      if (!d || d.type !== 'tm-noor-names' || !Array.isArray(d.names) || done) return;
+      done = true;
+      window.removeEventListener('message', onMsg);
+      const names = d.names.slice(0, 500).map(n => NoorPaste.norm(n)).filter(n => NoorPaste.isName(n));
+      const header = (d.header && typeof d.header === 'object') ? d.header : {};
+      history.replaceState(null, '', location.pathname + location.search);
+      const cls = DB.get('classes');
+      if (!cls.length) { Toast.show('أضف فصلًا أولًا ثم أعد الإرسال', 'error'); return; }
+      Pages.bulkStudentsModal(cls[0].id);
+      Pages._npApply({ names, skipped: [], header });
+      const ta = document.getElementById('np-input');
+      if (ta) ta.value = names.join('\n');
+      Toast.show(`وصل ${names.length} اسمًا من نور — راجعها ثم أضفها`);
+    };
+    window.addEventListener('message', onMsg);
+    if (window.opener) {
+      try { window.opener.postMessage({ type: 'tm-import-ready' }, NoorTool.ORIGIN); } catch (e) {}
+    }
+    setTimeout(() => window.removeEventListener('message', onMsg), 30000);
+  }
+};
+
 /* ==================== PAGES ==================== */
 const Pages = {
 
@@ -4481,55 +4802,171 @@ const Pages = {
       </div>`;
   },
 
+  /* الإضافة الجماعية: تتقبّل لصق جدول نور كما هو، وتنظّفه قبل الحفظ.
+     الحالة في _np لأن المعاينة تُعدَّل وتُحذف منها قبل الإضافة. */
+  _np: null,
+
   bulkStudentsModal(classId) {
     const classes = DB.get('classes');
-    Modal.open(`إضافة جماعية | Bulk Add Students`, `
-      <form onsubmit="Pages.saveBulkStudents(event, '${classId}')">
-        <div class="form-group">
-          <label>الفصل الدراسي *</label>
-          <select name="classId" required>
-            ${classes.map(c => `<option value="${c.id}" ${c.id===classId?'selected':''}>${_esc(c.name)}</option>`).join('')}
-          </select>
+    this._np = { names: [], skipped: [], header: {}, match: null };
+    Modal.open(`إضافة ${_T.theStus} — لصق من نور`, `
+      <div class="np-tool">
+        <div class="np-tool-head"><i class="fas fa-graduation-cap"></i> أداة السحب من نور
+          <button type="button" class="np-tool-toggle" onclick="Pages._npToggleTool()">كيف؟</button></div>
+        <div id="np-tool-body" class="np-tool-body hidden">
+          <ol>
+            <li>أظهر شريط المفضلة: <code>⌘/Ctrl + Shift + B</code></li>
+            <li>اسحب هذا الزر إليه: <a id="np-bm" class="np-bm" href="#" onclick="return Pages._npBmClick()">🎓 اسحب أسماء نور</a></li>
+            <li>افتح صفحة الطلاب في نور واضغطه — تنزل لوحة تجمع الأسماء وترسلها هنا.</li>
+          </ol>
+          <button type="button" class="btn btn-sm btn-outline" onclick="Pages._npCopyTool()">
+            <i class="fas fa-copy"></i> انسخ كود الأداة</button>
         </div>
-        <div class="form-group">
-          <label>أسماء ${_T.theStus} — كل سطر اسم واحد *</label>
-          <textarea name="names" rows="12" placeholder="أحمد محمد علي&#10;خالد عبدالله السالم&#10;سعد يوسف الحربي&#10;..." required style="font-size:.95rem;line-height:1.8"></textarea>
-          <div style="font-size:.78rem;color:var(--gray-400);margin-top:.3rem"><i class="fas fa-info-circle"></i> اكتب أو الصق الأسماء — كل سطر ${_T.stu}</div>
-        </div>
-        <div id="bulk-preview" style="margin-bottom:.75rem"></div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-outline" onclick="Pages._previewBulk()"><i class="fas fa-eye"></i> معاينة</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> إضافة الكل</button>
-          <button type="button" class="btn btn-outline" onclick="Modal.close()">إلغاء</button>
-        </div>
-      </form>`);
+      </div>
+
+      <div class="form-group">
+        <label>الفصل الدراسي *</label>
+        <select id="np-class" onchange="Pages._npRender()">
+          ${classes.map(c => `<option value="${c.id}"${c.id===classId?' selected':''}>${_esc(c.name)}</option>`).join('')}
+        </select>
+        <div id="np-class-hint"></div>
+      </div>
+
+      <div class="form-group">
+        <label>الصق أسماء ${_T.theStus}</label>
+        <textarea id="np-input" rows="6" placeholder="الصق جدول نور كما هو — أو اكتب اسمًا في كل سطر"
+          onpaste="Pages._npPaste(event)" oninput="Pages._npInput()"
+          style="font-size:.95rem;line-height:1.8"></textarea>
+        <div class="np-hint"><i class="fas fa-info-circle"></i>
+          نحذف أرقام الهوية وأسماء الأعمدة تلقائيًا — أرقام الهوية لا تُحفظ إطلاقًا.</div>
+      </div>
+
+      <div id="np-preview"></div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary" onclick="Pages._npSave()"><i class="fas fa-save"></i> إضافة الكل</button>
+        <button type="button" class="btn btn-outline" onclick="Modal.close()">إلغاء</button>
+      </div>`);
+    const a = document.getElementById('np-bm');
+    if (a) a.href = NoorTool.build();
+    this._npRender();
   },
 
-  _previewBulk() {
-    const ta = document.querySelector('[name="names"]');
-    if (!ta) return;
-    const names = ta.value.split('\n').map(n => n.trim()).filter(n => n.length > 1);
-    const el = document.getElementById('bulk-preview');
-    if (!el) return;
-    if (!names.length) { el.innerHTML = ''; return; }
-    el.innerHTML = `<div style="background:var(--green-light);color:var(--green);padding:.6rem 1rem;border-radius:8px;font-size:.85rem;font-weight:700">
-      <i class="fas fa-check-circle"></i> سيتم إضافة ${names.length} ${_T.stu}:
-      <div style="margin-top:.4rem;color:var(--gray-700);font-weight:400">${names.slice(0,5).join(' — ')}${names.length>5?` ... و${names.length-5} آخرين`:''}</div>
-    </div>`;
+  _npToggleTool() { document.getElementById('np-tool-body')?.classList.toggle('hidden'); },
+  _npBmClick() { Toast.show('اسحبه إلى شريط المفضلة — لا تضغطه هنا', 'error'); return false; },
+  _npCopyTool() {
+    navigator.clipboard.writeText(NoorTool.build())
+      .then(() => Toast.show('نُسخ كود الأداة — أنشئ إشارة مرجعية والصقه في خانة الرابط'),
+            () => Toast.show('تعذّر النسخ', 'error'));
   },
 
-  saveBulkStudents(e, _classId) {
-    e.preventDefault(); const f = e.target;
-    const names = f.names.value.split('\n').map(n => n.trim()).filter(n => n.length > 1);
-    if (!names.length) { Toast.show('لا توجد أسماء للإضافة', 'error'); return; }
+  /* اللصق: نفضّل جدول HTML من الحافظة لأنه يعطي العمود بلا تخمين */
+  _npPaste(e) {
+    const html = e.clipboardData?.getData('text/html') || '';
+    const text = e.clipboardData?.getData('text/plain') || '';
+    if (!html) return;                       /* بلا HTML يكفي oninput */
+    e.preventDefault();
+    const ta = document.getElementById('np-input');
+    if (ta) ta.value = text;
+    this._npApply(NoorPaste.parse({ html, text }));
+  },
+  _npInput() {
+    const ta = document.getElementById('np-input');
+    this._npApply(NoorPaste.parse({ text: ta ? ta.value : '' }));
+  },
+
+  _npApply(res) {
+    const classes = DB.get('classes');
+    this._np = { ...res, match: NoorPaste.matchClass(res.header, classes) };
+    const sel = document.getElementById('np-class');
+    if (sel && this._np.match.classId) sel.value = this._np.match.classId;
+    this._npRender();
+  },
+
+  _npRender() {
+    const box = document.getElementById('np-preview');
+    if (!box || !this._np) return;
+    const { names, skipped, match } = this._np;
+    const clsId = document.getElementById('np-class')?.value || '';
+    const existing = new Set(DB.get('students').filter(s => s.classId === clsId)
+                              .map(s => NoorPaste.norm(s.name)));
+
+    const hint = document.getElementById('np-class-hint');
+    if (hint) {
+      hint.innerHTML = !match || !match.label ? '' :
+        match.classId
+          ? `<div class="np-detected"><i class="fas fa-check-circle"></i> اكتُشف من نور: ${_esc(match.label)}</div>`
+          : `<div class="np-detected warn"><i class="fas fa-circle-info"></i> في اللصقة: ${_esc(match.label)}
+              ${match.canCreate ? `<button type="button" class="btn btn-sm btn-outline" onclick="Pages._npCreateClass()">أنشئ هذا الفصل</button>` : ''}</div>`;
+    }
+
+    if (!names.length) {
+      box.innerHTML = skipped.length
+        ? `<div class="np-empty">ما لقيت أسماء صالحة — تجاهلنا ${skipped.length} سطرًا. تأكد أنك نسخت عمود الأسماء.</div>` : '';
+      return;
+    }
+    const dup = names.filter(n => existing.has(n)).length;
+    box.innerHTML = `
+      <div class="np-stats">
+        <span class="np-pill">${names.length - dup} جاهز للإضافة</span>
+        ${dup ? `<span class="np-pill gray">${dup} موجود مسبقًا</span>` : ''}
+        ${skipped.length ? `<span class="np-pill gray">تجاهلنا ${skipped.length} سطرًا
+          <button type="button" class="np-link" onclick="Pages._npShowSkipped()">أظهرها</button></span>` : ''}
+      </div>
+      <div class="np-list">
+        ${names.map((n, i) => {
+          const isDup = existing.has(n);
+          return `<div class="np-row${isDup ? ' dup' : ''}">
+            <span class="np-idx">${i + 1}</span>
+            <input value="${_esc(n)}" oninput="Pages._npEdit(${i}, this.value)"${isDup ? ' disabled' : ''}>
+            ${isDup ? '<span class="np-tag">موجود</span>' : ''}
+            <button type="button" class="np-del" onclick="Pages._npDel(${i})" title="حذف">✕</button>
+          </div>`;
+        }).join('')}
+      </div>`;
+  },
+
+  _npEdit(i, val) { if (this._np) this._np.names[i] = NoorPaste.norm(val); },
+  _npDel(i) { if (this._np) { this._np.names.splice(i, 1); this._npRender(); } },
+  _npShowSkipped() {
+    const s = this._np?.skipped || [];
+    Toast.show(`تجاهلنا: ${s.slice(0, 6).join(' · ')}${s.length > 6 ? ' …' : ''}`);
+  },
+
+  _npCreateClass() {
+    const m = this._np?.match;
+    if (!m || !m.canCreate) return;
+    const name = `${m.gradeLevel} ${m.section}`;
+    const list = DB.get('classes');
+    const cls = { id: DB.id(), name, gradeLevel: m.gradeLevel,
+                  sectionType: SECTIONS_NUMS.includes(m.section) ? 'numbers' : 'letters',
+                  section: m.section, subject: m.subject || DB.teacher()?.subject || '', color: '#3B82F6' };
+    list.push(cls);
+    if (DB.set('classes', list) === false) return;
+    const sel = document.getElementById('np-class');
+    if (sel) {
+      sel.innerHTML = DB.get('classes')
+        .map(c => `<option value="${c.id}"${c.id === cls.id ? ' selected' : ''}>${_esc(c.name)}</option>`).join('');
+    }
+    this._np.match = { ...m, classId: cls.id };
+    Toast.show(`أُنشئ الفصل «${name}»`);
+    this._npRender();
+  },
+
+  _npSave() {
+    const clsId = document.getElementById('np-class')?.value || '';
+    if (!clsId) { Toast.show('اختر الفصل أولًا', 'error'); return; }
+    const existing = new Set(DB.get('students').filter(s => s.classId === clsId)
+                              .map(s => NoorPaste.norm(s.name)));
+    const fresh = (this._np?.names || []).filter(n => NoorPaste.isName(n) && !existing.has(n));
+    if (!fresh.length) { Toast.show('لا توجد أسماء جديدة للإضافة', 'error'); return; }
     const list = DB.get('students');
-    const clsId = f.classId.value;
-    names.forEach(name => {
-      list.push({ id: DB.id(), name, classId: clsId });
-    });
-    DB.set('students', list);
+    fresh.forEach(name => list.push({ id: DB.id(), name, classId: clsId }));
+    if (DB.set('students', list) === false) return;
+    const skipped = (this._np?.names || []).length - fresh.length;
     Modal.close();
-    Toast.show(`تم إضافة ${names.length} ${_T.stu} بنجاح! ✓`);
+    Toast.show(`أُضيف ${fresh.length} ${_T.stu}${skipped ? ` · تجاوزنا ${skipped} موجودًا` : ''} ✓`);
+    this._np = null;
     this.students({ classId: clsId });
   },
 
@@ -8079,6 +8516,7 @@ const App = {
        على نفسه. هنا _adminFlag مضبوط فعلاً. */
     Subscription.resolve().then(() => Subscription.paintLock());
     Router.go('dashboard');
+    NoorBridge.init();   /* بعد الراوتر: النافذة تُفتح فوق الصفحة الجاهزة */
     this._startSubWatcher();
   },
 
